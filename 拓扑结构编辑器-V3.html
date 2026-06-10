@@ -280,6 +280,7 @@ canvas{display:block;cursor:default}
         <button class="tb menu-btn" onclick="toggleMenu('menu-file')" data-i18n="📁 文件 ▾">📁 文件 ▾</button>
         <div class="menu-pop">
           <div class="mi" onclick="openTemplates();closeMenus()" data-i18n="📂 打开示例模板">📂 打开示例模板</div>
+          <div class="mi" onclick="document.getElementById('fi-json').click();closeMenus()" data-i18n="📥 导入画布 JSON">📥 导入画布 JSON</div>
           <div class="mi" onclick="showJSON();closeMenus()" data-i18n="⎙ 导出画布 JSON">⎙ 导出画布 JSON</div>
           <div class="mi" onclick="dlAllIconsZip();closeMenus()" data-i18n="🗂 导出元素库包 (ZIP)">🗂 导出元素库包 (ZIP)</div>
         </div>
@@ -534,6 +535,7 @@ canvas{display:block;cursor:default}
     <div class="ic">🖼</div><p id="dz-p1">点击选择 PNG / SVG 文件</p>
     <p id="dz-p2" style="color:var(--ui-text2);opacity:.7;margin-top:4px">建议 100×100 透明背景</p></div>
   <input type="file" id="fi" accept="image/png,image/svg+xml,image/jpeg" style="display:none" onchange="onFile(event)">
+  <input type="file" id="fi-json" accept="application/json,.json" style="display:none" onchange="onImportJSON(event)">
   <div class="uf">
     <label class="uf-label"><span class="df-tag df-zh">中</span> <span id="uf-zh-label">中文名称</span> <span class="req" id="uf-zh-req">*必填</span></label>
     <input type="text" id="un" placeholder="如：自定义设备">
@@ -841,7 +843,7 @@ const I18N={
   '视图与文件':'View & File','👁 视图 ▾':'👁 View ▾','⊙ 缩放复位 100%':'⊙ Reset Zoom 100%',
   '🎨 外观与主题':'🎨 Appearance & Theme','▦ 网格':'▦ Grid','🏷 全部线标签':'🏷 All Line Labels','📊 数据字段':'📊 Data Fields',
   '📍 占位点标记':'📍 Anchor Markers','占位点填充色':'Anchor Fill','透明':'Clear',
-  '📁 文件 ▾':'📁 File ▾','📂 打开示例模板':'📂 Open Templates','⎙ 导出画布 JSON':'⎙ Export Canvas JSON',
+  '📁 文件 ▾':'📁 File ▾','📂 打开示例模板':'📂 Open Templates','📥 导入画布 JSON':'📥 Import Canvas JSON','⎙ 导出画布 JSON':'⎙ Export Canvas JSON',
   '🗂 导出元素库包 (ZIP)':'🗂 Export Element Library Pack (ZIP)','🗂 元素库包(ZIP)':'🗂 Library Pack (ZIP)','⬇ 下载画布JSON':'⬇ Download Canvas JSON','📋 画布 JSON':'📋 Canvas JSON',
   '画布显示':'Canvas Display','显示名称':'Show Name','显示数据字段':'Show Data Fields',
   '批量(所选元素)':'Batch (selected)','隐藏名称':'Hide Name','显示字段':'Show Fields','隐藏字段':'Hide Fields','⊘ 取消选择':'⊘ Deselect',
@@ -3541,6 +3543,136 @@ function showJSON(){document.getElementById('jout').textContent=buildJSON();docu
 function hideJSON(){document.getElementById('jpanel').classList.remove('show');}
 function copyJSON(){navigator.clipboard.writeText(buildJSON()).then(()=>{const b=document.querySelector('#jpa .tb');const o=b.textContent;b.textContent='✓ 已复制';setTimeout(()=>b.textContent=o,1500);});}
 function dlJSON(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buildJSON()],{type:'application/json'}));a.download='topology.json';a.click();}
+
+// ───── 导入画布 JSON：按导出的配置还原节点/连线/画布设置，便于快速修改 ─────
+function onImportJSON(ev){
+  const file=ev.target.files&&ev.target.files[0];
+  if(!file)return;
+  const r=new FileReader();
+  r.onload=async e=>{
+    let obj;
+    try{ obj=JSON.parse(e.target.result); }
+    catch(err){ alert(lang==='en'?('Invalid JSON file: '+err.message):('JSON 解析失败：'+err.message)); ev.target.value=''; return; }
+    await importCanvasJSON(obj);
+    ev.target.value='';   // 清空，允许再次选择同一文件
+  };
+  r.onerror=()=>{ alert(lang==='en'?'Failed to read file':'读取文件失败'); ev.target.value=''; };
+  r.readAsText(file);
+}
+// 同步 View 菜单里的复选框开关到当前布尔状态
+function syncToggle(onchangeAttr,checked){
+  const el=document.querySelector('input[onchange="'+onchangeAttr+'"]');
+  if(el)el.checked=!!checked;
+}
+// 把导出节点(serNode 的产物 / 内部节点)还原为内部节点对象
+function parseImportedNode(o){
+  if(!o||!o.type)return null;
+  const pos=o.position||{};
+  const n={
+    id:o.id||genId(o.type),
+    type:o.type,
+    labelZh:(o.label&&typeof o.label==='object'?o.label.zh:o.label)||o.labelZh||'',
+    labelEn:(o.label&&typeof o.label==='object'?o.label.en:'')||o.labelEn||'',
+    x:(+pos.x||+o.x||0), y:(+pos.y||+o.y||0),
+    scale:(o.scale!=null?o.scale:1),
+    rotation:o.rotation||0,
+    fontSize:o.fontSize||14,
+    fontColor:o.fontColor||'#e8f4ff'
+  };
+  // 状态（中/英）
+  if(o.status&&typeof o.status==='object'){ n.status=o.status.zh||'待机'; if(o.status.en)n.statusEn=o.status.en; }
+  else n.status=o.status||'待机';
+  if(o.statusEn)n.statusEn=o.statusEn;
+  // 显示开关（导出用 display.showLabel/showFields；内部用 hideLabel/hideFields）
+  const disp=o.display||{};
+  n.hideLabel=(disp.showLabel===false)||(o.hideLabel===true);
+  n.hideFields=(disp.showFields===false)||(o.hideFields===true);
+  // 数据字段
+  n.data=(Array.isArray(o.data)?o.data:[]).map(f=>{
+    const key=(f.key&&typeof f.key==='object')?f.key:{zh:f.key,en:f.keyEn};
+    const off=f.offset||{};
+    let dv=(f.value!==undefined?f.value:f.dv);
+    if(dv==='--'||dv==null)dv=0;
+    return {key:(key.zh||''), keyEn:(key.en||key.zh||''), dv:dv, hidden:!!f.hidden,
+            ox:(+off.x||+f.ox||0), oy:(+off.y||+f.oy||0)};
+  });
+  // 文本框样式
+  if(o.type==='text'){const t=o.textStyle||{};n.bg=t.bg||o.bg||'none';n.border=t.border||o.border||'none';
+    n.borderColor=t.borderColor||o.borderColor||'#4dd0ff';n.borderWidth=(t.borderWidth!=null?t.borderWidth:(o.borderWidth!=null?o.borderWidth:1.5));
+    n.radius=(t.radius!=null?t.radius:(o.radius!=null?o.radius:6));n.padX=(t.padX!=null?t.padX:(o.padX!=null?o.padX:10));n.padY=(t.padY!=null?t.padY:(o.padY!=null?o.padY:6));}
+  // 占位点样式
+  if(o.type==='anchor'){const a=o.anchorStyle||{};n.fill=a.fill||o.fill||'none';n.opacity=(a.opacity!=null?a.opacity:(o.opacity!=null?o.opacity:1));}
+  return n;
+}
+// 把导出连线还原为内部连线对象（waypoints 内部用 [x,y] 数组）
+function parseImportedEdge(o){
+  if(!o||!o.from||!o.to)return null;
+  const wp=(Array.isArray(o.waypoints)?o.waypoints:[]).map(p=>Array.isArray(p)?[+p[0],+p[1]]:[+p.x,+p.y]).filter(p=>isFinite(p[0])&&isFinite(p[1]));
+  const e={
+    from:o.from, to:o.to,
+    et:o.edgeType||o.et||'ac_power',
+    route:routeToOption(o.route),
+    dir:o.dir||'forward',
+    w:(o.width!=null?o.width:(o.w!=null?o.w:1)),
+    lbl:o.label||o.lbl||'',
+    hideLabel:(o.showLabel===false)||(o.hideLabel===true),
+    orthoSnap:(o.orthoSnap!==false)
+  };
+  if(wp.length)e.waypoints=wp;
+  return e;
+}
+async function importCanvasJSON(obj){
+  if(!obj||typeof obj!=='object'||!Array.isArray(obj.nodes)){
+    alert(lang==='en'?'Not a valid canvas JSON (missing "nodes" array).':'不是有效的画布 JSON（缺少 nodes 数组）。');
+    return;
+  }
+  if(nodes.length>0){
+    const ok=await uiConfirm(lang==='en'?'Import will replace current canvas content. Continue?':'导入将替换当前画布内容，确定？',false);
+    if(!ok)return;
+  }
+  // 1) 合并连线类型样式：导出文件自带 edgeStyles，库里没有的类型也能还原线型
+  const es=obj.edgeStyles||{};
+  Object.keys(es).forEach(k=>{
+    if(ET[k])return;                       // 已有类型保持库定义，不覆盖
+    const s=es[k]||{};
+    ET[k]={label:s.labelZh||k, labelEn:s.labelEn||k, color:s.color||'#4dd0ff',
+           w:(s.width!=null?s.width:2.5), dash:s.dash||[], anim:s.anim||'flow',
+           spd:(s.speed!=null?s.speed:0.5), desc:''};
+  });
+  // 2) 还原节点 / 连线（仅保留两端节点都存在的连线）
+  const newNodes=obj.nodes.map(parseImportedNode).filter(Boolean);
+  const idSet=new Set(newNodes.map(n=>n.id));
+  const newEdges=(Array.isArray(obj.edges)?obj.edges:[]).map(parseImportedEdge)
+    .filter(e=>e&&idSet.has(e.from)&&idSet.has(e.to));
+  // 3) 应用状态
+  snapshot();
+  nodes=newNodes; edges=newEdges;
+  selNode=selEdge=null; selSet.clear(); selChips.clear();
+  // 4) 重建 id 计数器，保证后续新增节点 id 不冲突
+  ids={};
+  nodes.forEach(n=>{const m=String(n.id).match(/^(.+?)_?(\d+)$/);if(m){ids[m[1]]=Math.max(ids[m[1]]||0,parseInt(m[2]));}});
+  // 5) 还原画布设置
+  const canv=(obj.meta&&obj.meta.canvas)||{};
+  if(canv.bgColor) setBg(canv.bgColor);
+  if(canv.grid&&typeof canv.grid.show==='boolean'){ showGrid=canv.grid.show; syncToggle('toggleGrid()',showGrid); }
+  if(typeof canv.showAnchors==='boolean'){ showAnchors=canv.showAnchors; syncToggle('toggleAnchors()',showAnchors); }
+  // 6) 还原视图：有保存的缩放/平移就沿用，否则自动适配
+  if(typeof canv.zoom==='number'&&typeof canv.panX==='number'&&typeof canv.panY==='number'){
+    zoom=canv.zoom; panX=canv.panX; panY=canv.panY;
+    document.getElementById('zoom-info').textContent=Math.round(zoom*100)+'%';
+  }else{
+    fitView();
+  }
+  // 7) 收尾：清路由缓存，重置历史，提示结果
+  showPanel('none');
+  _pathCacheSig='';
+  updateAlignBar();
+  history=[];histIdx=-1;snapshot();
+  const missing=[...new Set(nodes.filter(n=>String(n.type).startsWith('custom_')&&!iconSrcOf(n.type)).map(n=>n.type))];
+  let msg=(lang==='en'?'Imported ':'已导入 ')+nodes.length+(lang==='en'?' nodes, ':' 个节点、')+edges.length+(lang==='en'?' edges':' 条连线');
+  if(missing.length)msg+=(lang==='en'?(' · '+missing.length+' custom icon(s) missing, re-upload in library'):('（'+missing.length+' 个自定义图标缺失，请在元素库重新上传）'));
+  flashHint(msg);
+}
 
 // ───── 极简 ZIP 打包器（store 模式，无需外部库）─────
 function crc32(buf){
