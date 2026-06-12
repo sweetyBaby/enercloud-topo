@@ -285,6 +285,8 @@ canvas{display:block;cursor:default}
           <div class="mi" onclick="dlAllIconsZip();closeMenus()" data-i18n="🗂 导出元素库包 (ZIP)">🗂 导出元素库包 (ZIP)</div>
         </div>
       </div>
+      <button class="tb" id="btn-preview" onclick="toggleSigPanel()" title="规则与信号：总览全部显隐/流向规则、管理全局信号、注入测试数据（规则在画布上始终实时生效）" data-i18n="⚙ 规则与信号">⚙ 规则与信号</button>
+      <button class="tb" id="btn-runview" onclick="toggleRunView()" title="预览效果：按规则彻底隐藏不该显示的元素/连线，并应用数据驱动流向，查看整个图的运行效果" data-i18n="▶ 预览效果">▶ 预览效果</button>
     </div>
   </div>
   <div class="tgroup">
@@ -425,6 +427,9 @@ canvas{display:block;cursor:default}
             <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-show-label" onchange="applyVis()" style="width:auto"> <span data-i18n="显示名称">显示名称</span></label>
             <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-show-fields" onchange="applyVis()" style="width:auto"> <span data-i18n="显示数据字段">显示数据字段</span></label>
           </div></div>
+        <div class="pr" id="prow-rule"><label data-i18n="显示条件（数据驱动）">显示条件（数据驱动）</label>
+          <div class="rule-line"><span id="np-rule-sum" class="rule-sum">无（始终显示）</span>
+            <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editNodeRule()" data-i18n="编辑">编辑</button></div></div>
         <div class="pr" id="prow-type"><label data-i18n="类型">类型</label><select id="p-type" onchange="applyNP()"></select></div>
         <div class="pr" id="prow-status"><label>初始状态（中文）<span style="color:#ff6b6b">*</span></label><input id="p-status" placeholder="待机/充电/放电" oninput="applyNP()"></div>
         <div class="pr" id="prow-status-en"><label>初始状态（English）<span style="color:#ff6b6b">*</span></label><input id="p-status-en" placeholder="如 Standby / Charging" oninput="applyNP()"></div>
@@ -495,11 +500,20 @@ canvas{display:block;cursor:default}
           <select id="ep-type" onchange="applyEP();refreshEpTypeBtn()" style="display:none"></select></div>
         <div class="pr"><label data-i18n="走线方式">走线方式</label><select id="ep-route" onchange="applyEP()">
           <option value="smart" data-i18n="智能（最短·自动避障）">智能（最短·自动避障）</option><option value="line" data-i18n="直线">直线</option><option value="arc" data-i18n="弧线">弧线</option><option value="manual" data-i18n="手动拐点">手动拐点</option></select></div>
-        <div class="phint" style="margin-bottom:6px">💡 选中连线后：直接拖蓝色方块(拐点)即可对齐/汇合（自动吸附其他节点的水平/垂直线与网格），点绿色「+」在线上加拐点，双击方块删除拐点</div>
+        <div class="phint" style="margin-bottom:6px">💡 选中连线后：直接拖蓝色方块(拐点)即可对齐/汇合（自动吸附其他节点的水平/垂直线与网格）</div>
         <div class="pr" id="ep-ortho-row" style="display:none"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ep-ortho" checked onchange="applyEP()" style="width:auto"> 拐点强制横平竖直（正交）</label></div>
-        <div class="pr"><label data-i18n="流向">流向</label><select id="ep-dir" onchange="applyEP()">
-          <option value="forward" data-i18n="正向 →">正向 →</option><option value="reverse" data-i18n="反向 ←">反向 ←</option>
-          <option value="both" data-i18n="双向 ↔">双向 ↔</option><option value="none" data-i18n="无流向">无流向</option></select></div>
+        <div class="pr"><label data-i18n="显示条件（数据驱动）">显示条件（数据驱动）</label>
+          <div class="rule-line"><span id="ep-show-sum" class="rule-sum">无（始终显示）</span>
+            <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editEdgeShowRule()" data-i18n="编辑">编辑</button></div>
+          <div class="phint" style="margin-top:3px" data-i18n="条件不满足→不画此连线（适合"动态建立的连线"）">条件不满足→不画此连线（适合"动态建立的连线"）</div></div>
+        <div class="pr"><label data-i18n="流向（按规则确定）">流向（按规则确定）</label>
+          <div class="rule-line"><span id="ep-dir-sum" class="rule-sum">无规则（用下面的固定流向）</span>
+            <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editEdgeDirRules()" data-i18n="编辑">编辑</button></div>
+          <div class="phint" style="margin:4px 0" data-i18n="按信号实时匹配规则确定流向；规则都不命中时用下面的固定流向">按信号实时匹配规则确定流向；规则都不命中时用下面的固定流向</div>
+          <div class="pr-inline"><span style="font-size:12px;color:var(--ui-text2);flex-shrink:0" data-i18n="固定流向（兜底）">固定流向（兜底）</span>
+            <select id="ep-dir" onchange="applyEP()" style="flex:1">
+            <option value="forward" data-i18n="正向 →">正向 →</option><option value="reverse" data-i18n="反向 ←">反向 ←</option>
+            <option value="both" data-i18n="双向 ↔">双向 ↔</option><option value="none" data-i18n="无流向">无流向</option></select></div></div>
         <div class="pr"><label>标签（可选）</label><input id="ep-lbl" oninput="applyEP()"></div>
         <div class="pr"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ep-showlbl" onchange="applyEP()" style="width:auto"> 单独显示本条连线标签</label>
           <div class="phint" style="margin-top:3px">提示：受顶部「全部线标签」总开关控制，总开关关闭时本条也不显示</div></div>
@@ -514,12 +528,173 @@ canvas{display:block;cursor:default}
 <div id="jpanel"><div id="jpi"><h3 data-i18n="📋 画布 JSON">📋 画布 JSON</h3>
   <div style="font-size:12px;color:var(--ui-text2);margin-bottom:8px;line-height:1.6">
     画布 JSON 轻量，仅含节点/连线实例信息，通过 <b>meta.libraryRef</b> 引用元素库版本，并自带本图用到的连线类型样式(edgeStyles)。完整元素库+字典+图标请点「🗂 元素库包」导出。
+    数据驱动规则随图导出：节点 <b>visibleWhen</b>、连线 <b>showWhen</b>/<b>dirRules</b>、顶层 <b>signals</b>/<b>sampleSignals</b>；运行端用元素库包内的 <b>runtime.js</b> 的 <b>resolveDynamic(topology, signals)</b> 还原显隐与流向（与编辑器内规则实时生效的效果一致）。
+    全局视图设置（线标签/数据字段/线宽/走线风格/汇流合并）记录在 <b>meta.view</b>，导入时一并还原，复原整张拓扑图外观。
   </div>
   <div id="jout"></div>
   <div id="jpa"><button class="tb" onclick="copyJSON()" data-i18n="📋 复制JSON">📋 复制JSON</button>
     <button class="tb grn" onclick="dlJSON()" data-i18n="⬇ 下载画布JSON">⬇ 下载画布JSON</button>
     <button class="tb grn" onclick="dlAllIconsZip()" data-i18n="🗂 元素库包(ZIP)">🗂 元素库包(ZIP)</button>
     <button class="tb red" onclick="hideJSON()" data-i18n="✕ 关闭">✕ 关闭</button></div></div></div>
+<!-- ★ 数据驱动：规则编辑模态 + 信号注入/预览面板 -->
+<style>
+#rulemodal-ov{display:none;position:fixed;inset:0;background:rgba(3,8,18,.6);z-index:400;align-items:center;justify-content:center}
+#rulemodal-ov.show{display:flex}
+#rulemodal{width:min(720px,96vw);max-height:88vh;display:flex;flex-direction:column;background:var(--ui-bg);border:1px solid var(--ui-border);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#rulemodal h3{font-size:15px;color:var(--ui-accent);padding:14px 18px;border-bottom:1px solid var(--ui-border)}
+.rm-target{padding:10px 18px;border-bottom:1px solid var(--ui-border);border-left:4px solid var(--ui-accent);background:var(--ui-bg2)}
+.rm-tg-top{display:flex;align-items:center;gap:8px;min-width:0}
+.rm-tg-chip{flex-shrink:0;font-size:11px;font-weight:700;color:#fff;background:var(--ui-accent);border-radius:4px;padding:2px 7px;letter-spacing:.5px}
+.rm-tg-main{font-size:14px;font-weight:600;color:var(--ui-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rm-tg-sub{font-size:12px;color:var(--ui-text2);margin-top:4px}
+#rm-body{padding:14px 18px;overflow-y:auto}
+#rm-foot{display:flex;gap:8px;align-items:center;padding:12px 18px;border-top:1px solid var(--ui-border)}
+.rm-cond{display:flex;flex-direction:column;gap:8px}
+.rm-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;row-gap:7px}
+.rm-head{color:var(--ui-text2);font-size:13px}
+.rm-mode,.rm-op,.rm-cond select{background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:5px 7px;border-radius:6px}
+.rm-var,.rm-val,.rm-cond input{background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:6px 8px;border-radius:6px}
+.rm-var{flex:1;min-width:150px}
+.rm-sigwrap{display:flex;gap:6px;flex:1 1 160px;min-width:130px}
+.rm-sigwrap select{flex:1;min-width:0}
+.rm-sig-field:disabled{opacity:.45}
+/* 值/信号比较槽：内部允许换行，避免「与信号比较」时第二个信号选择器撑爆并遮挡删除按钮 */
+.rm-valwrap{display:flex;align-items:center;gap:5px;flex:1 1 200px;min-width:150px;flex-wrap:wrap;row-gap:5px}
+.rm-valwrap .rm-sigwrap{flex:1 1 140px;min-width:120px}
+.rm-val{flex:1;min-width:70px}
+.rm-reftg{flex-shrink:0;background:var(--ui-btn-bg);border:1px solid var(--ui-btn-border);color:var(--ui-text2);font-size:11px;padding:5px 7px;border-radius:5px;cursor:pointer}
+.rm-reftg.on{border-color:var(--ui-accent);color:var(--ui-accent)}
+.rm-del{flex-shrink:0;align-self:center;margin-left:auto;width:26px;height:26px;border-radius:5px;border:1px solid #c0504d;background:transparent;color:#e8736f;cursor:pointer;font-size:16px;line-height:1}
+.rm-del:hover{background:rgba(200,80,77,.15)}
+.rm-add{margin-top:4px;background:var(--ui-btn-bg);border:1px dashed var(--ui-btn-border);color:var(--ui-accent);font-family:inherit;font-size:12px;padding:6px 10px;border-radius:6px;cursor:pointer}
+.rm-add:hover{border-color:var(--ui-accent)}
+.rm-empty{color:var(--ui-text2);font-size:12px;font-style:italic;padding:2px 0}
+.rm-hint{color:var(--ui-text2);font-size:12px;margin-bottom:6px}
+.rm-dircard{border:1px solid var(--ui-border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--ui-bg2)}
+.rm-dirtop{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;color:var(--ui-text);font-size:13px}
+.rm-dirbtns{margin-left:auto;display:flex;gap:4px}
+.rm-mini{width:24px;height:24px;border:1px solid var(--ui-border);background:var(--ui-btn-bg);color:var(--ui-text2);border-radius:5px;cursor:pointer}
+.rm-mini:hover{border-color:var(--ui-accent);color:var(--ui-accent)}
+.rm-dirdefault{display:flex;align-items:center;gap:8px;color:var(--ui-text2);font-size:13px;margin-top:4px}
+.rule-line{display:flex;align-items:center;gap:8px}
+.rule-sum{flex:1;min-width:0;font-size:12px;color:var(--ui-text2);background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);border-radius:6px;padding:6px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rule-sum.has{color:#ffcc44;border-color:#7a6320}
+#simpanel{position:fixed;top:0;right:0;bottom:0;width:344px;max-width:90vw;display:flex;flex-direction:column;background:var(--ui-bg);border-left:1px solid var(--ui-accent);box-shadow:-10px 0 36px rgba(0,0,0,.5);z-index:250;transform:translateX(102%);transition:transform .22s ease}
+#simpanel.show{transform:translateX(0)}
+#sim-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--ui-bg2);border-bottom:1px solid var(--ui-border);color:var(--ui-accent);font-weight:600;font-size:14px;flex-shrink:0}
+#sim-close{cursor:pointer;color:var(--ui-text2);padding:0 4px;font-size:16px}#sim-close:hover{color:var(--ui-accent)}
+#sim-body{flex:1;overflow-y:auto;padding:10px 14px}
+.sim-sec{font-size:12px;font-weight:600;color:var(--ui-accent);margin:14px 0 6px;letter-spacing:.5px}
+.sim-sec:first-child{margin-top:2px}
+.sim-sec-x{font-weight:400;color:var(--ui-text2);font-size:11px;margin-left:4px}
+.sim-irow{display:flex;align-items:center;gap:5px;margin-bottom:6px}
+.sim-irow:last-child{margin-bottom:0}
+/* 注入信号按「元素」分组：分组框 + 组头（元素名 + 该元素「+字段」）+ 紧凑字段行 */
+.sim-igroup{border:1px solid var(--ui-border);border-radius:8px;padding:7px 9px;margin-bottom:8px;background:var(--ui-bg2);transition:border-color .12s,box-shadow .12s}
+.sim-igroup:hover{border-color:var(--ui-accent);box-shadow:0 0 0 1px color-mix(in srgb,var(--ui-accent) 40%,transparent)}
+.sim-ghead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.sim-gname{flex:1;min-width:0;font-size:12px;font-weight:600;color:var(--ui-accent);display:flex;align-items:center;gap:6px;overflow:hidden}
+.sim-gchip{flex-shrink:0;font-size:10px;font-weight:700;color:#fff;background:var(--ui-accent);border-radius:4px;padding:1px 6px}
+.sim-gadd{flex-shrink:0;background:var(--ui-btn-bg);border:1px dashed var(--ui-btn-border);color:var(--ui-accent);font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer}
+.sim-gadd:hover:not(:disabled){border-color:var(--ui-accent)}
+.sim-gadd:disabled,.rm-add:disabled{opacity:.4;cursor:not-allowed}
+/* 手风琴：分组头可点击折叠/展开；折叠时隐藏字段行，仅留头部 */
+.sim-ghead.clk{cursor:pointer;user-select:none}
+.sim-gchev{flex-shrink:0;width:14px;text-align:center;font-size:11px;line-height:1;color:var(--ui-accent);font-weight:700}
+.sim-gcount{flex-shrink:0;font-size:10px;color:var(--ui-text2);font-weight:500}
+.sim-igroup.collapsed .sim-ghead{margin-bottom:0}
+.sim-gbody{display:flex;flex-direction:column;gap:6px}
+/* 待确认的新增注入草稿卡：醒目虚线高亮，确认（✓）后才并入分组列表 */
+.sim-igroup.draft{border-color:var(--ui-accent);border-style:dashed;box-shadow:0 0 0 1px color-mix(in srgb,var(--ui-accent) 25%,transparent)}
+.sim-ok{flex-shrink:0;width:26px;height:26px;border-radius:5px;border:1px solid #3a7d44;background:transparent;color:#5fcf6f;cursor:pointer;font-size:15px;line-height:1;font-weight:700}
+.sim-ok:hover:not(:disabled){background:rgba(95,207,111,.16);border-color:#5fcf6f}
+.sim-ok:disabled{opacity:.4;cursor:not-allowed}
+#sim-inj-tools{display:none;justify-content:flex-end;gap:6px;margin:0 0 7px}
+.sim-acc-btn{background:var(--ui-btn-bg);border:1px solid var(--ui-btn-border);color:var(--ui-accent);font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;cursor:pointer;font-family:inherit}
+.sim-acc-btn:hover{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 14%,transparent)}
+.sim-sel{flex:1;min-width:0;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:5px 6px;border-radius:5px}
+.sim-sel:disabled{opacity:.45}
+.sim-val{width:74px;flex-shrink:0;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:5px 6px;border-radius:5px}
+.sim-val:disabled{opacity:.45}
+.sim-empty{color:var(--ui-text2);font-size:12px;line-height:1.6;padding:2px 0}
+.sim-hint{font-size:11px;color:var(--ui-text2);line-height:1.5;margin:4px 0 6px}
+#sim-rules{display:flex;flex-direction:column;gap:6px}
+.rule-item{border:1px solid var(--ui-border);border-left:4px solid var(--ui-accent);border-radius:7px;padding:7px 9px;background:var(--ui-bg2)}
+.rule-item-head{display:flex;align-items:center;gap:7px;min-width:0}
+.rule-item-chip{flex-shrink:0;font-size:10px;font-weight:700;color:#fff;background:var(--ui-accent);border-radius:4px;padding:1px 6px}
+.rule-item-name{font-size:12px;font-weight:600;color:var(--ui-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rule-item-sum{font-size:11px;color:#ffcc44;margin:4px 0 6px;word-break:break-all;line-height:1.4}
+.rule-item-btns{display:flex;gap:6px}
+.rm-mini.rm-wide{width:auto;height:24px;padding:0 10px;font-size:12px}
+.sim-crow{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.sim-cname{flex:1;min-width:0;font-size:12px;color:var(--ui-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.sim-ctype{flex-shrink:0;font-size:10px;font-weight:600;color:var(--ui-accent);border:1px solid var(--ui-border);border-radius:4px;padding:0 5px;line-height:16px}
+#sim-runview-row{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ui-text);cursor:pointer;margin:0 0 4px}
+#sim-runview-row input{width:auto;margin:0;flex-shrink:0}
+#sim-add{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+#sim-add input{flex:1;min-width:60px;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:5px 7px;border-radius:5px}
+#sim-newopts{box-sizing:border-box;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:5px 7px;border-radius:5px}
+#sim-json{width:100%;min-height:56px;box-sizing:border-box;margin-top:6px;resize:vertical;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:ui-monospace,Consolas,Monaco,monospace;font-size:12px;line-height:1.55;padding:8px 10px;border-radius:7px;tab-size:2}
+#sim-json:focus{outline:none;border-color:var(--ui-accent);box-shadow:0 0 0 1px color-mix(in srgb,var(--ui-accent) 35%,transparent)}
+#sim-foot{display:flex;gap:8px;margin-top:8px}
+</style>
+<div id="rulemodal-ov" onclick="if(event.target===this)closeRuleModal()">
+  <div id="rulemodal">
+    <h3 id="rm-title">动态规则</h3>
+    <div id="rm-target" class="rm-target"></div>
+    <div id="rm-body"></div>
+    <div id="rm-foot">
+      <button class="tb red" onclick="clearRuleModalState()" data-i18n="清空条件">清空条件</button>
+      <span style="flex:1"></span>
+      <button class="tb" onclick="closeRuleModal()" data-i18n="取消">取消</button>
+      <button class="tb grn" onclick="saveRuleModal()" data-i18n="保存">保存</button>
+    </div>
+  </div>
+</div>
+<div id="simpanel">
+  <div id="sim-head"><span data-i18n="⚙ 规则与信号">⚙ 规则与信号</span>
+    <span id="sim-close" onclick="toggleSigPanel()" title="关闭面板">✕</span></div>
+  <div id="sim-body">
+    <label id="sim-runview-row" title="开启后彻底隐藏被规则隐藏的元素，预览运行效果；关闭时编辑态把它们「虚化」仍可点选编辑">
+      <input type="checkbox" id="sim-runview" onchange="toggleRunView(this.checked)">
+      <span data-i18n="运行视图（彻底隐藏被规则隐藏者）">运行视图（彻底隐藏被规则隐藏者）</span></label>
+    <div class="sim-hint" data-i18n="规则随信号实时生效：编辑态被隐藏的元素/连线会「虚化」显示，仍可点选并编辑；勾选「运行视图」可预览真实显隐效果。">规则随信号实时生效：编辑态被隐藏的元素/连线会「虚化」显示，仍可点选并编辑；勾选「运行视图」可预览真实显隐效果。</div>
+
+    <div class="sim-sec"><span data-i18n="全局信号">全局信号</span><span class="sim-sec-x" data-i18n="（添加后画布上所有元素/连线的规则均可引用，随图导出）">（添加后画布上所有元素/连线的规则均可引用，随图导出）</span></div>
+    <div id="sim-custom"></div>
+    <div id="sim-add">
+      <input id="sim-newname" placeholder="信号名 如 mode">
+      <select id="sim-newtype" class="sim-sel" style="flex:0 0 84px" onchange="onNewSigType()">
+        <option value="number" data-i18n="数值">数值</option>
+        <option value="bool" data-i18n="布尔">布尔</option>
+        <option value="enum" data-i18n="枚举">枚举</option>
+        <option value="text" data-i18n="文本">文本</option>
+      </select>
+      <input id="sim-newval" placeholder="当前值">
+      <button class="tb" style="flex-shrink:0;padding:5px 9px" onclick="addCustomSignal()" data-i18n="+ 信号">+ 信号</button>
+    </div>
+    <input id="sim-newopts" style="width:100%;margin-top:5px;display:none" placeholder="枚举可选值，逗号分隔，如 自动,手动,离网">
+
+    <div class="sim-sec"><span data-i18n="规则总览">规则总览</span><span class="sim-sec-x" data-i18n="（仅查看；新增/修改请选中元素或连线，在右侧属性面板里设置）">（仅查看；新增/修改请选中元素或连线，在右侧属性面板里设置）</span></div>
+    <div id="sim-rules"></div>
+
+    <div class="sim-sec"><span data-i18n="注入信号（测试）">注入信号（测试）</span><span class="sim-sec-x" data-i18n="（临时覆盖某信号的值，验证规则；不填用当前值）">（临时覆盖某信号的值，验证规则；不填用当前值）</span></div>
+    <div id="sim-inj-tools">
+      <button type="button" class="sim-acc-btn" onclick="injExpandAll()" title="展开全部分组" data-i18n="▼ 全部展开">▼ 全部展开</button>
+      <button type="button" class="sim-acc-btn" onclick="injCollapseAll()" title="折叠全部分组" data-i18n="▶ 全部折叠">▶ 全部折叠</button>
+    </div>
+    <div id="sim-inj"></div>
+    <button id="sim-add-inj" class="rm-add" style="margin:2px 0 4px" onclick="addInjRow()" data-i18n="+ 添加注入">+ 添加注入</button>
+    <div class="sim-sec"><span data-i18n="批量样例 JSON">批量样例 JSON</span><span class="sim-sec-x" data-i18n="（一次性设置多个信号的值）">（一次性设置多个信号的值）</span></div>
+    <div class="sim-hint" data-i18n="粘贴 {信号名:值} 批量覆盖注入；点「填入当前」生成模板再改。">粘贴 {信号名:值} 批量覆盖注入；点「填入当前」生成模板再改。</div>
+    <textarea id="sim-json" oninput="autoGrowSimJSON()" placeholder='{"bms_1.SOC(%)":20,"grid_1.online":true}'></textarea>
+    <div id="sim-foot">
+      <button class="tb" onclick="fillSimTemplate()" data-i18n="填入当前">填入当前</button>
+      <button class="tb" onclick="pasteSimJSON()" data-i18n="应用JSON">应用JSON</button>
+      <button class="tb red" onclick="clearSim()" data-i18n="清空注入">清空注入</button>
+    </div>
+  </div>
+</div>
 <div id="ctxmenu">
   <div class="cti" id="ctx-conn" onclick="ctxConn()" title="以此元素为起点开始连线"><span>🔗</span> 从此连线</div>
   <div class="cti" id="ctx-copy" onclick="ctxCopy()" title="复制该元素"><span>⧉</span> 复制</div>
@@ -620,6 +795,14 @@ let dragChip=null,dchox=0,dchoy=0,dragWaypoint=null,dragBus=null,dragResize=null
 let selSet=new Set(),selChips=new Set(),rubber=null,_groupDrag=false,_groupStart={},alignGuides=[],_overlapHandles=[]; // 多选集合 + 选中字段 + 框选矩形 + 对齐辅助线 + 重叠线拐点浅色手柄
 let ids={},animT=0,ctxTgt=null,ctxKind=null,bgColor='#0a1f40',showGrid=true,showEdgeLabels=true,showFieldChips=true,showAnchors=true,busMerge=true,busMergeGap=16,busTrunkBold=true,busStyle='busbar',busOffsets={},busShareTrunk=false,busShowHandles=false,routeStyle=3,busAggregation=false;
 let history=[],histIdx=-1;
+// ★ 数据驱动（动态显隐/流向）：规则随信号实时求值并自动生效；面板开关与「运行视图」互相独立
+// previewMode=运行视图（彻底隐藏被规则隐藏的元素）；panelOpen=「规则与信号」侧栏是否展开；
+// _drawAlpha=当前绘制透明度（编辑态把被规则隐藏的元素「虚化」仍可点选编辑）
+let previewMode=false,panelOpen=false,_drawAlpha=1,signalValues={},injRows=[],customSignals=[],_dyn={hiddenNodes:new Set(),hiddenEdges:new Set(),dirMap:new Map()};
+let injCollapsed=new Set(),_injInited=false;   // 注入信号卡片手风琴：折叠的元素键集合 + 「默认首张展开」是否已初始化
+let injDraft=null;   // 新增注入草稿（元素/字段/值）；点 ✓ 确认后才并入 injRows 卡片列表，避免选元素即跳转
+const GHOST_A=0.16,GHOST_SEL=0.5; // 虚化透明度：普通/选中
+let _ruleHovering=false,_ruleHoverPrev=null;   // 规则总览悬停高亮：是否正在悬停、进入列表前的选中态
 function genId(t){ids[t]=(ids[t]||0)+1;return t+'_'+ids[t];}
 
 function snapshot(){const s=JSON.stringify({nodes,edges,bgColor,routeStyle});history=history.slice(0,histIdx+1);history.push(s);if(history.length>21)history.shift();histIdx=history.length-1;updUR();}
@@ -835,6 +1018,16 @@ function toggleAnchors(){showAnchors=!showAnchors;}
 function toggleBusMerge(){busMerge=!busMerge;_pathCacheSig='';}
 // 完整中英文对照表（界面静态文案）
 const I18N={
+  '⚙ 规则与信号':'⚙ Rules & Signals',
+  '▶ 预览效果':'▶ Preview','■ 退出预览':'■ Exit Preview',
+  '运行视图（彻底隐藏被规则隐藏者）':'Run view (fully hide rule-hidden items)',
+  '规则随信号实时生效：编辑态被隐藏的元素/连线会「虚化」显示，仍可点选并编辑；勾选「运行视图」可预览真实显隐效果。':'Rules apply live as signals change: in edit mode, hidden elements/edges are dimmed but still selectable & editable; tick "Run view" to preview the real show/hide result.',
+  '全局信号':'Global Signals',
+  '（添加后画布上所有元素/连线的规则均可引用，随图导出）':'(once added, any element/edge rule can reference it; exported with the diagram)',
+  '数值':'Number','布尔':'Boolean','枚举':'Enum','文本':'Text',
+  '（仅查看；新增/修改请选中元素或连线，在右侧属性面板里设置）':'(view only; to add/edit, select an element or edge and set it in the property panel)',
+  '注入信号（测试）':'Inject Signals (test)',
+  '（临时覆盖某信号的值，验证规则；不填用当前值）':'(temporarily override a signal value to verify rules; blank = current value)',
   '⚡ 储能拓扑编辑器':'⚡ Energy Storage Topology Editor','储能拓扑编辑器':'Energy Storage Topology Editor',
   '历史':'History','↩ 撤销':'↩ Undo','↪ 重做':'↪ Redo',
   '模式':'Mode','⬚ 选择模式':'⬚ Select','🔗 连线模式':'🔗 Connect',
@@ -844,6 +1037,18 @@ const I18N={
   '🎨 外观与主题':'🎨 Appearance & Theme','▦ 网格':'▦ Grid','🏷 全部线标签':'🏷 All Line Labels','📊 数据字段':'📊 Data Fields',
   '📍 占位点标记':'📍 Anchor Markers','占位点填充色':'Anchor Fill','透明':'Clear',
   '📁 文件 ▾':'📁 File ▾','📂 打开示例模板':'📂 Open Templates','📥 导入画布 JSON':'📥 Import Canvas JSON','⎙ 导出画布 JSON':'⎙ Export Canvas JSON',
+  '▶ 数据预览':'▶ Data Preview','▶ 数据预览（注入信号）':'▶ Data Preview (inject signals)',
+  '显示条件（数据驱动）':'Show condition (data-driven)','流向规则（数据驱动）':'Direction rules (data-driven)','编辑':'Edit',
+  '流向（按规则确定）':'Flow (set by rules)','固定流向（兜底）':'Fixed direction (fallback)',
+  '按信号实时匹配规则确定流向；规则都不命中时用下面的固定流向':'Direction is matched live from signal rules; falls back to the fixed direction below when no rule matches',
+  '条件不满足→不画此连线（适合"动态建立的连线"）':'If condition fails → edge is not drawn (use for "dynamically created links")',
+  '清空条件':'Clear','取消':'Cancel','保存':'Save','+ 信号':'+ Signal','应用JSON':'Apply JSON','清空注入':'Reset',
+  '▼ 全部展开':'▼ Expand all','▶ 全部折叠':'▶ Collapse all',
+  '注入信号':'Inject Signals','（覆盖预览数据；不填用静态值）':'(override preview values; blank = static)','自定义全局信号':'Custom Global Signals',
+  '（规则可引用，随图导出）':'(usable in rules, exported with the diagram)','批量样例 JSON':'Bulk Sample JSON','+ 添加注入':'+ Add Injection',
+  '规则总览':'Rules Overview','（元素/连线的显隐与流向规则，与属性面板同步）':'(show/direction rules for nodes & edges, synced with the property panel)',
+  '+ 规则':'+ Rule','（一次性设置多个信号的值）':'(set many signal values at once)','填入当前':'Fill Current',
+  '粘贴 {信号名:值} 批量覆盖注入；点「填入当前」生成模板再改。':'Paste {signal:value} to bulk-override injections; click "Fill Current" to generate a template, then edit.',
   '🗂 导出元素库包 (ZIP)':'🗂 Export Element Library Pack (ZIP)','🗂 元素库包(ZIP)':'🗂 Library Pack (ZIP)','⬇ 下载画布JSON':'⬇ Download Canvas JSON','📋 画布 JSON':'📋 Canvas JSON',
   '画布显示':'Canvas Display','显示名称':'Show Name','显示数据字段':'Show Data Fields',
   '批量(所选元素)':'Batch (selected)','隐藏名称':'Hide Name','显示字段':'Show Fields','隐藏字段':'Hide Fields','⊘ 取消选择':'⊘ Deselect',
@@ -901,6 +1106,7 @@ function toggleLang(){
   buildSelects();
   applyUploadLang();
   updateAlignBar();
+  toggleRunView(previewMode);   // 重设「预览效果」按钮文案（applyLang 会按 data-i18n 复位，需按当前状态再同步）
   if(selNode)selectNode(selNode); else if(selEdge)selectEdge(selEdge); else showPanel('none');
 }
 // 上传弹框文案随语言切换
@@ -2168,7 +2374,7 @@ function rgba(h,a){const[r,g,b]=hexRgb(h);return`rgba(${r},${g},${b},${a})`;}
 // 汇合/分支「电气节点」：在多条连线交汇于同一点、或某连线端点接入另一条连线处，画一个实心点，
 // 让"两线并为一处""线路在此分支/接入"一目了然（拖动对齐到同一通道、自动汇合后即出现该节点点）。
 function drawJunctionDots(){
-  const paths=[]; edges.forEach(e=>{ const p=_pathCache[e._cacheKey]||e._drawPts; if(p&&p.length>=2) paths.push({e,p,col:(ET[e.et]||ET.ac_power).color}); });
+  const paths=[]; edges.forEach(e=>{ if(_dyn.hiddenEdges.has(e))return; const p=_pathCache[e._cacheKey]||e._drawPts; if(p&&p.length>=2) paths.push({e,p,col:(ET[e.et]||ET.ac_power).color}); });
   if(paths.length<2)return;
   const EPS=4/zoom, dots=[];
   const add=(x,y,col)=>{ for(const d of dots){ if(Math.abs(d.x-x)<EPS&&Math.abs(d.y-y)<EPS)return; } dots.push({x,y,col}); };
@@ -2224,7 +2430,14 @@ function drawAll(){
     ctx.restore();
   }
   computeCrossHops();
-  edges.forEach(drawEdge);drawJunctionDots();nodes.forEach(drawNode);
+  // ★ 数据驱动：规则始终按当前信号实时求值并自动生效（无需进入预览）。
+  //   编辑态：被规则隐藏的元素/连线「虚化」绘制，仍可点选编辑；运行视图(previewMode)：彻底隐藏。
+  _dyn=computeDynamic(buildCtx(signalValues));
+  edges.forEach(e=>{const ghost=_dyn.hiddenEdges.has(e);if(ghost&&previewMode)return;_drawAlpha=ghost?(selEdge===e?GHOST_SEL:GHOST_A):1;drawEdge(e);});
+  _drawAlpha=1;ctx.globalAlpha=1;
+  drawJunctionDots();
+  nodes.forEach(n=>{const ghost=_dyn.hiddenNodes.has(n.id);if(ghost&&previewMode)return;_drawAlpha=ghost?(selNode===n.id?GHOST_SEL:GHOST_A):1;drawNode(n);});
+  _drawAlpha=1;ctx.globalAlpha=1;   // 复位：drawNode 的虚化透明度设在 save 之前，循环后需手动还原
   // 多选高亮：给选中集合的节点画蓝色描边
   if(selSet.size>0){
     ctx.save();ctx.strokeStyle='#ffcc44';ctx.lineWidth=2/zoom;ctx.setLineDash([5/zoom,4/zoom]);
@@ -2375,17 +2588,18 @@ function pointAt(pts,dist){
 
 function drawEdge(e){
   const pts=edgePath(e);if(!pts)return;
+  const dir=effDir(e);   // ★ 流向由数据驱动规则实时确定（命中规则用规则结果，否则用固定 e.dir 兜底）
   const baseCfg=ET[e.et]||ET.ac_power,isSel=selEdge===e;
   // 应用粗细倍率（每条边 e.w × 全局 globalWidth）
   const wmul=(e.w||1)*globalWidth;
   const cfg=Object.assign({},baseCfg,{w:baseCfg.w*wmul});
-  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.globalAlpha=_drawAlpha;
   if(isSel){ctx.strokeStyle='rgba(255,255,255,0.18)';ctx.lineWidth=(cfg.w+8)/zoom;strokePolyline(pts);}
 
   // base glow
   if(cfg.anim!=='none'){
-    ctx.strokeStyle=cfg.color;ctx.globalAlpha=.13;ctx.lineWidth=(cfg.w+5)/zoom;
-    ctx.shadowColor=cfg.color;ctx.shadowBlur=10/zoom;strokePolyline(pts);ctx.globalAlpha=1;ctx.shadowBlur=0;
+    ctx.strokeStyle=cfg.color;ctx.globalAlpha=.13*_drawAlpha;ctx.lineWidth=(cfg.w+5)/zoom;
+    ctx.shadowColor=cfg.color;ctx.shadowBlur=10/zoom;strokePolyline(pts);ctx.globalAlpha=_drawAlpha;ctx.shadowBlur=0;
   }
 
   if(cfg.anim==='pipe'){
@@ -2394,7 +2608,7 @@ function drawEdge(e){
     // flowing glow dots
     const total=polyLen(pts),gapW=22,off=(animT*cfg.spd*40)%gapW;
     for(let d=-off;d<total;d+=gapW){
-      if(d<0)continue;const dd=(e.dir==='reverse')?(total-d):d;
+      if(d<0)continue;const dd=(dir==='reverse')?(total-d):d;
       const[px,py]=pointAt(pts,dd);
       ctx.beginPath();ctx.fillStyle=cfg.color;ctx.shadowColor=cfg.color;ctx.shadowBlur=8/zoom;
       ctx.arc(px,py,(cfg.w*0.6)/zoom,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
@@ -2408,14 +2622,14 @@ function drawEdge(e){
   } else {
     ctx.strokeStyle=cfg.color;ctx.lineWidth=cfg.w/zoom;
     ctx.shadowColor=cfg.color;ctx.shadowBlur=cfg.anim!=='none'?4/zoom:0;
-    if(cfg.anim==='alarm')ctx.globalAlpha=.5+.5*Math.sin(animT*cfg.spd*Math.PI*2);
-    if(cfg.anim==='pulse')ctx.globalAlpha=.35+.45*Math.sin(animT*cfg.spd*Math.PI*2);
-    strokePolyline(pts,cfg.dash.map(d=>d/zoom));ctx.globalAlpha=1;ctx.shadowBlur=0;
+    if(cfg.anim==='alarm')ctx.globalAlpha=_drawAlpha*(.5+.5*Math.sin(animT*cfg.spd*Math.PI*2));
+    if(cfg.anim==='pulse')ctx.globalAlpha=_drawAlpha*(.35+.45*Math.sin(animT*cfg.spd*Math.PI*2));
+    strokePolyline(pts,cfg.dash.map(d=>d/zoom));ctx.globalAlpha=_drawAlpha;ctx.shadowBlur=0;
     if(cfg.anim==='flow'||cfg.anim==='dash'){
       const pl=cfg.anim==='dash'?3:8,gap=cfg.anim==='dash'?8:16,off=(animT*cfg.spd*55)%(pl+gap);
       ctx.strokeStyle=rgba(cfg.color,.92);ctx.lineWidth=(cfg.w+.5)/zoom;
-      if(e.dir==='both'){strokePolyline(pts,[pl/zoom,gap/zoom],-off/zoom);strokePolyline(pts,[pl/zoom,gap/zoom],off/zoom);}
-      else strokePolyline(pts,[pl/zoom,gap/zoom],(e.dir==='reverse'?off:-off)/zoom);
+      if(dir==='both'){strokePolyline(pts,[pl/zoom,gap/zoom],-off/zoom);strokePolyline(pts,[pl/zoom,gap/zoom],off/zoom);}
+      else strokePolyline(pts,[pl/zoom,gap/zoom],(dir==='reverse'?off:-off)/zoom);
     }
   }
   ctx.shadowBlur=0;
@@ -2433,8 +2647,7 @@ function drawEdge(e){
       ctx.beginPath();ctx.arc(h.x,h.y,R,Math.PI,0,false);ctx.stroke();
     });
   }
-  // arrow at end
-  const dir=e.dir||'forward';
+  // arrow at end（dir 已在函数顶部按数据驱动求得）
   const p2=pts[pts.length-1],p1=pts[pts.length-2];
   const pa=pts[0],pb=pts[1];
   if((dir==='forward'||dir==='both')&&cfg.anim!=='busbar'&&cfg.anim!=='pipe')drawArrowSeg(p1,p2,cfg.color,cfg.w);
@@ -2445,6 +2658,11 @@ function drawEdge(e){
     if(lbl){const mid=pointAt(pts,polyLen(pts)/2);const fs=13/zoom;ctx.font=fs+"px -apple-system,'Microsoft YaHei',sans-serif";ctx.textAlign='center';
       const tw=ctx.measureText(lbl).width;ctx.fillStyle=bgPlate();ctx.fillRect(mid[0]-tw/2-4/zoom,mid[1]-fs*0.8,tw+8/zoom,fs+5/zoom);
       ctx.fillStyle=cfg.color;ctx.fillText(lbl,mid[0],mid[1]+fs*.18);}
+  }
+  // 编辑态：带「显示/流向」条件的连线，在中点旁标琥珀色小点
+  if(!previewMode){ const m=pointAt(pts,polyLen(pts)/2);
+    if(_dyn.hiddenEdges.has(e)) drawHiddenBadge(m[0], m[1]);              // 被规则隐藏：醒目⊘标记，区别于其它虚化/普通线
+    else if(edgeHasRule(e)) drawCondBadge(m[0]+9/zoom, m[1]-9/zoom);      // 有规则但当前显示：琥珀点
   }
   // 选中连线时，仅在「线上的真实节点」显示可拖动方块手柄：每个方向变更处(拐点) + 已存拐点 + 起止端。
   // 不显示"段中点新增拐点"标记，也不显示其他线的浮动手柄——避免越拖越乱、或线被拖走后留下孤立节点。
@@ -2477,6 +2695,7 @@ function drawArrowSeg(p1,p2,color,w){
 
 function rotatePt(px,py,cx,cy,rad){if(!rad)return [px,py];const c=Math.cos(rad),s=Math.sin(rad);const dx=px-cx,dy=py-cy;return [cx+dx*c-dy*s, cy+dx*s+dy*c];}
 function drawNode(n){
+  ctx.globalAlpha=_drawAlpha;   // 编辑态被规则隐藏的元素「虚化」绘制（仍可点选编辑）
   // 文本框元素：只渲染文字，无图标
   if(n.type==='text'){ drawTextNode(n); return; }
   const img=CUSTOM_ICONS[n.type]||IMGS[n.type];const s=nsz(n);
@@ -2511,14 +2730,14 @@ function drawNode(n){
     // 占位点：可配置填充色 + 不透明度。把填充设为画布同色或不透明度调 0 即可对用户「隐形」。
     const r=s*0.36, op=(n.opacity!=null?n.opacity:1);
     if(n.fill && n.fill!=='none' && op>0){
-      ctx.globalAlpha=op;ctx.fillStyle=n.fill;
-      ctx.beginPath();ctx.arc(vcx,vcy,r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+      ctx.globalAlpha=op*_drawAlpha;ctx.fillStyle=n.fill;
+      ctx.beginPath();ctx.arc(vcx,vcy,r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=_drawAlpha;
     }
     // 研发辅助标记：仅当「📍 占位点标记」开启或该点被选中时显示淡虚线环，方便研发定位/点选；
     // 关闭后即便填充透明也不会被用户看到。
     if(showAnchors || isSel){
       ctx.save();
-      ctx.globalAlpha=0.7;ctx.strokeStyle='#4dd0ff';ctx.lineWidth=1.2/zoom;ctx.setLineDash([3/zoom,3/zoom]);
+      ctx.globalAlpha=0.7*_drawAlpha;ctx.strokeStyle='#4dd0ff';ctx.lineWidth=1.2/zoom;ctx.setLineDash([3/zoom,3/zoom]);
       ctx.beginPath();ctx.arc(vcx,vcy,r,0,Math.PI*2);ctx.stroke();
       ctx.setLineDash([]);ctx.lineWidth=1/zoom;ctx.beginPath();
       ctx.moveTo(vcx-3/zoom,vcy);ctx.lineTo(vcx+3/zoom,vcy);ctx.moveTo(vcx,vcy-3/zoom);ctx.lineTo(vcx,vcy+3/zoom);ctx.stroke();
@@ -2528,6 +2747,11 @@ function drawNode(n){
   else if(img)ctx.drawImage(img,n.x-s/2,n.y-s*.72,s,s);
   else{ctx.fillStyle='#1a3a5c';ctx.fillRect(n.x-s/2,n.y-s*.72,s,s);const fs=10/zoom;ctx.fillStyle='#4dd0ff';ctx.font=fs+'px Courier New';ctx.textAlign='center';ctx.fillText(n.type,n.x,n.y+fs*.5);}
   ctx.restore();
+  // 编辑态：带「显示」条件的节点，在图标右上角标琥珀色小点
+  if(!previewMode){
+    if(_dyn.hiddenNodes.has(n.id)) drawHiddenBadge(n.x+s*0.34, n.y-s*0.6);    // 被规则隐藏：醒目⊘标记
+    else if(nodeHasRule(n)) drawCondBadge(n.x+s*0.34, n.y-s*0.66);
+  }
   if(!n.hideLabel){
   const lfs=(n.fontSize||14)/zoom;
   ctx.font='bold '+lfs+"px -apple-system,'Microsoft YaHei',sans-serif";ctx.textAlign='center';
@@ -2782,7 +3006,7 @@ function selectNode(id){
   document.getElementById('p-x').textContent=n.x.toFixed(0);document.getElementById('p-y').textContent=n.y.toFixed(0);
   // 文本框元素：隐藏类型/状态/图标大小/数据字段，改用文字相关字段
   const isText=n.type==='text';
-  ['prow-type','prow-status','prow-status-en','prow-scale','prow-data','prow-datasep','prow-vis'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isText?'none':'';});
+  ['prow-type','prow-status','prow-status-en','prow-scale','prow-data','prow-datasep','prow-vis','prow-rule'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isText?'none':'';});
   // 画布显示开关：反映当前节点的 hideLabel / hideFields
   const slEl=document.getElementById('p-show-label'),sfEl=document.getElementById('p-show-fields');
   if(slEl)slEl.checked=!n.hideLabel; if(sfEl)sfEl.checked=!n.hideFields;
@@ -2811,6 +3035,7 @@ function selectNode(id){
     document.getElementById('p-radius-v').textContent=n.radius!=null?n.radius:6;
   }
   renderDFs(n);
+  refreshNodeRuleSummary(n);
 }
 function applyTextStyle(){
   const n=nodes.find(x=>x.id===selNode);if(!n)return;
@@ -2852,6 +3077,7 @@ function selectEdge(e){
   orow.style.display=(e.route==='manual')?'block':'none';
   document.getElementById('ep-ortho').checked=(e.orthoSnap!==false);
   const cfg=ET[e.et]||ET.ac_power;document.getElementById('ep-desc').textContent=cfg.desc;document.getElementById('ep-desc').style.color=cfg.color;
+  refreshEdgeRuleSummary(e);
   updateEpTypeSwatch();
 }
 function showPanel(m){document.getElementById('pnone').style.display=m==='none'?'block':'none';document.getElementById('pnode').style.display=m==='node'?'block':'none';document.getElementById('pedge').style.display=m==='edge'?'block':'none';}
@@ -3506,6 +3732,7 @@ function buildJSON(){
       borderWidth:(n.borderWidth!=null?n.borderWidth:1.5), radius:(n.radius!=null?n.radius:6),
       padX:(n.padX!=null?n.padX:10), padY:(n.padY!=null?n.padY:6)};
     if(n.type==='anchor') o.anchorStyle={fill:n.fill||'none', opacity:(n.opacity!=null?n.opacity:1)};
+    if(n.visibleWhen!=null) o.visibleWhen=n.visibleWhen;   // ★ 数据驱动：显示条件（条件不满足→运行端隐藏该元素）
     return o;
   };
   // 本图用到的连线类型样式（自带，前端无需依赖元素库即可还原线型）；完整表见 element-library.json
@@ -3519,11 +3746,14 @@ function buildJSON(){
       // ★ 引用元素库版本（按 name+version 加载完整库）；本文件已自带 edgeStyles，可独立还原线型
       libraryRef:{ name:LIBRARY_NAME, version:LIBRARY_VERSION },
       canvas:{ bgColor, zoom:parseFloat(zoom.toFixed(3)), panX:parseFloat(panX.toFixed(1)), panY:parseFloat(panY.toFixed(1)),
-               grid:{show:showGrid, stepPx:40}, showAnchors }
+               grid:{show:showGrid, stepPx:40}, showAnchors },
+      // ★ 全局视图/显示设置：随图导出，导入时一并还原，便于复原整张拓扑图的外观
+      view:{ showEdgeLabels, showFieldChips, globalWidth, routeStyle,
+             busMerge, busMergeGap, busTrunkBold, busStyle, busShareTrunk, busAggregation }
     },
     edgeStyles,   // ★ type → 线型样式（颜色/粗细/虚线/动画）
     nodes:nodes.map(serNode),
-    edges:edges.map(e=>{const c=ET[e.et]||ET.ac_power;return {
+    edges:edges.map(e=>{const c=ET[e.et]||ET.ac_power;const eo={
       from:e.from, to:e.to,
       edgeType:e.et||'ac_power',                 // 连线类型 key
       edgeTypeLabel:{zh:c.label,en:c.labelEn},   // 类型中英文名
@@ -3534,8 +3764,15 @@ function buildJSON(){
       orthoSnap:(e.orthoSnap!==false),
       waypoints:(e.waypoints||[]).map(p=>Array.isArray(p)?{x:parseFloat((+p[0]).toFixed(1)),y:parseFloat((+p[1]).toFixed(1))}:{x:parseFloat((+p.x).toFixed(1)),y:parseFloat((+p.y).toFixed(1))}),
       active:true
-    };})
+    };
+    if(e.showWhen!=null) eo.showWhen=e.showWhen;                              // ★ 数据驱动：显示/存在条件
+    if(Array.isArray(e.dirRules)&&e.dirRules.length) eo.dirRules=e.dirRules;  // ★ 数据驱动：流向规则（顺序匹配，e.dir 兜底）
+    return eo;})
   };
+  // ★ 数据驱动：自定义全局信号目录（节点字段信号 id.字段 由运行端按 nodes 自动派生，无需导出）
+  if(customSignals&&customSignals.length) obj.signals=customSignals.map(s=>{const o={name:s.name,label:s.label||s.name,sample:s.sample};if(s.type)o.type=s.type;if(Array.isArray(s.options)&&s.options.length)o.options=s.options.slice();return o;});
+  // ★ 数据驱动：当前注入的样例信号值（预览数据，随图导出，便于运行端/再次编辑时作默认值）
+  if(signalValues&&Object.keys(signalValues).length) obj.sampleSignals=Object.assign({},signalValues);
   return JSON.stringify(obj,null,2);
 }
 function refreshJSON(){document.getElementById('jout').textContent=buildJSON();}
@@ -3602,6 +3839,7 @@ function parseImportedNode(o){
     n.radius=(t.radius!=null?t.radius:(o.radius!=null?o.radius:6));n.padX=(t.padX!=null?t.padX:(o.padX!=null?o.padX:10));n.padY=(t.padY!=null?t.padY:(o.padY!=null?o.padY:6));}
   // 占位点样式
   if(o.type==='anchor'){const a=o.anchorStyle||{};n.fill=a.fill||o.fill||'none';n.opacity=(a.opacity!=null?a.opacity:(o.opacity!=null?o.opacity:1));}
+  if(o.visibleWhen!=null)n.visibleWhen=o.visibleWhen;   // ★ 数据驱动：显示条件
   return n;
 }
 // 把导出连线还原为内部连线对象（waypoints 内部用 [x,y] 数组）
@@ -3619,6 +3857,8 @@ function parseImportedEdge(o){
     orthoSnap:(o.orthoSnap!==false)
   };
   if(wp.length)e.waypoints=wp;
+  if(o.showWhen!=null)e.showWhen=o.showWhen;                              // ★ 数据驱动：显示/存在条件
+  if(Array.isArray(o.dirRules)&&o.dirRules.length)e.dirRules=o.dirRules;  // ★ 数据驱动：流向规则
   return e;
 }
 async function importCanvasJSON(obj){
@@ -3639,6 +3879,9 @@ async function importCanvasJSON(obj){
            w:(s.width!=null?s.width:2.5), dash:s.dash||[], anim:s.anim||'flow',
            spd:(s.speed!=null?s.speed:0.5), desc:''};
   });
+  // 1.5) 还原自定义全局信号 + 清空上次注入
+  customSignals=(Array.isArray(obj.signals)?obj.signals:[]).filter(s=>s&&s.name).map(s=>{const o={name:s.name,label:s.label||s.name,sample:s.sample};if(s.type)o.type=s.type;if(Array.isArray(s.options))o.options=s.options.slice();return o;});
+  signalValues={};injRows=[];injDraft=null;_injInited=false;
   // 2) 还原节点 / 连线（仅保留两端节点都存在的连线）
   const newNodes=obj.nodes.map(parseImportedNode).filter(Boolean);
   const idSet=new Set(newNodes.map(n=>n.id));
@@ -3648,6 +3891,11 @@ async function importCanvasJSON(obj){
   snapshot();
   nodes=newNodes; edges=newEdges;
   selNode=selEdge=null; selSet.clear(); selChips.clear();
+  // 还原注入的样例信号值（sampleSignals）→ 重建注入行
+  if(obj.sampleSignals&&typeof obj.sampleSignals==='object'){
+    Object.keys(obj.sampleSignals).forEach(k=>{const ps=parseSignal(k);injRows.push({node:ps.node,field:ps.field,val:obj.sampleSignals[k]});});
+    syncInjections();
+  }
   // 4) 重建 id 计数器，保证后续新增节点 id 不冲突
   ids={};
   nodes.forEach(n=>{const m=String(n.id).match(/^(.+?)_?(\d+)$/);if(m){ids[m[1]]=Math.max(ids[m[1]]||0,parseInt(m[2]));}});
@@ -3656,6 +3904,23 @@ async function importCanvasJSON(obj){
   if(canv.bgColor) setBg(canv.bgColor);
   if(canv.grid&&typeof canv.grid.show==='boolean'){ showGrid=canv.grid.show; syncToggle('toggleGrid()',showGrid); }
   if(typeof canv.showAnchors==='boolean'){ showAnchors=canv.showAnchors; syncToggle('toggleAnchors()',showAnchors); }
+  // 5.5) 还原全局视图/显示设置（线标签、数据字段、线宽、走线风格、汇流合并），并同步对应 UI 控件
+  const view=(obj.meta&&obj.meta.view)||{};
+  if(typeof view.showEdgeLabels==='boolean'){ showEdgeLabels=view.showEdgeLabels; syncToggle('toggleEdgeLabels()',showEdgeLabels); }
+  if(typeof view.showFieldChips==='boolean'){ showFieldChips=view.showFieldChips; syncToggle('toggleFieldChips()',showFieldChips); }
+  if(typeof view.globalWidth==='number'){ globalWidth=view.globalWidth;
+    const gw=document.getElementById('global-w'),gwv=document.getElementById('global-w-v');
+    if(gw)gw.value=globalWidth; if(gwv)gwv.textContent=globalWidth.toFixed(1)+'×'; }
+  if(typeof view.routeStyle==='number'){ routeStyle=view.routeStyle;
+    document.querySelectorAll('#seg-route .seg-btn').forEach(b=>b.classList.toggle('active',parseInt(b.dataset.rs)===routeStyle)); }
+  if(typeof view.busMerge==='boolean') busMerge=view.busMerge;
+  if(typeof view.busAggregation==='boolean') busAggregation=view.busAggregation;
+  if(typeof view.busMergeGap==='number'){ busMergeGap=view.busMergeGap;
+    const bg=document.getElementById('bm-gap'),bgv=document.getElementById('bm-gap-v');
+    if(bg)bg.value=busMergeGap; if(bgv)bgv.textContent=busMergeGap; }
+  if(typeof view.busTrunkBold==='boolean'){ busTrunkBold=view.busTrunkBold; const b=document.getElementById('bm-bold'); if(b)b.checked=busTrunkBold; }
+  if(typeof view.busShareTrunk==='boolean'){ busShareTrunk=view.busShareTrunk; const b=document.getElementById('bm-share'); if(b)b.checked=busShareTrunk; }
+  if(typeof view.busStyle==='string'){ busStyle=view.busStyle; const b=document.getElementById('bm-style'); if(b)b.value=busStyle; }
   // 6) 还原视图：有保存的缩放/平移就沿用，否则自动适配
   if(typeof canv.zoom==='number'&&typeof canv.panX==='number'&&typeof canv.panY==='number'){
     zoom=canv.zoom; panX=canv.panX; panY=canv.panY;
@@ -3668,11 +3933,755 @@ async function importCanvasJSON(obj){
   _pathCacheSig='';
   updateAlignBar();
   history=[];histIdx=-1;snapshot();
+  if(panelOpen)renderSimPanel();
   const missing=[...new Set(nodes.filter(n=>String(n.type).startsWith('custom_')&&!iconSrcOf(n.type)).map(n=>n.type))];
   let msg=(lang==='en'?'Imported ':'已导入 ')+nodes.length+(lang==='en'?' nodes, ':' 个节点、')+edges.length+(lang==='en'?' edges':' 条连线');
   if(missing.length)msg+=(lang==='en'?(' · '+missing.length+' custom icon(s) missing, re-upload in library'):('（'+missing.length+' 个自定义图标缺失，请在元素库重新上传）'));
   flashHint(msg);
 }
+
+// ══════════════════════════════════════════════════════════════
+// ★ 数据驱动引擎（动态显隐 / 流向 / 条件连线）——编辑器预览与运行端共用同一套逻辑
+// ══════════════════════════════════════════════════════════════
+const RULE_OPS=[{v:'>=',t:'≥'},{v:'<=',t:'≤'},{v:'>',t:'>'},{v:'<',t:'<'},{v:'==',t:'='},{v:'!=',t:'≠'},
+  {v:'in',t:'属于'},{v:'between',t:'区间'},{v:'truthy',t:'为真'},{v:'falsy',t:'为假'},{v:'exists',t:'存在'}];
+const RULE_DIRS=[{v:'forward',t:'正向 →'},{v:'reverse',t:'反向 ←'},{v:'both',t:'双向 ↔'},{v:'none',t:'无流向'}];
+const _OPT={'>=':'≥','<=':'≤','>':'>','<':'<','==':'=','!=':'≠','in':'∈','between':'∈区间','truthy':'为真','falsy':'为假','exists':'存在'};
+function _num(x){if(typeof x==='number')return x;if(typeof x==='boolean')return x?1:0;const f=parseFloat(x);return isNaN(f)?NaN:f;}
+function _looseEq(a,b){if(a===b)return true;const na=_num(a),nb=_num(b);if(!isNaN(na)&&!isNaN(nb))return na===nb;return String(a)===String(b);}
+function _toList(rv){if(Array.isArray(rv))return rv;return String(rv==null?'':rv).split(',').map(s=>s.trim()).filter(s=>s!=='');}
+function autoNum(v){if(typeof v!=='string')return v;const t=v.trim();if(t==='')return '';if(t==='true')return true;if(t==='false')return false;if(/^-?\d+(\.\d+)?$/.test(t))return parseFloat(t);return v;}
+// 单条件求值
+function cmpOp(lv,op,rv){
+  switch(op){
+    case '==': return _looseEq(lv,rv);
+    case '!=': return !_looseEq(lv,rv);
+    case '>':  return _num(lv)>_num(rv);
+    case '>=': return _num(lv)>=_num(rv);
+    case '<':  return _num(lv)<_num(rv);
+    case '<=': return _num(lv)<=_num(rv);
+    case 'truthy': return !!lv && lv!=='false' && lv!=='0';
+    case 'falsy':  return !lv || lv==='false' || lv==='0';
+    case 'exists': return lv!==undefined && lv!==null && lv!=='';
+    case 'in':     return _toList(rv).some(x=>_looseEq(lv,x));
+    case 'between':{const a=_toList(rv).map(_num);if(a.length<2)return false;return _num(lv)>=Math.min(a[0],a[1])&&_num(lv)<=Math.max(a[0],a[1]);}
+    default: return true;
+  }
+}
+// 条件树求值：null/无条件 → true；支持 all/any/not + 叶子{var,op,val|ref}
+function evalCond(cond, ctx){
+  if(cond==null)return true;
+  if(typeof cond!=='object')return !!cond;
+  if(Array.isArray(cond.all))return cond.all.every(c=>evalCond(c,ctx));
+  if(Array.isArray(cond.any))return cond.any.some(c=>evalCond(c,ctx));
+  if(cond.not!=null)return !evalCond(cond.not,ctx);
+  if(cond.var==null)return true;
+  const lv=ctx[cond.var];
+  const rv=(cond.ref!=null)?ctx[cond.ref]:cond.val;
+  return cmpOp(lv,cond.op||'truthy',rv);
+}
+// 汇总当前画布全部可用信号：节点字段(id.字段) + id.status + id.online + 自定义全局信号
+function collectSignals(){
+  const out=[],seen=new Set();
+  const add=(name,label)=>{if(name&&!seen.has(name)){seen.add(name);out.push({name,label:label||name});}};
+  nodes.forEach(n=>{
+    (n.data||[]).forEach(f=>{if(f.key)add(n.id+'.'+f.key,nodeLabel(n)+' · '+f.key);});
+    add(n.id+'.status',nodeLabel(n)+' · 状态');
+    add(n.id+'.online',nodeLabel(n)+' · 在线');
+  });
+  (customSignals||[]).forEach(s=>add(s.name,s.label||s.name));
+  return out;
+}
+// 构造求值上下文：静态默认值(节点字段dv/状态/在线=true/自定义样例) 叠加注入的样例值
+function buildCtx(values){
+  const ctx={};
+  nodes.forEach(n=>{
+    (n.data||[]).forEach(f=>{if(f.key)ctx[n.id+'.'+f.key]=f.dv;});
+    ctx[n.id+'.status']=n.status||'';
+    ctx[n.id+'.online']=true;
+  });
+  (customSignals||[]).forEach(s=>{if(s.name!=null&&s.sample!==undefined)ctx[s.name]=s.sample;});
+  if(values)Object.keys(values).forEach(k=>{ctx[k]=values[k];});
+  return ctx;
+}
+// 连线有效流向：按 dirRules 顺序匹配，首个命中生效，否则用 e.dir
+function edgeDirFor(e,ctx){
+  if(Array.isArray(e.dirRules))for(const r of e.dirRules){if(evalCond(r.when,ctx))return r.dir;}
+  return e.dir||'forward';
+}
+// 计算一帧的动态结果：隐藏节点集、隐藏连线集、流向覆盖表
+function computeDynamic(ctx){
+  const hiddenNodes=new Set(),hiddenEdges=new Set(),dirMap=new Map();
+  nodes.forEach(n=>{if(n.visibleWhen!=null&&!evalCond(n.visibleWhen,ctx))hiddenNodes.add(n.id);});
+  edges.forEach(e=>{
+    let hidden=hiddenNodes.has(e.from)||hiddenNodes.has(e.to);
+    if(!hidden&&e.showWhen!=null&&!evalCond(e.showWhen,ctx))hidden=true;
+    if(hidden)hiddenEdges.add(e);
+    else if(Array.isArray(e.dirRules)&&e.dirRules.length)dirMap.set(e,edgeDirFor(e,ctx));
+  });
+  return {hiddenNodes,hiddenEdges,dirMap};
+}
+// 渲染期取连线有效流向：流向规则随信号实时求值并自动生效（编辑态与预览态一致）；
+// 有命中规则时用规则结果（dirMap），否则用连线自身的「固定流向」e.dir 兜底。仅改流向，不改连线类型/走线。
+function effDir(e){ return _dyn.dirMap.has(e)?_dyn.dirMap.get(e):(e.dir||'forward'); }
+function nodeHasRule(n){ return n&&n.visibleWhen!=null; }
+function edgeHasRule(e){ return e&&(e.showWhen!=null||(Array.isArray(e.dirRules)&&e.dirRules.length>0)); }
+// 编辑态下「带条件」的元素角标（琥珀色小点）
+function drawCondBadge(x,y){
+  ctx.save();ctx.shadowBlur=0;
+  ctx.beginPath();ctx.arc(x,y,4.5/zoom,0,Math.PI*2);
+  ctx.fillStyle='#ffcc44';ctx.fill();
+  ctx.lineWidth=1.4/zoom;ctx.strokeStyle='#3a2a00';ctx.stroke();
+  ctx.restore();
+}
+// 「被规则隐藏」标记：在虚化的元素/连线上画一个醒目的斜杠圆（⊘），与普通线区分，避免混淆。强制满透明绘制。
+function drawHiddenBadge(x,y){
+  ctx.save();ctx.shadowBlur=0;ctx.globalAlpha=1;ctx.setLineDash([]);
+  const r=6.5/zoom;
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle='rgba(16,24,40,0.95)';ctx.fill();
+  ctx.lineWidth=1.7/zoom;ctx.strokeStyle='#8aa0bf';ctx.stroke();
+  const d=r*0.6;ctx.beginPath();ctx.moveTo(x-d,y+d);ctx.lineTo(x+d,y-d);ctx.lineWidth=1.8/zoom;ctx.strokeStyle='#cdd8ea';ctx.stroke();
+  ctx.restore();
+}
+
+// ───── 条件 ↔ 编辑态(扁平组) 互转 ─────
+function _leafToRow(c){const row={var:c.var||'',op:c.op||'>=',isRef:(c.ref!=null)};if(c.ref!=null)row.ref=c.ref;else row.val=(c.val!=null?c.val:'');return row;}
+function condToEdit(cond){
+  if(cond==null)return {mode:'all',rows:[]};
+  if(Array.isArray(cond.all))return {mode:'all',rows:cond.all.filter(c=>c&&c.var!=null).map(_leafToRow)};
+  if(Array.isArray(cond.any))return {mode:'any',rows:cond.any.filter(c=>c&&c.var!=null).map(_leafToRow)};
+  if(cond.var!=null)return {mode:'all',rows:[_leafToRow(cond)]};
+  return {mode:'all',rows:[]};
+}
+function _rowToLeaf(r){
+  if(!r.var)return null;
+  const leaf={var:r.var,op:r.op};
+  if(['truthy','falsy','exists'].includes(r.op))return leaf;
+  if(r.isRef){if(!r.ref)return null;leaf.ref=r.ref;}
+  else leaf.val=autoNum(r.val);
+  return leaf;
+}
+function editToCond(st){
+  const leaves=st.rows.map(_rowToLeaf).filter(Boolean);
+  if(!leaves.length)return null;
+  if(leaves.length===1)return leaves[0];
+  return {[st.mode]:leaves};
+}
+// 条件 → 可读摘要
+function condSummary(cond){
+  function leaf(c){const v=c.var||'?';if(['truthy','falsy','exists'].includes(c.op))return v+_OPT[c.op];const r=(c.ref!=null)?c.ref:c.val;return v+(_OPT[c.op]||c.op)+r;}
+  function walk(c){if(c==null)return '';if(Array.isArray(c.all))return c.all.map(walk).filter(Boolean).join(' 且 ');if(Array.isArray(c.any))return '('+c.any.map(walk).filter(Boolean).join(' 或 ')+')';if(c.not!=null)return '非('+walk(c.not)+')';if(c.var!=null)return leaf(c);return '';}
+  return walk(cond)||null;
+}
+
+// ───── 信号选择器：先选分类（元素 / 全局信号），再选具体信号 ─────
+// value 为完整信号名（如 bms_1.SOC(%) 或自定义全局信号名）；变更时回调 onChange(完整信号名)
+function makeSignalPicker(value, onChange){
+  const wrap=document.createElement('span');wrap.className='rm-sigwrap';
+  const nsel=document.createElement('select');nsel.className='rm-sig-node';
+  const fsel=document.createElement('select');fsel.className='rm-sig-field';
+  const state={node:'',field:''};
+  if(value){const p=parseSignal(value);state.node=p.node;state.field=p.field;}
+  const opt=(v,t)=>{const o=document.createElement('option');o.value=v;o.textContent=t;return o;};
+  function fillNodes(){
+    nsel.innerHTML='';
+    nsel.appendChild(opt('',lang==='en'?'Category…':'选择分类…'));
+    nodes.forEach(n=>nsel.appendChild(opt(n.id,nodeLabel(n))));
+    if((customSignals&&customSignals.length)||state.node==='@global')nsel.appendChild(opt('@global',lang==='en'?'＊Global signals':'＊全局信号'));
+    nsel.value=state.node;
+  }
+  function fillFields(){
+    fsel.innerHTML='';
+    fsel.appendChild(opt('',lang==='en'?'Signal…':'选择信号…'));
+    const opts=state.node?fieldOptionsFor(state.node):[];
+    opts.forEach(o=>fsel.appendChild(opt(o.v,o.t)));
+    // 兜底：当前值在选项中已不存在（节点/字段被删或导入残留），仍展示并保留
+    if(state.field&&!opts.some(o=>o.v===state.field))fsel.appendChild(opt(state.field,state.field+(lang==='en'?' (missing)':'（已失效）')));
+    fsel.value=state.field;fsel.disabled=!state.node;
+  }
+  const emit=()=>onChange(injSignalName({node:state.node,field:state.field})||'');
+  nsel.onchange=e=>{state.node=e.target.value;state.field='';fillFields();emit();};
+  fsel.onchange=e=>{state.field=e.target.value;emit();};
+  fillNodes();fillFields();
+  wrap.appendChild(nsel);wrap.appendChild(fsel);
+  return wrap;
+}
+// ───── 信号值语义：决定规则里「值」用「布尔/枚举下拉」还是「数值/文本输入」，避免全部混为一谈 ─────
+function signalValueMeta(name){
+  if(!name)return {kind:'text'};
+  const p=parseSignal(name);
+  if(p.field==='online')return {kind:'bool'};
+  if(p.field==='status'){
+    const base=['在线','离线','待机','运行','充电','放电','故障','告警','备用','发电'];
+    const n=nodes.find(x=>x.id===p.node);if(n&&n.status&&!base.includes(n.status))base.unshift(n.status);
+    return {kind:'enum',options:base};
+  }
+  if(p.node==='@global'){
+    const s=(customSignals||[]).find(c=>c.name===p.field);
+    if(!s)return {kind:'text'};
+    const t=sigTypeOf(s);
+    if(t==='bool')return {kind:'bool'};
+    if(t==='enum')return {kind:'enum',options:(s.options||[]).map(String)};
+    if(t==='number')return {kind:'num'};
+    return {kind:'text'};
+  }
+  const n=nodes.find(x=>x.id===p.node);const f=n&&(n.data||[]).find(d=>d.key===p.field);
+  if(f){
+    if(typeof f.dv==='boolean')return {kind:'bool'};
+    if(typeof f.dv==='number')return {kind:'num'};
+    if(f.dv!==''&&f.dv!=null&&!isNaN(Number(f.dv)))return {kind:'num'};
+    return {kind:'text'};
+  }
+  return {kind:'num'};   // 节点数据字段默认按数值
+}
+// 按信号语义与运算符，生成规则里「常量值」的输入控件
+function makeRuleValueInput(row){
+  const meta=signalValueMeta(row.var);
+  const multi=(row.op==='between'||row.op==='in');
+  if(!multi&&meta.kind==='bool'){
+    const sel=document.createElement('select');sel.className='rm-val';
+    [['',(lang==='en'?'value…':'值…')],['true','true'],['false','false']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;sel.appendChild(o);});
+    sel.value=(row.val!=null?String(row.val):'');sel.onchange=e=>row.val=e.target.value;return sel;
+  }
+  if(!multi&&meta.kind==='enum'){
+    const sel=document.createElement('select');sel.className='rm-val';
+    sel.appendChild((()=>{const o=document.createElement('option');o.value='';o.textContent=(lang==='en'?'value…':'值…');return o;})());
+    const opts=(meta.options||[]).map(String);
+    if(row.val!=null&&row.val!==''&&!opts.includes(String(row.val)))opts.push(String(row.val));
+    opts.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});
+    sel.value=(row.val!=null?String(row.val):'');sel.onchange=e=>row.val=e.target.value;return sel;
+  }
+  if(!multi&&meta.kind==='num'){
+    const inp=document.createElement('input');inp.className='rm-val';inp.type='number';inp.placeholder=(lang==='en'?'number':'数值');inp.value=(row.val!=null?row.val:'');inp.oninput=e=>row.val=e.target.value;return inp;
+  }
+  const inp=document.createElement('input');inp.className='rm-val';
+  inp.placeholder=(row.op==='between'?'a,b':(row.op==='in'?(lang==='en'?'v1,v2':'值1,值2'):(lang==='en'?'value':'值')));
+  inp.value=(row.val!=null?row.val:'');inp.oninput=e=>row.val=e.target.value;return inp;
+}
+// 渲染一个「条件组」编辑器到容器；直接就地修改传入的 st 对象（{mode,rows}）
+function renderCond(box, st){
+  box.innerHTML='';box.className='rm-cond';
+  const head=document.createElement('div');head.className='rm-row rm-head';
+  const ms=document.createElement('select');ms.className='rm-mode';
+  [['all','全部满足(且)'],['any','任一满足(或)']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;ms.appendChild(o);});
+  ms.value=st.mode;ms.onchange=e=>{st.mode=e.target.value;};
+  head.appendChild(document.createTextNode('匹配 '));head.appendChild(ms);box.appendChild(head);
+  const list=document.createElement('div');box.appendChild(list);
+  function drawRows(){
+    list.innerHTML='';
+    st.rows.forEach((row,idx)=>{
+      const r=document.createElement('div');r.className='rm-row';
+      const vIn=makeSignalPicker(row.var,v=>{row.var=v;rebuildVal();});  // 换信号→按新信号语义重建值输入（保留已填的值，含 0，不清空）
+      const op=document.createElement('select');op.className='rm-op';
+      RULE_OPS.forEach(o=>{const opt=document.createElement('option');opt.value=o.v;opt.textContent=o.t;op.appendChild(opt);});
+      op.value=row.op||'>=';
+      const valWrap=document.createElement('span');valWrap.className='rm-valwrap';
+      function rebuildVal(){
+        valWrap.innerHTML='';
+        if(['truthy','falsy','exists'].includes(row.op))return;
+        if(row.isRef){
+          valWrap.appendChild(makeSignalPicker(row.ref,v=>{row.ref=v;}));
+        }else{
+          valWrap.appendChild(makeRuleValueInput(row));
+        }
+        const tg=document.createElement('button');tg.type='button';tg.className='rm-reftg'+(row.isRef?' on':'');tg.textContent=row.isRef?'信号':'常量';tg.title='切换：与常量比较 / 与另一个信号比较';
+        tg.onclick=()=>{row.isRef=!row.isRef;rebuildVal();};
+        valWrap.appendChild(tg);
+      }
+      op.onchange=e=>{row.op=e.target.value;rebuildVal();};
+      const del=document.createElement('button');del.type='button';del.className='rm-del';del.textContent='×';del.title='删除此条件';
+      del.onclick=()=>{st.rows.splice(idx,1);drawRows();};
+      r.appendChild(vIn);r.appendChild(op);r.appendChild(valWrap);r.appendChild(del);
+      list.appendChild(r);rebuildVal();
+    });
+    if(!st.rows.length){const em=document.createElement('div');em.className='rm-empty';em.textContent='无条件（始终满足）';list.appendChild(em);}
+  }
+  drawRows();
+  const add=document.createElement('button');add.type='button';add.className='rm-add';add.textContent='+ 添加条件';
+  add.onclick=()=>{st.rows.push({var:'',op:'>=',val:''});drawRows();};
+  box.appendChild(add);
+}
+function _mkBtn(t,fn,title){const b=document.createElement('button');b.type='button';b.className='rm-mini';b.textContent=t;if(title)b.title=title;b.onclick=fn;return b;}
+// 渲染「流向规则表」编辑器（ds={def,rules:[{when:editState,dir}]}）
+function renderDirRules(box, ds){
+  box.innerHTML='';box.className='rm-cond';
+  const hint=document.createElement('div');hint.className='rm-hint';hint.textContent='按顺序匹配，第一个命中的规则决定流向；都不命中时用连线自身的「流向」设置。仅修改流向，不改变连线类型与走线方式。';box.appendChild(hint);
+  const list=document.createElement('div');box.appendChild(list);
+  function draw(){
+    list.innerHTML='';
+    ds.rules.forEach((r,idx)=>{
+      const card=document.createElement('div');card.className='rm-dircard';
+      const top=document.createElement('div');top.className='rm-dirtop';
+      top.appendChild(document.createTextNode('规则'+(idx+1)+' 命中 ⇒ 流向 '));
+      const dsel=document.createElement('select');RULE_DIRS.forEach(d=>{const o=document.createElement('option');o.value=d.v;o.textContent=d.t;dsel.appendChild(o);});dsel.value=r.dir;dsel.onchange=e=>r.dir=e.target.value;
+      top.appendChild(dsel);
+      const sp=document.createElement('span');sp.className='rm-dirbtns';
+      sp.appendChild(_mkBtn('↑',()=>{if(idx>0){const t=ds.rules[idx-1];ds.rules[idx-1]=ds.rules[idx];ds.rules[idx]=t;draw();}},'上移'));
+      sp.appendChild(_mkBtn('↓',()=>{if(idx<ds.rules.length-1){const t=ds.rules[idx+1];ds.rules[idx+1]=ds.rules[idx];ds.rules[idx]=t;draw();}},'下移'));
+      sp.appendChild(_mkBtn('×',()=>{ds.rules.splice(idx,1);draw();},'删除规则'));
+      top.appendChild(sp);card.appendChild(top);
+      const condBox=document.createElement('div');card.appendChild(condBox);renderCond(condBox,r.when);
+      list.appendChild(card);
+    });
+    // 兜底流向只读展示——它就是连线自身的「流向」，请在属性面板里改；此处不改连线本身，避免编辑流向规则时动到走线
+    const defRow=document.createElement('div');defRow.className='rm-dirdefault';
+    const defLbl=(RULE_DIRS.find(d=>d.v===ds.def)||{t:ds.def}).t;
+    defRow.appendChild(document.createTextNode('都不命中 ⇒ 用连线流向：'+defLbl+'（在属性面板修改）'));
+    list.appendChild(defRow);
+  }
+  draw();
+  const add=document.createElement('button');add.type='button';add.className='rm-add';add.textContent='+ 添加流向规则';
+  add.onclick=()=>{ds.rules.push({when:{mode:'all',rows:[{var:'',op:'>',val:'0'}]},dir:'forward'});draw();};
+  box.appendChild(add);
+}
+
+// ───── 规则编辑模态 ─────
+let _ruleSaver=null,_ruleClearer=null;
+// 在模态顶部显示「当前绑定的元素/连线」，避免不知道规则属于谁
+function setRuleTarget(target){
+  const el=document.getElementById('rm-target');if(!el)return;
+  if(!target){el.style.display='none';return;}
+  el.style.display='';
+  el.style.borderLeftColor=target.color||'var(--ui-accent)';
+  el.innerHTML='';
+  const top=document.createElement('div');top.className='rm-tg-top';
+  const chip=document.createElement('span');chip.className='rm-tg-chip';chip.textContent=target.kind;
+  const main=document.createElement('span');main.className='rm-tg-main';main.textContent=target.main;
+  top.appendChild(chip);top.appendChild(main);el.appendChild(top);
+  if(target.sub){const sub=document.createElement('div');sub.className='rm-tg-sub';sub.textContent=target.sub;el.appendChild(sub);}
+}
+// 连线的目标描述：起点 → 终点（类型 / 标签）
+function edgeTargetDesc(e){
+  const a=nodes.find(n=>n.id===e.from), b=nodes.find(n=>n.id===e.to);
+  const al=a?(nodeLabel(a)||a.id):e.from, bl=b?(nodeLabel(b)||b.id):e.to;
+  const cfg=ET[e.et]||ET.ac_power;
+  const tl=(lang==='en'?(cfg.labelEn||cfg.label):cfg.label)||e.et;
+  const sub=(lang==='en'?'Type: ':'类型：')+tl+(e.lbl?((lang==='en'?'  ·  Label: ':'  ·  标签：')+e.lbl):'');
+  return {kind:(lang==='en'?'EDGE':'连线'), main:al+'  →  '+bl, sub:sub, color:cfg.color};
+}
+function nodeTargetDesc(n){
+  return {kind:(lang==='en'?'NODE':'元素'), main:(nodeLabel(n)||n.id), sub:n.id+'  ·  '+n.type, color:n.fontColor||'var(--ui-accent)'};
+}
+function openRuleModal(title, target, bodyRenderer, saver, clearer){
+  document.getElementById('rm-title').textContent=title;
+  setRuleTarget(target);
+  const body=document.getElementById('rm-body');body.innerHTML='';
+  bodyRenderer(body);
+  _ruleSaver=saver;_ruleClearer=clearer||null;
+  document.getElementById('rulemodal-ov').classList.add('show');
+}
+function closeRuleModal(){document.getElementById('rulemodal-ov').classList.remove('show');_ruleSaver=_ruleClearer=null;}
+function saveRuleModal(){if(_ruleSaver)_ruleSaver();closeRuleModal();}
+function clearRuleModalState(){if(_ruleClearer)_ruleClearer();}
+// 节点显示条件（可传入指定节点；不传则用当前选中——属性面板与规则总览共用）
+function editNodeRule(n){
+  n=n||nodes.find(x=>x.id===selNode);if(!n)return;
+  const st=condToEdit(n.visibleWhen);
+  openRuleModal((lang==='en'?'Show condition':'显示条件'), nodeTargetDesc(n),
+    box=>renderCond(box,st),
+    ()=>{snapshot();n.visibleWhen=editToCond(st);snapshot();afterRuleChange(n);},
+    ()=>{st.rows=[];renderCond(document.getElementById('rm-body'),st);});
+}
+// 连线显示条件
+function editEdgeShowRule(e){
+  e=e||selEdge;if(!e)return;
+  const st=condToEdit(e.showWhen);
+  openRuleModal((lang==='en'?'Edge show condition':'连线显示条件'), edgeTargetDesc(e),
+    box=>renderCond(box,st),
+    ()=>{snapshot();e.showWhen=editToCond(st);snapshot();afterRuleChange(e);},
+    ()=>{st.rows=[];renderCond(document.getElementById('rm-body'),st);});
+}
+// 连线流向规则
+function editEdgeDirRules(e){
+  e=e||selEdge;if(!e)return;
+  const ds={def:e.dir||'forward',rules:(Array.isArray(e.dirRules)?e.dirRules:[]).map(r=>({when:condToEdit(r.when),dir:r.dir||'forward'}))};
+  openRuleModal((lang==='en'?'Edge direction rules':'连线流向规则'), edgeTargetDesc(e),
+    box=>renderDirRules(box,ds),
+    ()=>{snapshot();
+      // 只写入流向规则，绝不改动连线的固定流向(e.dir)、类型(e.et)、走线方式(e.route)与拐点(e.waypoints)
+      const rules=ds.rules.map(r=>({when:editToCond(r.when),dir:r.dir})).filter(r=>r.when!=null);
+      if(rules.length)e.dirRules=rules;else delete e.dirRules;
+      snapshot();afterRuleChange(e);},
+    ()=>{ds.rules=[];renderDirRules(document.getElementById('rm-body'),ds);});
+}
+// 规则改动后：同步刷新属性面板摘要(若该元素正被选中) + 抽屉「规则总览」，两边一致
+function afterRuleChange(ref){
+  if(ref&&typeof ref==='object'){
+    if(ref.id!==undefined&&ref.id===selNode)refreshNodeRuleSummary(ref);
+    if(ref===selEdge)refreshEdgeRuleSummary(ref);
+  }
+  renderRulesList();
+  _pathCacheSig='';
+}
+// 规则总览：增/删/改入口（与属性面板共用同一套编辑器与数据）
+function openRuleEditor(kind, ref){
+  if(kind==='nodeShow')editNodeRule(ref);
+  else if(kind==='edgeShow')editEdgeShowRule(ref);
+  else if(kind==='edgeDir')editEdgeDirRules(ref);
+}
+function clearRuleOf(kind, ref){
+  snapshot();
+  if(kind==='nodeShow')delete ref.visibleWhen;
+  else if(kind==='edgeShow')delete ref.showWhen;
+  else if(kind==='edgeDir')delete ref.dirRules;
+  snapshot();afterRuleChange(ref);
+}
+function ruleItemInfo(kind, ref){
+  const dt={forward:'正向→',reverse:'反向←',both:'双向↔',none:'无'};
+  if(kind==='nodeShow')return {chip:(lang==='en'?'NODE':'元素'), tag:(lang==='en'?'Show':'显示'), name:(nodeLabel(ref)||ref.id), sum:(condSummary(ref.visibleWhen)||'—'), color:ref.fontColor||'var(--ui-accent)'};
+  const a=nodes.find(n=>n.id===ref.from),b=nodes.find(n=>n.id===ref.to);
+  const nm=(a?(nodeLabel(a)||a.id):ref.from)+' → '+(b?(nodeLabel(b)||b.id):ref.to);
+  const cfg=ET[ref.et]||ET.ac_power;
+  if(kind==='edgeShow')return {chip:(lang==='en'?'EDGE':'连线'), tag:(lang==='en'?'Show':'显示'), name:nm, sum:(condSummary(ref.showWhen)||'—'), color:cfg.color};
+  const sum=(Array.isArray(ref.dirRules)?ref.dirRules.map(r=>(condSummary(r.when)||'?')+'⇒'+(dt[r.dir]||r.dir)).join('；'):'')+'；否则'+(dt[ref.dir||'forward']||'正向→');
+  return {chip:(lang==='en'?'EDGE':'连线'), tag:(lang==='en'?'Dir':'流向'), name:nm, sum:sum, color:cfg.color};
+}
+function renderRulesList(){
+  const wrap=document.getElementById('sim-rules');if(!wrap)return;
+  wrap.innerHTML='';
+  const rows=[];
+  nodes.forEach(n=>{if(n.visibleWhen!=null)rows.push({kind:'nodeShow',ref:n});});
+  edges.forEach(e=>{if(e.showWhen!=null)rows.push({kind:'edgeShow',ref:e});if(Array.isArray(e.dirRules)&&e.dirRules.length)rows.push({kind:'edgeDir',ref:e});});
+  // 鼠标移出整张规则列表时，恢复进入列表前的选中；移入某条规则时临时选中其元素/连线
+  wrap.onmouseleave=()=>{ if(!_ruleHovering)return; _ruleHovering=false; const p=_ruleHoverPrev;_ruleHoverPrev=null; restoreSelection(p); };
+  if(!rows.length){const d=document.createElement('div');d.className='sim-empty';d.textContent=(lang==='en'?'No rules yet. Select an element/edge on the canvas, then set its show/direction condition in the property panel — it takes effect immediately.':'暂无规则。在画布上选中元素或连线，于右侧属性面板设置「显示条件 / 流向规则」，保存后立即生效。');wrap.appendChild(d);}
+  else rows.forEach(r=>{
+    const info=ruleItemInfo(r.kind,r.ref);
+    const it=document.createElement('div');it.className='rule-item';it.style.borderLeftColor=info.color;it.style.cursor='pointer';
+    const head=document.createElement('div');head.className='rule-item-head';
+    const chip=document.createElement('span');chip.className='rule-item-chip';chip.textContent=info.chip+' · '+info.tag;
+    const nm=document.createElement('span');nm.className='rule-item-name';nm.textContent=info.name;nm.title=info.name;
+    head.appendChild(chip);head.appendChild(nm);
+    const sum=document.createElement('div');sum.className='rule-item-sum';sum.textContent=info.sum;sum.title=info.sum;
+    const btns=document.createElement('div');btns.className='rule-item-btns';
+    const ed=document.createElement('button');ed.type='button';ed.className='rm-mini rm-wide';ed.textContent=(lang==='en'?'Edit':'编辑');ed.onclick=()=>{_ruleHovering=false;_ruleHoverPrev=null;selectRuleTarget(r.kind,r.ref);openRuleEditor(r.kind,r.ref);};
+    const cl=document.createElement('button');cl.type='button';cl.className='rm-mini rm-wide';cl.textContent=(lang==='en'?'Clear':'清除');cl.onclick=()=>clearRuleOf(r.kind,r.ref);
+    btns.appendChild(ed);btns.appendChild(cl);
+    // 悬停高亮：临时选中对应元素/连线，便于辨认是哪个；记住进入列表前的选中以便复原
+    it.onmouseenter=()=>{ if(!_ruleHovering){_ruleHovering=true;_ruleHoverPrev={node:selNode,edge:selEdge};} selectRuleTarget(r.kind,r.ref); };
+    it.appendChild(head);it.appendChild(sum);it.appendChild(btns);
+    wrap.appendChild(it);
+  });
+}
+// 悬停规则总览的恢复：还原进入列表前的选中态
+function restoreSelection(p){
+  try{
+    if(p&&p.node&&nodes.some(n=>n.id===p.node)){ selectNode(p.node); }
+    else if(p&&p.edge&&edges.indexOf(p.edge)>=0){ selectEdge(p.edge); }
+    else { selNode=selEdge=null; showPanel('none'); }
+  }catch(e){}
+}
+// 从规则总览定位并选中对应元素/连线（便于在画布上看到它，并与属性面板联动）
+function selectRuleTarget(kind, ref){
+  try{ if(kind==='nodeShow'){ if(typeof selectNode==='function')selectNode(ref.id); } else { if(typeof selectEdge==='function')selectEdge(ref); } }catch(e){}
+}
+// 批量样例文本框：按内容自适应高度（无内部滚动条）
+function autoGrowSimJSON(){ const ta=document.getElementById('sim-json'); if(!ta)return; ta.style.height='auto'; ta.style.height=(ta.scrollHeight+4)+'px'; }
+// 用当前信号值生成一份完整 JSON 模板，便于看清「批量样例 JSON」的格式；填入后自适应高度并滚动到底部定位到批量样例处
+function fillSimTemplate(){
+  const ctxv=buildCtx(signalValues);const obj={};
+  collectSignals().forEach(s=>{obj[s.name]=ctxv[s.name];});
+  const ta=document.getElementById('sim-json');if(ta)ta.value=JSON.stringify(obj,null,2);
+  autoGrowSimJSON();   // 同步改高度（内部读取 scrollHeight 触发回流）→ 此后 body 高度已是最新，可直接滚到底
+  const body=document.getElementById('sim-body');
+  if(body){ body.scrollTop=body.scrollHeight; setTimeout(()=>{ if(body)body.scrollTop=body.scrollHeight; },60); }   // 定位到底部「批量样例」处
+}
+// 面板规则摘要
+function refreshNodeRuleSummary(n){
+  const el=document.getElementById('np-rule-sum');if(!el)return;
+  const s=n&&condSummary(n.visibleWhen);
+  el.textContent=s||(lang==='en'?'None (always show)':'无（始终显示）');
+  el.classList.toggle('has',!!s);
+}
+function refreshEdgeRuleSummary(e){
+  const se=document.getElementById('ep-show-sum');
+  if(se){const s=e&&condSummary(e.showWhen);se.textContent=s||(lang==='en'?'None (always show)':'无（始终显示）');se.classList.toggle('has',!!s);}
+  const de=document.getElementById('ep-dir-sum');
+  if(de){
+    const dt={forward:'正向→',reverse:'反向←',both:'双向↔',none:'无'};
+    let txt,has=false;
+    if(e&&Array.isArray(e.dirRules)&&e.dirRules.length){has=true;txt=e.dirRules.map(r=>(condSummary(r.when)||'?')+'⇒'+(dt[r.dir]||r.dir)).join('；')+'；否则'+(dt[e.dir||'forward']||'正向→');}
+    else txt=(lang==='en'?'No rules (uses fixed direction below)':'无规则（用下面的固定流向）');
+    de.textContent=txt;de.classList.toggle('has',has);
+  }
+}
+
+// ───── 「规则与信号」侧栏 + 运行视图 ─────
+// 规则始终实时生效（编辑态虚化、运行视图彻底隐藏）；侧栏仅用于「总览规则 / 管理全局信号 / 注入测试」。
+// 注意：togglePanel(side) 已被左右属性面板折叠占用，这里用独立名 toggleSigPanel。
+function toggleSigPanel(){
+  panelOpen=!panelOpen;
+  const b=document.getElementById('btn-preview');
+  if(b)b.classList.toggle('act',panelOpen);
+  document.getElementById('simpanel').classList.toggle('show',panelOpen);
+  if(panelOpen)renderSimPanel();
+}
+// 运行视图/预览开关：开=彻底隐藏被规则隐藏的元素并应用数据驱动流向（看整图运行效果）；关=回到编辑态（被隐藏者虚化+⊘标记，仍可编辑）
+function toggleRunView(on){
+  previewMode=(on!=null)?!!on:!previewMode;
+  const cb=document.getElementById('sim-runview');if(cb)cb.checked=previewMode;
+  const b=document.getElementById('btn-runview');
+  if(b){b.classList.toggle('act',previewMode);b.textContent=previewMode?(lang==='en'?'■ Exit Preview':'■ 退出预览'):(lang==='en'?'▶ Preview':'▶ 预览效果');}
+  _pathCacheSig='';
+}
+// 兼容旧入口名
+function togglePreview(){ toggleSigPanel(); }
+// 注入行 → 信号名（@global 用字段名本身，否则 节点id.字段）
+function injSignalName(r){ if(!r)return null; if(r.node==='@global')return r.field||null; if(r.node&&r.field)return r.node+'.'+r.field; return null; }
+// 信号名 → 注入行结构（导入/粘贴时反解）
+function parseSignal(name){ const i=String(name).lastIndexOf('.'); if(i>0){const nd=name.slice(0,i),fd=name.slice(i+1);if(nodes.some(n=>n.id===nd))return {node:nd,field:fd};} return {node:'@global',field:name}; }
+// 注入行 → signalValues（供求值用）
+function syncInjections(){ signalValues={}; injRows.forEach(r=>{const nm=injSignalName(r);if(nm&&r.val!=='')signalValues[nm]=autoNum(r.val);}); }
+// 某元素的「字段」可选项
+function fieldOptionsFor(node){
+  if(node==='@global')return (customSignals||[]).map(s=>({v:s.name,t:s.label||s.name}));
+  const n=nodes.find(x=>x.id===node);if(!n)return [];
+  const opts=(n.data||[]).filter(f=>f.key).map(f=>({v:f.key,t:f.key}));
+  opts.push({v:'status',t:'状态'});opts.push({v:'online',t:'在线'});
+  return opts;
+}
+// 某行「值」的下拉建议（在线→true/false；状态→常见状态；数值→当前静态值）
+function valSuggestFor(r){
+  if(r.field==='online')return ['true','false'];
+  if(r.field==='status'){const base=['在线','离线','待机','运行','充电','放电','故障','告警','备用','发电'];const n=nodes.find(x=>x.id===r.node);if(n&&n.status&&base.indexOf(n.status)<0)base.unshift(n.status);return base;}
+  if(r.node==='@global'){const s=(customSignals||[]).find(c=>c.name===r.field);if(!s)return [];const t=sigTypeOf(s);if(t==='bool')return ['true','false'];if(t==='enum')return (s.options||[]).map(String);return (s.sample!==''&&s.sample!=null)?[String(s.sample)]:[];}
+  const n=nodes.find(x=>x.id===r.node);const f=n&&(n.data||[]).find(d=>d.key===r.field);return (f&&f.dv!=='')?[String(f.dv)]:[];
+}
+function renderSimPanel(){ renderRulesList(); renderInjRows(); renderCustomSignals(); autoGrowSimJSON(); }
+// 某元素「尚未被其它注入行占用」的字段（去重用；exceptIdx 为当前行自身，排除在外）
+function remainingFieldsFor(node, exceptIdx){
+  const used=new Set();
+  injRows.forEach((r,i)=>{ if(i===exceptIdx)return; if(r.node===node && r.field) used.add(r.field); });
+  return fieldOptionsFor(node).filter(o=>!used.has(o.v));
+}
+// 是否所有可用信号都已注入（节点字段/状态/在线 + 全局信号）
+function allSignalsInjected(){
+  const avail=collectSignals(); if(!avail.length)return false;
+  const inj=new Set(injRows.map(injSignalName).filter(Boolean));
+  return avail.every(s=>inj.has(s.name));
+}
+// 是否正在新增（存在待确认草稿）→ 用于禁用「+ 添加注入」，一次只编辑一条草稿
+function hasPendingInjRow(){ return !!injDraft; }
+// 注入「值」控件：按信号语义决定控件类型——布尔/枚举(在线、状态、枚举型全局信号)用下拉；数值/文本用输入框（不再用 datalist 让数值也带下拉）
+function makeInjValueInput(r){
+  const name=injSignalName(r);
+  const meta=name?signalValueMeta(name):{kind:'text'};
+  if(meta.kind==='bool'){
+    const sel=document.createElement('select');sel.className='sim-val';
+    [['',(lang==='en'?'value…':'值…')],['true','true'],['false','false']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;sel.appendChild(o);});
+    sel.value=(r.val!=null?String(r.val):'');sel.onchange=e=>{r.val=e.target.value;syncInjections();};return sel;
+  }
+  if(meta.kind==='enum'){
+    const sel=document.createElement('select');sel.className='sim-val';
+    const ph=document.createElement('option');ph.value='';ph.textContent=(lang==='en'?'value…':'值…');sel.appendChild(ph);
+    const opts=(meta.options||[]).map(String);
+    if(r.val!=null&&r.val!==''&&!opts.includes(String(r.val)))opts.push(String(r.val));
+    opts.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});
+    sel.value=(r.val!=null?String(r.val):'');sel.onchange=e=>{r.val=e.target.value;syncInjections();};return sel;
+  }
+  const inp=document.createElement('input');inp.className='sim-val';
+  if(meta.kind==='num'){inp.type='number';inp.placeholder=(lang==='en'?'number':'数值');}else{inp.placeholder=(lang==='en'?'value':'值');}
+  inp.value=(r.val!=null?r.val:'');inp.oninput=e=>{r.val=e.target.value;syncInjections();};return inp;
+}
+// 已确认注入行（分组内紧凑行）：字段 + 值 + 删除（元素由分组头表示）
+function buildInjCompactRow(idx){
+  const r=injRows[idx];
+  const row=document.createElement('div');row.className='sim-irow';
+  const fsel=document.createElement('select');fsel.className='sim-sel';
+  const optList=remainingFieldsFor(r.node, idx);                                   // 排除同元素其它行已占字段 → 防重复
+  if(r.field && !optList.some(o=>o.v===r.field)){ const own=fieldOptionsFor(r.node).find(o=>o.v===r.field); optList.push(own||{v:r.field,t:r.field}); }
+  if(!r.field && optList.length)r.field=optList[0].v;
+  optList.forEach(o=>{const op=document.createElement('option');op.value=o.v;op.textContent=o.t;fsel.appendChild(op);});
+  fsel.value=r.field||'';
+  fsel.onchange=e=>{r.field=e.target.value;r.val='';syncInjections();renderInjRows();};
+  const vctrl=makeInjValueInput(r);
+  const del=document.createElement('button');del.type='button';del.className='rm-del';del.textContent='×';del.title=(lang==='en'?'Remove':'删除');del.onclick=()=>{injRows.splice(idx,1);syncInjections();renderInjRows();};
+  row.appendChild(fsel);row.appendChild(vctrl);row.appendChild(del);
+  return row;
+}
+// 新增注入草稿卡：选元素 → 选字段 → 填值 → 点 ✓ 确认后才并入分组列表（× 取消）；选完元素不再立即跳转
+function buildInjDraftCard(){
+  const d=injDraft;
+  const box=document.createElement('div');box.className='sim-igroup draft';
+  const head=document.createElement('div');head.className='sim-ghead';
+  const name=document.createElement('span');name.className='sim-gname';name.style.color='var(--ui-text2)';name.textContent=(lang==='en'?'New injection…':'新增注入…');
+  head.appendChild(name);box.appendChild(head);
+  const fullTag=(lang==='en'?' (all injected)':'（已全部注入）');
+  // 第一行：元素下拉（已全部注入的元素置灰）
+  const r1=document.createElement('div');r1.className='sim-irow';
+  const nsel=document.createElement('select');nsel.className='sim-sel';
+  const ph=document.createElement('option');ph.value='';ph.textContent=(lang==='en'?'Element':'选择元素');nsel.appendChild(ph);
+  nodes.forEach(n=>{const o=document.createElement('option');o.value=n.id;o.textContent=nodeLabel(n);if(remainingFieldsFor(n.id,-1).length===0){o.disabled=true;o.textContent+=fullTag;}nsel.appendChild(o);});
+  const og=document.createElement('option');og.value='@global';og.textContent=(lang==='en'?'＊Global signals':'＊全局信号');if(remainingFieldsFor('@global',-1).length===0){og.disabled=true;og.textContent+=((customSignals&&customSignals.length)?fullTag:(lang==='en'?' (none)':'（无全局信号）'));}nsel.appendChild(og);
+  nsel.value=d.node||'';
+  nsel.onchange=e=>{d.node=e.target.value;const rem=remainingFieldsFor(d.node,-1);d.field=(rem[0]?rem[0].v:'');d.val='';renderInjRows();};
+  r1.appendChild(nsel);box.appendChild(r1);
+  // 第二行：字段 + 值 + ✓ 确认 + × 取消
+  const r2=document.createElement('div');r2.className='sim-irow';
+  const fsel=document.createElement('select');fsel.className='sim-sel';
+  if(!d.node){const fph=document.createElement('option');fph.value='';fph.textContent=(lang==='en'?'Field':'选择字段');fsel.appendChild(fph);fsel.disabled=true;}
+  else{const optList=remainingFieldsFor(d.node,-1);if(!d.field&&optList.length)d.field=optList[0].v;optList.forEach(o=>{const op=document.createElement('option');op.value=o.v;op.textContent=o.t;fsel.appendChild(op);});fsel.value=d.field||'';}
+  fsel.onchange=e=>{d.field=e.target.value;d.val='';renderInjRows();};
+  const vctrl=d.field?makeInjValueInput(d):(function(){const i=document.createElement('input');i.className='sim-val';i.placeholder=(lang==='en'?'value':'值');i.disabled=true;return i;})();
+  const ok=document.createElement('button');ok.type='button';ok.className='sim-ok';ok.textContent='✓';ok.title=(lang==='en'?'Confirm & add':'确认添加到列表');
+  ok.disabled=!(d.node&&d.field);
+  ok.onclick=()=>{ if(!(d.node&&d.field))return; injRows.push({node:d.node,field:d.field,val:(d.val!=null?d.val:'')}); injCollapsed.delete(d.node); injDraft=null; syncInjections(); renderInjRows(); };
+  const cancel=document.createElement('button');cancel.type='button';cancel.className='rm-del';cancel.textContent='×';cancel.title=(lang==='en'?'Cancel':'取消');cancel.onclick=()=>{injDraft=null;renderInjRows();};
+  r2.appendChild(fsel);r2.appendChild(vctrl);r2.appendChild(ok);r2.appendChild(cancel);box.appendChild(r2);
+  return box;
+}
+function renderInjRows(){
+  const wrap=document.getElementById('sim-inj');if(!wrap)return;
+  wrap.innerHTML='';
+  const addBtn=document.getElementById('sim-add-inj');
+  const tools=document.getElementById('sim-inj-tools');
+  if(!nodes.length&&!customSignals.length){
+    wrap.innerHTML='<div class="sim-empty">'+(lang==='en'?'No elements/signals yet: add nodes & data fields, or add a global signal below.':'画布暂无元素/信号：先添加节点与数据字段，或在下方添加全局信号。')+'</div>';
+    if(addBtn)addBtn.disabled=true; if(tools)tools.style.display='none'; _injInited=false; return;
+  }
+  // 鼠标移出注入列表 → 恢复进入前的选中（与「规则总览」共用悬停高亮机制）
+  wrap.onmouseleave=()=>{ if(!_ruleHovering)return; _ruleHovering=false; const p=_ruleHoverPrev;_ruleHoverPrev=null; restoreSelection(p); };
+  const committed=injRows.filter(r=>r.node);   // 已确认（完整）注入；草稿单独存在 injDraft
+  if(!committed.length)_injInited=false;
+  if(!committed.length && !injDraft){
+    wrap.innerHTML='<div class="sim-empty">'+(lang==='en'?'Click "+ Add injection" to pick an element & field and inject preview data.':'点「+ 添加注入」选择元素与字段，注入预览数据。')+'</div>';
+    if(tools)tools.style.display='none';
+  } else {
+    // 按元素分组（首次出现顺序）——仅已确认行参与分组
+    const order=[],map={};
+    injRows.forEach((r,idx)=>{ if(!r.node)return; const key=r.node; if(!(key in map)){map[key]={node:r.node,items:[]};order.push(key);} map[key].items.push(idx); });
+    const realKeys=order;
+    if(!_injInited){ _injInited=true; injCollapsed=new Set(realKeys.slice(1)); }   // 手风琴：默认仅首张展开
+    if(tools)tools.style.display=(realKeys.length>=2)?'flex':'none';               // ≥2 个分组才显示「全部展开/折叠」
+    order.forEach(key=>{
+      const g=map[key];
+      const box=document.createElement('div');box.className='sim-igroup';
+      // 悬停卡片 → 高亮画布上对应元素（及其数据字段）；全局信号无对应元素则临时清空高亮
+      box.onmouseenter=()=>{ if(!_ruleHovering){_ruleHovering=true;_ruleHoverPrev={node:selNode,edge:selEdge};}
+        if(g.node&&g.node!=='@global'&&nodes.some(n=>n.id===g.node)){ try{ selectNode(g.node); }catch(e){} }
+        else { selNode=null;selEdge=null; } };
+      const head=document.createElement('div');head.className='sim-ghead';
+      const name=document.createElement('span');name.className='sim-gname';
+      const collapsed=injCollapsed.has(key);
+      if(collapsed)box.classList.add('collapsed');
+      head.classList.add('clk');
+      const chev=document.createElement('span');chev.className='sim-gchev';chev.textContent=collapsed?'▶':'▼';
+      const chip=document.createElement('span');chip.className='sim-gchip';chip.textContent=(g.node==='@global'?(lang==='en'?'GLOBAL':'全局'):(lang==='en'?'NODE':'元素'));
+      const nd=nodes.find(x=>x.id===g.node);
+      const lab=document.createElement('span');lab.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+      lab.textContent=(g.node==='@global'?(lang==='en'?'Global signals':'全局信号'):(nd?nodeLabel(nd):g.node));
+      name.appendChild(chip);name.appendChild(lab);
+      const cnt=document.createElement('span');cnt.className='sim-gcount';cnt.textContent='('+g.items.length+')';
+      const gadd=document.createElement('button');gadd.type='button';gadd.className='sim-gadd';gadd.textContent=(lang==='en'?'+ field':'+ 字段');
+      const rem=remainingFieldsFor(g.node,-1);
+      gadd.disabled=!rem.length;gadd.title=rem.length?(lang==='en'?'Inject another field of this element':'为该元素再注入一个字段'):(lang==='en'?'All fields of this element are injected':'该元素的字段已全部注入');
+      gadd.onclick=ev=>{ev.stopPropagation();const r2=remainingFieldsFor(g.node,-1);if(!r2.length)return;injCollapsed.delete(g.node);injRows.push({node:g.node,field:r2[0].v,val:''});syncInjections();renderInjRows();};
+      head.appendChild(chev);head.appendChild(name);head.appendChild(cnt);head.appendChild(gadd);box.appendChild(head);
+      head.onclick=ev=>{ if(ev.target.closest('.sim-gadd'))return; if(injCollapsed.has(key))injCollapsed.delete(key);else injCollapsed.add(key); renderInjRows(); };
+      if(!collapsed){const body=document.createElement('div');body.className='sim-gbody';g.items.forEach(idx=>body.appendChild(buildInjCompactRow(idx)));box.appendChild(body);}
+      wrap.appendChild(box);
+    });
+    // 草稿卡（待确认）放最后
+    if(injDraft)wrap.appendChild(buildInjDraftCard());
+  }
+  // 「+ 添加注入」：所有可用信号都已注入 或 正在编辑草稿 时禁用
+  if(addBtn){
+    const noneLeft=allSignalsInjected(),drafting=!!injDraft;
+    addBtn.disabled=noneLeft||drafting;
+    addBtn.title=noneLeft?(lang==='en'?'All available signals are injected':'所有可用信号都已注入，无需再添加')
+              :drafting?(lang==='en'?'Finish the new injection below first':'请先完成下方「新增注入」并点 ✓ 确认')
+              :'';
+  }
+}
+function addInjRow(){
+  if(allSignalsInjected()){ flashHint(lang==='en'?'All available signals are already injected':'所有可用信号都已注入，无需再添加'); renderInjRows(); return; }
+  if(injDraft){ flashHint(lang==='en'?'Finish the new injection below first':'请先完成下方「新增注入」并点 ✓ 确认'); renderInjRows(); return; }
+  injDraft={node:'',field:'',val:''};renderInjRows();
+}
+// 全局信号类型：number(数值) / bool(布尔) / enum(枚举) / text(文本)。老数据无 type 时按样例值推断。
+function sigTypeOf(s){ if(s&&s.type)return s.type; if(typeof (s&&s.sample)==='boolean')return 'bool'; if(typeof (s&&s.sample)==='number')return 'number'; return 'text'; }
+function sigTypeLabel(t){ return ({number:(lang==='en'?'NUM':'数值'),bool:(lang==='en'?'BOOL':'布尔'),enum:(lang==='en'?'ENUM':'枚举'),text:(lang==='en'?'TEXT':'文本')})[t]||t; }
+function renderCustomSignals(){
+  const wrap=document.getElementById('sim-custom');if(!wrap)return;
+  wrap.innerHTML='';
+  if(!customSignals.length){const e=document.createElement('div');e.className='sim-empty';e.textContent=(lang==='en'?'No global signals yet (e.g. mode, islanding). Add one below — any rule can then reference it.':'暂无全局信号（如 mode、islanding）。在下方添加后，任意元素/连线的规则均可引用。');wrap.appendChild(e);return;}
+  customSignals.forEach((s,idx)=>{
+    const row=document.createElement('div');row.className='sim-crow';
+    const nm=document.createElement('span');nm.className='sim-cname';
+    const tb=document.createElement('span');tb.className='sim-ctype';tb.textContent=sigTypeLabel(sigTypeOf(s));
+    const nt=document.createElement('span');nt.textContent=s.name;nt.title=s.name+' · '+sigTypeLabel(sigTypeOf(s));nt.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    nm.appendChild(tb);nm.appendChild(nt);
+    const vctrl=makeGlobalValueInput(s);
+    const del=document.createElement('button');del.type='button';del.className='rm-del';del.textContent='×';del.title='删除信号';del.onclick=()=>{customSignals.splice(idx,1);renderSimPanel();_pathCacheSig='';};
+    row.appendChild(nm);row.appendChild(vctrl);row.appendChild(del);wrap.appendChild(row);
+  });
+}
+// 全局信号「当前值」控件：按类型给布尔/枚举下拉或数值/文本输入；该值即参与规则实时求值
+function makeGlobalValueInput(s){
+  const t=sigTypeOf(s);
+  if(t==='bool'){
+    const sel=document.createElement('select');sel.className='sim-val';sel.style.width='78px';
+    [['','—'],['true','true'],['false','false']].forEach(([v,tx])=>{const o=document.createElement('option');o.value=v;o.textContent=tx;sel.appendChild(o);});
+    sel.value=(s.sample===true?'true':(s.sample===false?'false':''));
+    sel.onchange=e=>{s.sample=(e.target.value===''?'':(e.target.value==='true'));};
+    return sel;
+  }
+  if(t==='enum'){
+    const sel=document.createElement('select');sel.className='sim-val';sel.style.width='96px';
+    const ph=document.createElement('option');ph.value='';ph.textContent='—';sel.appendChild(ph);
+    (s.options||[]).forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});
+    if(s.sample!=null&&s.sample!==''&&!(s.options||[]).map(String).includes(String(s.sample))){const o=document.createElement('option');o.value=String(s.sample);o.textContent=String(s.sample);sel.appendChild(o);}
+    sel.value=(s.sample!=null?String(s.sample):'');
+    sel.onchange=e=>{s.sample=e.target.value;};
+    return sel;
+  }
+  const inp=document.createElement('input');inp.className='sim-val';inp.value=(s.sample!=null?s.sample:'');inp.placeholder=(t==='number'?(lang==='en'?'number':'数值'):(lang==='en'?'value':'值'));
+  if(t==='number')inp.type='number';
+  inp.oninput=e=>{const v=e.target.value;s.sample=(v===''?'':(t==='number'?autoNum(v):v));};
+  return inp;
+}
+// 新建全局信号：切换类型时，枚举显示「可选值」输入，并调整当前值占位
+function onNewSigType(){
+  const t=(document.getElementById('sim-newtype')||{}).value;
+  const opts=document.getElementById('sim-newopts');if(opts)opts.style.display=(t==='enum')?'block':'none';
+  const val=document.getElementById('sim-newval');if(val)val.placeholder=(t==='bool'?'true/false':(t==='number'?(lang==='en'?'current value (number)':'当前值(数值)'):(lang==='en'?'current value':'当前值')));
+}
+function addCustomSignal(){
+  const nmEl=document.getElementById('sim-newname');const nm=(nmEl.value||'').trim();if(!nm)return;
+  if(customSignals.some(s=>s.name===nm)){alert(lang==='en'?'A global signal with this name already exists.':'已存在同名全局信号。');return;}
+  const type=(document.getElementById('sim-newtype')||{}).value||'number';
+  const rawVal=((document.getElementById('sim-newval')||{}).value||'').trim();
+  const sig={name:nm,label:nm,type:type};
+  if(type==='enum'){
+    const opts=((document.getElementById('sim-newopts')||{}).value||'').split(/[,，]/).map(x=>x.trim()).filter(Boolean);
+    sig.options=opts;
+    sig.sample=(rawVal!==''&&(!opts.length||opts.includes(rawVal)))?rawVal:(opts.length?opts[0]:'');
+  } else if(type==='bool'){
+    sig.sample=(rawVal==='')?true:(rawVal==='true'||rawVal==='1'||rawVal==='是');
+  } else if(type==='number'){
+    sig.sample=(rawVal==='')?0:autoNum(rawVal);
+  } else {
+    sig.sample=rawVal;
+  }
+  customSignals.push(sig);
+  nmEl.value='';const v=document.getElementById('sim-newval');if(v)v.value='';const o=document.getElementById('sim-newopts');if(o)o.value='';
+  renderSimPanel();_pathCacheSig='';
+}
+function pasteSimJSON(){
+  const ta=document.getElementById('sim-json');const txt=ta.value.trim();if(!txt)return;
+  let obj;try{obj=JSON.parse(txt);}catch(err){alert(lang==='en'?('Invalid JSON: '+err.message):('JSON 解析失败：'+err.message));return;}
+  if(obj&&typeof obj==='object')Object.keys(obj).forEach(k=>{
+    const existing=injRows.find(r=>injSignalName(r)===k);
+    if(existing)existing.val=obj[k];
+    else{const ps=parseSignal(k);injRows.push({node:ps.node,field:ps.field,val:obj[k]});}
+  });
+  syncInjections();renderSimPanel();autoGrowSimJSON();flashHint(lang==='en'?'Sample data applied':'已应用样例数据');
+}
+function clearSim(){injRows=[];signalValues={};_injInited=false;injDraft=null;const ta=document.getElementById('sim-json');if(ta)ta.value='';autoGrowSimJSON();renderSimPanel();}
+// 注入信号手风琴：全部展开 / 全部折叠（仅作用于已选元素的分组，待指定行不折叠）
+function injExpandAll(){ injCollapsed.clear(); renderInjRows(); }
+function injCollapseAll(){ const ks=new Set(); injRows.forEach(r=>{ if(r.node)ks.add(r.node); }); injCollapsed=ks; renderInjRows(); }
 
 // ───── 极简 ZIP 打包器（store 模式，无需外部库）─────
 function crc32(buf){
@@ -3758,6 +4767,76 @@ function allLibraryEntries(){
 }
 // 导出「全部」左侧元素图标（不限于当前画布）——产出前端可直接使用的图标包：
 // 真实图标文件 + 路径映射(JSON) + 开箱即用 ES 模块(icons.js) + 可视化预览(preview.html)
+// ★ 运行端数据驱动库（随元素库包导出）：与编辑器预览同一套求值逻辑，保证线上=预览
+const RUNTIME_JS=`// 储能拓扑 · 数据驱动运行端（与编辑器「数据预览」同一套逻辑）
+// 用法：
+//   import { resolveDynamic } from './runtime.js';
+//   const state = resolveDynamic(topology, signals);
+//   state.nodes: [{...node, visible}]        // visible=false → 不渲染该元素
+//   state.edges: [{...edge, visible, dir}]    // visible=false → 不渲染（含"条件不满足时无连线"）；dir=动态流向
+// signals：扁平对象，如 { "bms_1.SOC(%)": 20, "grid_1.online": true, "mode": "island" }
+//   未提供的信号回退到画布静态值（节点字段 value / 状态 / 在线=true / topology.signals 样例）。
+function _num(x){if(typeof x==='number')return x;if(typeof x==='boolean')return x?1:0;var f=parseFloat(x);return isNaN(f)?NaN:f;}
+function _looseEq(a,b){if(a===b)return true;var na=_num(a),nb=_num(b);if(!isNaN(na)&&!isNaN(nb))return na===nb;return String(a)===String(b);}
+function _toList(rv){if(Array.isArray(rv))return rv;return String(rv==null?'':rv).split(',').map(function(s){return s.trim();}).filter(function(s){return s!=='';});}
+function cmpOp(lv,op,rv){
+  switch(op){
+    case '==': return _looseEq(lv,rv);
+    case '!=': return !_looseEq(lv,rv);
+    case '>':  return _num(lv)>_num(rv);
+    case '>=': return _num(lv)>=_num(rv);
+    case '<':  return _num(lv)<_num(rv);
+    case '<=': return _num(lv)<=_num(rv);
+    case 'truthy': return !!lv && lv!=='false' && lv!=='0';
+    case 'falsy':  return !lv || lv==='false' || lv==='0';
+    case 'exists': return lv!==undefined && lv!==null && lv!=='';
+    case 'in':     return _toList(rv).some(function(x){return _looseEq(lv,x);});
+    case 'between':{var a=_toList(rv).map(_num);if(a.length<2)return false;return _num(lv)>=Math.min(a[0],a[1])&&_num(lv)<=Math.max(a[0],a[1]);}
+    default: return true;
+  }
+}
+export function evalCond(cond, ctx){
+  if(cond==null)return true;
+  if(typeof cond!=='object')return !!cond;
+  if(Array.isArray(cond.all))return cond.all.every(function(c){return evalCond(c,ctx);});
+  if(Array.isArray(cond.any))return cond.any.some(function(c){return evalCond(c,ctx);});
+  if(cond.not!=null)return !evalCond(cond.not,ctx);
+  if(cond.var==null)return true;
+  var lv=ctx[cond.var];
+  var rv=(cond.ref!=null)?ctx[cond.ref]:cond.val;
+  return cmpOp(lv,cond.op||'truthy',rv);
+}
+export function buildContext(topology, signals){
+  var ctx={};
+  (topology.nodes||[]).forEach(function(n){
+    (n.data||[]).forEach(function(f){
+      var key=(f.key&&typeof f.key==='object')?f.key.zh:f.key;
+      if(key!=null)ctx[n.id+'.'+key]=(f.value==='--'?0:f.value);
+    });
+    ctx[n.id+'.status']=(n.status&&typeof n.status==='object')?n.status.zh:(n.status||'');
+    ctx[n.id+'.online']=true;
+  });
+  (topology.signals||[]).forEach(function(s){if(s&&s.name!=null&&s.sample!==undefined)ctx[s.name]=s.sample;});
+  if(topology.sampleSignals)Object.keys(topology.sampleSignals).forEach(function(k){ctx[k]=topology.sampleSignals[k];});
+  if(signals)Object.keys(signals).forEach(function(k){ctx[k]=signals[k];});
+  return ctx;
+}
+export function resolveDynamic(topology, signals){
+  var ctx=buildContext(topology, signals);
+  var hidden={};
+  (topology.nodes||[]).forEach(function(n){if(n.visibleWhen!=null&&!evalCond(n.visibleWhen,ctx))hidden[n.id]=true;});
+  var nodes=(topology.nodes||[]).map(function(n){var o={},k;for(k in n)o[k]=n[k];o.visible=!hidden[n.id];return o;});
+  var edges=(topology.edges||[]).map(function(e){
+    var visible=!(hidden[e.from]||hidden[e.to]);
+    if(visible&&e.showWhen!=null)visible=evalCond(e.showWhen,ctx);
+    var dir=e.dir||'forward',i;
+    if(Array.isArray(e.dirRules)){for(i=0;i<e.dirRules.length;i++){if(evalCond(e.dirRules[i].when,ctx)){dir=e.dirRules[i].dir;break;}}}
+    var o={},k;for(k in e)o[k]=e[k];o.visible=visible;o.dir=dir;return o;
+  });
+  return {ctx:ctx, nodes:nodes, edges:edges};
+}
+export default resolveDynamic;
+`;
 function dlAllIconsZip(){
   const entries=allLibraryEntries();
   const files=[]; const seen=new Set();
@@ -3797,6 +4876,9 @@ function dlAllIconsZip(){
   // 2.5) element-library.json —— 后台维护的「元素库 + 字典」单一事实来源（前端加载一次）
   files.push({name:'element-library.json', data:strToBytes(JSON.stringify(buildLibraryObj(),null,2))});
 
+  // 2.6) runtime.js —— 数据驱动运行端（与编辑器预览同一套逻辑：动态显隐/流向/条件连线）
+  files.push({name:'runtime.js', data:strToBytes(RUNTIME_JS)});
+
   // 3) preview.html —— 双击在浏览器打开即可看到全部图标
   let cards='';
   Object.keys(meta).forEach(t=>{const m=meta[t];
@@ -3820,6 +4902,7 @@ function dlAllIconsZip(){
 '按 node.type 到库里取图标/默认字段/默认尺寸，再叠加画布 JSON 的实例信息即可还原渲染。\n\n'+
 '目录：\n'+
 '  element-library.json  ★元素库+字典(单一事实来源)：version / tabs / groups(每type: icon, defaultData, defaultSizeWorld) / edgeTypes / statusDict / dataLabelDict\n'+
+'  runtime.js            ★数据驱动运行端：resolveDynamic(topology, signals) → 按规则算出每个节点/连线的 visible 与连线 dir（与编辑器预览同逻辑）\n'+
 '  icons/                每个元素的图标文件（.png 实拍 / .svg 线框）\n'+
 '  icon-map.json         type → 图标路径 映射（轻量）\n'+
 '  icons.js              开箱即用 ES 模块：ICON_PATHS / ICON_META / ICON_DATA(内联 dataURI)\n'+
@@ -3833,7 +4916,15 @@ function dlAllIconsZip(){
 '  4) 遍历 edges：样式查 library.edgeTypes[edge.edgeType]，按 route / waypoints 走线\n\n'+
 '图标用法（任选）：\n'+
 '  A) 静态资源：icons/ 部署到 /assets/topo-icons/，url = ICON_BASE + ICON_PATHS[type]\n'+
-'  B) 内联零请求：ICON_DATA[type]（已是 dataURI）\n';
+'  B) 内联零请求：ICON_DATA[type]（已是 dataURI）\n\n'+
+'数据驱动（动态显隐 / 流向 / 条件连线）：\n'+
+'  画布 JSON 中：node.visibleWhen（显示条件）、edge.showWhen（显示/存在条件）、edge.dirRules（流向规则，顺序匹配 e.dir 兜底）、顶层 signals（自定义全局信号）。\n'+
+'  条件结构：叶子 {var,op,val|ref}；组合 {all:[...]}/{any:[...]}/{not:{...}}；op ∈ == != > >= < <= in between truthy falsy exists。\n'+
+'  信号寻址：节点字段=“节点id.字段名(中文)”，另有“节点id.status”“节点id.online”，以及 signals 里的全局信号。\n'+
+'  运行端用法：\n'+
+'    import { resolveDynamic } from "./runtime.js";\n'+
+'    const state = resolveDynamic(topology, liveSignals);   // liveSignals 形如 {"bms_1.SOC(%)":18,"grid_1.online":false}\n'+
+'    state.nodes/state.edges 上的 visible 决定是否渲染，edge.dir 为动态流向。\n';
   files.push({name:'README.md', data:strToBytes(readme)});
 
   const zip=makeZip(files);
@@ -4002,6 +5093,41 @@ const TEMPLATES={
         {from:'sw_ac',to:'pcs_1',et:'ac_power',route:'ortho',dir:'forward',lbl:''},
         {from:'pcs_1',to:'sw_dc',et:'dc_power',route:'ortho',dir:'forward',lbl:''},
         {from:'sw_dc',to:'bms_1',et:'pipe_blue',route:'ortho',dir:'both',lbl:''},
+      ];
+      return {nodes,edges};
+    }
+  },
+  // ★ 数据驱动示例：规则随信号实时生效（编辑态虚化、运行视图隐藏）；点顶栏「⚙ 规则与信号」改 grid_1.online / pcs_1.P(kW) 看显隐与流向变化
+  t7_dynamic:{
+    name:'数据驱动示例', nameEn:'Data-Driven Demo', desc:'电网在线/PCS功率正负 → 元素与连线实时显隐、流向自动切换（规则即时生效；在「⚙ 规则与信号」里改信号值体验）',
+    build(){
+      const W=1000,H=620;
+      const nodes=[
+        {id:'pcs_1',type:'pcs',labelZh:'PCS变流器',labelEn:'PCS',x:W*.5,y:H*.5,status:'运行',fontSize:14,fontColor:'#2ecc71',
+          data:mkData([['P(kW)','P(kW)',-30],['U(V)','U(V)',750]])},
+        {id:'grid_1',type:'grid',labelZh:'市电',labelEn:'Grid',x:W*.18,y:H*.28,status:'在线',fontSize:14,fontColor:'#e8f4ff',
+          data:mkData([['P(kW)','P(kW)',200]])},
+        {id:'bms_1',type:'bms',labelZh:'储能电池',labelEn:'Battery',x:W*.82,y:H*.28,status:'充电',fontSize:14,fontColor:'#3aa0ff',
+          data:mkData([['SOC(%)','SOC(%)',55]])},
+        {id:'load_1',type:'load',labelZh:'用户负载',labelEn:'Load',x:W*.82,y:H*.72,status:'在线',fontSize:14,fontColor:'#e8f4ff',
+          data:mkData([['负载功率(kW)','Load(kW)',80]])},
+        // 发电机：仅在「市电离线(孤岛)」时显示（工况2：元素按数据动态显隐）
+        {id:'gen_1',type:'generator',labelZh:'柴油发电机',labelEn:'Generator',x:W*.18,y:H*.72,status:'备用',fontSize:14,fontColor:'#f5c518',
+          data:mkData([['P(kW)','P(kW)',0]]), visibleWhen:{var:'grid_1.online',op:'falsy'}},
+      ];
+      const edges=[
+        // 工况2：市电在线才有这条并网连线；离线时整条消失
+        {from:'grid_1',to:'pcs_1',et:'ac_power',route:'straight',dir:'forward',lbl:'并网',
+          showWhen:{var:'grid_1.online',op:'truthy'}},
+        // 工况1：PCS 功率正→充电(正向)，负→放电(反向)，由数据决定流向
+        {from:'pcs_1',to:'bms_1',et:'charge',route:'straight',dir:'both',lbl:'',
+          dirRules:[{when:{var:'pcs_1.P(kW)',op:'>',val:0},dir:'forward'},
+                    {when:{var:'pcs_1.P(kW)',op:'<',val:0},dir:'reverse'}]},
+        // 常显：PCS 向负载供电
+        {from:'pcs_1',to:'load_1',et:'discharge',route:'straight',dir:'forward',lbl:''},
+        // 工况2：仅孤岛(市电离线)时，发电机接入并供电
+        {from:'gen_1',to:'pcs_1',et:'ac_power',route:'straight',dir:'forward',lbl:'孤岛',
+          showWhen:{var:'grid_1.online',op:'falsy'}},
       ];
       return {nodes,edges};
     }
