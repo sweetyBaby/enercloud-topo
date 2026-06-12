@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>拓扑运行端接入示例（iframe + 实时数据）</title>
+<style>
+  :root{--bg:#0a1428;--panel:#0f1d36;--bd:#1c3a5e;--txt:#cfe0f2;--accent:#4dd0ff}
+  *{box-sizing:border-box}
+  body{margin:0;height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--txt);font-family:-apple-system,"Microsoft YaHei",sans-serif}
+  header{padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;color:var(--accent)}
+  .hint{font-size:12px;color:#8aa8c4}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  button{background:#13294a;border:1px solid var(--bd);color:var(--txt);font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  #status{font-size:12px;color:#8aa8c4;margin-left:auto}
+  #frame{flex:1;border:0;width:100%;background:#0a1f40}
+</style>
+</head>
+<body>
+  <header>
+    <h1>⚡ 拓扑运行端接入示例</h1>
+    <span class="hint">演示：把运营端编辑器以 <code>?mode=embed</code> 内嵌，父页面用 postMessage 下发「拓扑 + 实时数据」，渲染与运营端完全一致。</span>
+    <div class="bar">
+      <button onclick="sim.charging()">电池充电(PCS&gt;0)</button>
+      <button onclick="sim.discharging()">电池放电(PCS&lt;0)</button>
+      <button onclick="sim.gridOff()">市电离线</button>
+      <button onclick="sim.gridOn()">市电在线</button>
+      <button onclick="sim.toggleAuto()">▶/⏸ 自动模拟</button>
+    </div>
+    <span id="status">未就绪…</span>
+  </header>
+
+  <!-- 运营端编辑器，以只读运行模式内嵌；不带 topology 参数 → 等待父页面 postMessage 下发 -->
+  <iframe id="frame" src="拓扑结构编辑器-V3.html?mode=embed&interactive=0"></iframe>
+
+<script>
+// ── 1) 一份示例拓扑（实际项目里从运营端接口动态获取这份「画布 JSON」即可）──
+const TOPOLOGY = {
+  schemaVersion:"2.0",
+  meta:{ canvas:{ bgColor:"#0a1f40" } },
+  nodes:[
+    {id:"grid_1", type:"grid",  label:{zh:"市电",      en:"Grid"}, position:{x:140,y:240}, data:[{key:{zh:"P(kW)",en:"P(kW)"},value:5}]},
+    {id:"pv_1",   type:"solar", label:{zh:"光伏",      en:"PV"},   position:{x:340,y:90},  data:[{key:{zh:"P(kW)",en:"P(kW)"},value:8}]},
+    {id:"pcs_1",  type:"pcs",   label:{zh:"PCS变流器", en:"PCS"},  position:{x:540,y:240}, data:[{key:{zh:"P(kW)",en:"P(kW)"},value:0}],
+      // 规则：市电离线时隐藏 PCS（演示「数据驱动显隐」）
+      visibleWhen:{var:"grid_1.online", op:"truthy"}},
+    {id:"bms_1",  type:"bms",   label:{zh:"电池BMS",   en:"BMS"},  position:{x:760,y:240}, data:[{key:{zh:"SOC(%)",en:"SOC(%)"},value:60}]}
+  ],
+  edges:[
+    {from:"pv_1",  to:"grid_1", edgeType:"ac_power", route:"smart", dir:"forward"},
+    {from:"grid_1",to:"pcs_1",  edgeType:"ac_power", route:"smart", dir:"forward"},
+    // 规则：PCS 功率 >0 充电(正向→BMS)，<0 放电(反向←BMS)，=0 无流向（演示「数据驱动流向」）
+    {from:"pcs_1", to:"bms_1",  edgeType:"dc_power", route:"smart", dir:"none",
+      dirRules:[ {when:{var:"pcs_1.P(kW)",op:">",val:0}, dir:"forward"},
+                 {when:{var:"pcs_1.P(kW)",op:"<",val:0}, dir:"reverse"},
+                 {when:{var:"pcs_1.P(kW)",op:"==",val:0},dir:"none"} ]}
+  ]
+};
+
+const frame = document.getElementById('frame');
+const post  = (msg)=>frame.contentWindow.postMessage(msg, '*');
+function setStatus(t){ document.getElementById('status').textContent = t; }
+
+// ── 2) 等 iframe 就绪 → 下发拓扑 → 开始推送实时数据 ──
+window.addEventListener('message', (ev)=>{
+  if(ev.data && ev.data.type === 'topo:ready'){
+    setStatus('已就绪 · 已下发拓扑');
+    post({type:'topo:topology', data:TOPOLOGY});           // 下发画布
+    sim.start();                                           // 开始模拟实时数据
+  }
+});
+
+// ── 3) 实时数据：键名 = 规则里的信号名（节点id.字段 / .status / .online / 全局信号）──
+let auto=null;
+const sim = {
+  push(sig){ post({type:'topo:merge', data:sig}); },       // 增量合并；整批覆盖用 type:'topo:signals'
+  charging(){ this.push({'pcs_1.P(kW)':  12}); setStatus('PCS=+12kW 充电 → 流向 PCS→BMS 正向'); },
+  discharging(){ this.push({'pcs_1.P(kW)': -9}); setStatus('PCS=-9kW 放电 → 流向 反向'); },
+  gridOff(){ this.push({'grid_1.online': false}); setStatus('市电离线 → PCS 及相关连线按规则隐藏'); },
+  gridOn(){  this.push({'grid_1.online': true });  setStatus('市电在线 → 恢复显示'); },
+  start(){ if(auto) return; auto=setInterval(()=>{
+      // 模拟一组随机实时值
+      this.push({
+        'grid_1.P(kW)': +(Math.random()*20-10).toFixed(1),
+        'pv_1.P(kW)':   +(Math.random()*15).toFixed(1),
+        'pcs_1.P(kW)':  +(Math.random()*30-15).toFixed(1),
+        'bms_1.SOC(%)': Math.round(Math.random()*100)
+      });
+    }, 2000); },
+  toggleAuto(){ if(auto){ clearInterval(auto); auto=null; setStatus('已暂停自动模拟'); } else { this.start(); setStatus('自动模拟中（每2秒）'); } }
+};
+
+// 兜底：某些环境 iframe 不发 ready（如已带 topology 参数自行加载），3 秒后也尝试下发一次
+setTimeout(()=>{ if(!auto){ try{ post({type:'topo:topology', data:TOPOLOGY}); sim.start(); setStatus('已下发拓扑（兜底）'); }catch(e){} } }, 3000);
+</script>
+</body>
+</html>
