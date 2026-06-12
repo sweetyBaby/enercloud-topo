@@ -810,7 +810,11 @@ function undo(){if(histIdx<=0)return;histIdx--;const s=JSON.parse(history[histId
 function redo(){if(histIdx>=history.length-1)return;histIdx++;const s=JSON.parse(history[histIdx]);nodes=s.nodes;edges=s.edges;if(s.bgColor!==undefined)bgColor=s.bgColor;if(s.routeStyle!==undefined)routeStyle=s.routeStyle;selNode=selEdge=null;selSet.clear();selChips.clear();updateAlignBar();showPanel('none');_pathCacheSig='';updUR();}
 function updUR(){document.getElementById('btn-undo').disabled=histIdx<=0;document.getElementById('btn-redo').disabled=histIdx>=history.length-1;}
 
-function init(){buildSidebar();buildEdgeBar();buildSelects();buildBg();resizeCanvas();snapshot();loadDefaultTemplate();requestAnimationFrame(loop);
+function init(){buildSidebar();buildEdgeBar();buildSelects();buildBg();resizeCanvas();snapshot();
+  const _rt=topoRuntimeConfig();
+  if(_rt){ enterRuntimeMode(_rt); }            // ★ 运营端配置好后，前端以「只读运行模式」用同一份渲染器+规则渲染（动态拉 JSON/实时数据）
+  else { loadDefaultTemplate(); }
+  requestAnimationFrame(loop);
   // 拖动提示 6 秒后淡出
   setTimeout(()=>{const ph=document.getElementById('pan-hint');if(ph)ph.style.opacity='0';},6000);
 }
@@ -1562,7 +1566,7 @@ function addNode(type,x,y){
   nodes.push({id,type,labelZh,labelEn,x,y,status:'待机',fontSize:14,fontColor:'#e8f4ff',scale:(type==='anchor'?0.1:1),
     hideLabel:(type==='anchor'),hideFields:(type==='anchor'),
     ...(type==='anchor'?{fill:'#4dd0ff',opacity:1}:{}),
-    data:(def.data||[]).map(k=>({key:k,keyEn:(DATA_LABEL_EN[k]||k),dv:0}))});
+    data:(def.data||[]).map(k=>({key:k,keyEn:(DATA_LABEL_EN[k]||k),dv:''}))});
   snapshot();selectNode(id);
 }
 // 获取节点当前语言标签
@@ -2843,7 +2847,7 @@ function fieldChipPos(n,i){
 }
 function fieldChipText(f){
   const k=dataKey(f);
-  const v=(f.dv!=null&&f.dv!==0&&f.dv!=='')?f.dv:'--';
+  const v=(f.dv==null||f.dv==='')?'':f.dv;   // 有值就显示（含 0 显示为 0）；无值(null/空串)显示空
   return k+': '+v;
 }
 function drawFieldChips(n,s){
@@ -2880,8 +2884,9 @@ function drawFieldChips(n,s){
     // 文字：字段名浅色，值强调色
     const k=dataKey(f), kw=ctx.measureText(k+': ').width;
     ctx.fillStyle='#9fc0dd';ctx.fillText(k+': ',bx+padX,pos.y);
-    const v=(f.dv!=null&&f.dv!==0&&f.dv!=='')?f.dv:'--';
-    ctx.fillStyle=(f.dv!=null&&f.dv!==0&&f.dv!=='')?'#4dd0ff':'#6b8299';
+    const _hv=(f.dv!=null&&f.dv!=='');         // 有值(含 0)→强调色显示；无值→留空
+    const v=_hv?f.dv:'';
+    ctx.fillStyle=_hv?'#4dd0ff':'#6b8299';
     ctx.fillText(''+v,bx+padX+kw,pos.y);
     f._chipBox={x:bx,y:by,w:bw,h:bh};
   });
@@ -3129,8 +3134,8 @@ function applyEP(){
   _pathCacheSig='';
   const cfg=ET[selEdge.et]||ET.ac_power;document.getElementById('ep-desc').textContent=cfg.desc;document.getElementById('ep-desc').style.color=cfg.color;updateEpTypeSwatch();snapshot();
 }
-function renderDFs(n){const c=document.getElementById('dfields');c.innerHTML='';(n.data||[]).forEach((f,i)=>{const r=document.createElement('div');r.className='dfrow';const dvVal=(f.dv!=null&&f.dv!==0&&f.dv!=='')?String(f.dv).replace(/"/g,'&quot;'):'';r.innerHTML='<input class="df-zh-in" value="'+(f.key||'')+'" placeholder="中文" oninput="updDF('+i+',\'key\',this.value)"><input class="df-en-in" value="'+(f.keyEn||'')+'" placeholder="English" oninput="updDF('+i+',\'keyEn\',this.value)"><input class="df-val-in" value="'+dvVal+'" placeholder="--" oninput="updDFVal('+i+',this.value)"><button onclick="rmDF('+i+')">✕</button>';c.appendChild(r);});}
-function addDF(){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.data=n.data||[];const def=NODE_DEFAULTS[n.type]||{data:[]};const used=n.data.map(f=>f.key);const next=def.data.find(k=>!used.includes(k))||'字段'+(n.data.length+1);n.data.push({key:next,keyEn:(DATA_LABEL_EN[next]||next),dv:0});renderDFs(n);}
+function renderDFs(n){const c=document.getElementById('dfields');c.innerHTML='';(n.data||[]).forEach((f,i)=>{const r=document.createElement('div');r.className='dfrow';const dvVal=(f.dv==null||f.dv==='')?'':String(f.dv).replace(/"/g,'&quot;');r.innerHTML='<input class="df-zh-in" value="'+(f.key||'')+'" placeholder="中文" oninput="updDF('+i+',\'key\',this.value)"><input class="df-en-in" value="'+(f.keyEn||'')+'" placeholder="English" oninput="updDF('+i+',\'keyEn\',this.value)"><input class="df-val-in" value="'+dvVal+'" placeholder="--" oninput="updDFVal('+i+',this.value)"><button onclick="rmDF('+i+')">✕</button>';c.appendChild(r);});}
+function addDF(){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.data=n.data||[];const def=NODE_DEFAULTS[n.type]||{data:[]};const used=n.data.map(f=>f.key);const next=def.data.find(k=>!used.includes(k))||'字段'+(n.data.length+1);n.data.push({key:next,keyEn:(DATA_LABEL_EN[next]||next),dv:''});renderDFs(n);}
 function resetRotation(){const n=nodes.find(x=>x.id===selNode);if(!n)return;snapshot();n.rotation=0;document.getElementById('p-rot').value=0;document.getElementById('p-rot-v').textContent=0;snapshot();}
 function resetFieldPos(){const n=nodes.find(x=>x.id===selNode);if(!n||!n.data)return;snapshot();n.data.forEach(f=>{f.ox=0;f.oy=0;});snapshot();}
 // 智能环绕布局：把字段卡片分配到设备四周空闲方向，避开连线占用的边
@@ -3721,7 +3726,7 @@ function buildJSON(){
       display:{ showLabel:!n.hideLabel, showFields:!n.hideFields },
       data:(n.data||[]).map(f=>({
         key:{zh:f.key, en:f.keyEn||f.key},
-        value:(f.dv!=null&&f.dv!==0&&f.dv!=='')?f.dv:'--',
+        value:(f.dv==null||f.dv==='')?'':f.dv,
         hidden:!!f.hidden,
         offset:{x:parseFloat((f.ox||0).toFixed(1)), y:parseFloat((f.oy||0).toFixed(1))}
       }))
@@ -3829,7 +3834,7 @@ function parseImportedNode(o){
     const key=(f.key&&typeof f.key==='object')?f.key:{zh:f.key,en:f.keyEn};
     const off=f.offset||{};
     let dv=(f.value!==undefined?f.value:f.dv);
-    if(dv==='--'||dv==null)dv=0;
+    if(dv==='--'||dv==null)dv='';   // 兼容旧导出的占位符 '--'：视为无值（空）
     return {key:(key.zh||''), keyEn:(key.en||key.zh||''), dv:dv, hidden:!!f.hidden,
             ox:(+off.x||+f.ox||0), oy:(+off.y||+f.oy||0)};
   });
@@ -4811,7 +4816,7 @@ export function buildContext(topology, signals){
   (topology.nodes||[]).forEach(function(n){
     (n.data||[]).forEach(function(f){
       var key=(f.key&&typeof f.key==='object')?f.key.zh:f.key;
-      if(key!=null)ctx[n.id+'.'+key]=(f.value==='--'?0:f.value);
+      if(key!=null)ctx[n.id+'.'+key]=(f.value==='--'?'':f.value);
     });
     ctx[n.id+'.status']=(n.status&&typeof n.status==='object')?n.status.zh:(n.status||'');
     ctx[n.id+'.online']=true;
@@ -4924,7 +4929,22 @@ function dlAllIconsZip(){
 '  运行端用法：\n'+
 '    import { resolveDynamic } from "./runtime.js";\n'+
 '    const state = resolveDynamic(topology, liveSignals);   // liveSignals 形如 {"bms_1.SOC(%)":18,"grid_1.online":false}\n'+
-'    state.nodes/state.edges 上的 visible 决定是否渲染，edge.dir 为动态流向。\n';
+'    state.nodes/state.edges 上的 visible 决定是否渲染，edge.dir 为动态流向。\n\n'+
+'前端接入（两种方式，按需选）：\n'+
+'  方式A（推荐·零重写·像素级一致）：直接把本编辑器 HTML 以「只读运行模式」托管/内嵌，复用同一份渲染器+规则，\n'+
+'    流向动画/智能走线/母线汇流/字段卡片都与运营端完全一致，无需自己实现渲染。\n'+
+'    • URL 方式： 编辑器.html?mode=runtime&topology=<画布JSON地址>&signals=<实时数据地址>&interval=2000\n'+
+'        其它参数：fit=0 关闭自动适配；interactive=1 允许平移缩放（默认只读不可交互）。\n'+
+'    • iframe 内嵌：父页面 postMessage 推送：\n'+
+'        iframe.contentWindow.postMessage({type:"topo:topology",data:画布JSON对象},"*");\n'+
+'        iframe.contentWindow.postMessage({type:"topo:signals",data:{"grid_1.P(kW)":-2,"grid_1.online":true}},"*");  // 整批覆盖\n'+
+'        iframe.contentWindow.postMessage({type:"topo:merge",data:{"bms_1.SOC(%)":55}},"*");                         // 增量合并\n'+
+'        iframe 就绪后会向父页面 postMessage({type:"topo:ready"})，收到后再推数据更稳妥。\n'+
+'    • JS API（同源/直接托管时）：window.TopoRuntime.loadTopology(对象或URL) / setSignals(obj) / mergeSignals(obj) / fit()\n'+
+'    实时数据键名 = 规则里的信号名：节点字段「节点id.字段名」、状态「节点id.status」、在线「节点id.online」、全局信号名；\n'+
+'    同一份实时数据既驱动规则(显隐/流向)，也用于字段卡片数值显示（注意编辑器约定：字段值为 0 显示为 --）。\n'+
+'  方式B（自研渲染器）：用 runtime.js 的 resolveDynamic 仅取 visible/dir，再按上面「前端渲染流程」自行绘制\n'+
+'    （注意 route="smart" 的智能走线路径未存入 JSON，自研渲染需自行实现走线，否则线形可能与运营端不一致）。\n';
   files.push({name:'README.md', data:strToBytes(readme)});
 
   const zip=makeZip(files);
@@ -4936,7 +4956,7 @@ function dlAllIconsZip(){
 // ══════════════════════════════════════════════
 // 示例模板库（4 种典型储能拓扑）
 // ══════════════════════════════════════════════
-function mkData(pairs){return pairs.map(([k,e,v])=>({key:k,keyEn:e,dv:v||0}));}
+function mkData(pairs){return pairs.map(([k,e,v])=>({key:k,keyEn:e,dv:(v==null?'':v)}));}
 const TEMPLATES={
   t1:{
     name:'发散式拓扑', nameEn:'Radial Layout', desc:'PCS 居中，光伏/电网/电池/负载/发电机十字分布',
@@ -5211,6 +5231,98 @@ function setRouteStyle(s){ routeStyle=parseInt(s); applyTidyRouting(); _pathCach
 // 兼容旧调用：默认加载模板1
 async function loadDemo(){ openTemplates(); }
 function loadDefaultTemplate(){ loadTemplate('t1'); }
+
+// ══════════════════════════════════════════════════════════════
+// ★ 只读运行模式（前端嵌入/独立托管）：与运营端编辑器同一份渲染器 + 同一套规则引擎，
+//   保证前端拓扑/连线/流向/字段与运营端「像素级一致」。前端动态拉取画布 JSON 与实时数据即可。
+//   开启方式（任选）：
+//     1) URL 参数：?mode=runtime&topology=<画布JSON地址>&signals=<实时数据地址>&interval=2000
+//        其它参数：fit=0 关闭自动适配；interactive=1 允许平移/缩放（默认只读不可交互）
+//     2) iframe 内嵌：父页面 postMessage({type:'topo:topology',data:画布JSON对象})、
+//        {type:'topo:signals',data:{信号:值}}（整批覆盖）、{type:'topo:merge',data:{...}}（增量合并）
+//     3) JS API：window.TopoRuntime.loadTopology(对象或URL) / setSignals(obj) / mergeSignals(obj) / fit()
+//   实时数据键名 = 规则里用的信号名：节点字段「节点id.字段名」、状态「节点id.status」、在线「节点id.online」、全局信号名。
+// ══════════════════════════════════════════════════════════════
+let _rtCfg=null,_rtTimer=null;
+function topoRuntimeConfig(){
+  let cfg=null;
+  try{
+    const q=new URLSearchParams(location.search);
+    const mode=(q.get('mode')||'').toLowerCase();
+    const on=(mode==='runtime'||mode==='view'||mode==='embed'||q.has('embed')||(typeof window!=='undefined'&&window.__TOPO_RUNTIME__));
+    if(!on)return null;
+    cfg={ topology:q.get('topology')||q.get('topo')||null,
+          signals:q.get('signals')||null,
+          interval:parseInt(q.get('interval')||'0',10)||0,
+          fit:q.get('fit')!=='0',
+          interactive:q.get('interactive')==='1' };
+    if(window.__TOPO_RUNTIME__&&typeof window.__TOPO_RUNTIME__==='object')cfg=Object.assign(cfg,window.__TOPO_RUNTIME__);
+  }catch(e){ cfg=(typeof window!=='undefined'&&window.__TOPO_RUNTIME__)?Object.assign({fit:true},window.__TOPO_RUNTIME__):null; }
+  return cfg;
+}
+// 实时数据 → 既喂规则(signalValues)，又回写字段值/状态用于显示（与编辑器同一套字段渲染）
+function applyLiveSignals(payload){
+  if(!payload||typeof payload!=='object')return;
+  Object.keys(payload).forEach(k=>{
+    const v=payload[k];
+    signalValues[k]=v;                                   // 规则求值用
+    const ps=parseSignal(k);                             // 映射到节点字段→更新显示
+    if(ps&&ps.node&&ps.node!=='@global'){
+      const n=nodes.find(x=>x.id===ps.node); if(!n)return;
+      if(ps.field==='status') n.status=v;
+      else if(ps.field==='online'){ /* 仅参与规则，无字段显示 */ }
+      else { const f=(n.data||[]).find(d=>d.key===ps.field); if(f)f.dv=v; }
+    }
+  });
+  // 流向/显隐由渲染循环每帧按 signalValues 实时求值，无需手动重绘
+}
+async function rtLoadTopology(src){
+  let obj=src;
+  try{ if(typeof src==='string'){ const r=await fetch(src,{cache:'no-store'}); obj=await r.json(); } }
+  catch(e){ console.error('[TopoRuntime] 拉取画布 JSON 失败：',e); return false; }
+  nodes=[];edges=[];selNode=selEdge=null; try{selSet&&selSet.clear&&selSet.clear();}catch(e){}   // 置空以跳过导入二次确认
+  try{ await importCanvasJSON(obj); }catch(e){ console.error('[TopoRuntime] 还原画布失败：',e); return false; }
+  previewMode=true;                                      // 运行视图：被规则隐藏者彻底不画
+  if(!_rtCfg||_rtCfg.fit!==false){ resizeCanvas(); fitView(); }
+  return true;
+}
+function _rtStartSignalFeed(){
+  if(!_rtCfg||!_rtCfg.signals)return;
+  const pull=()=>fetch(_rtCfg.signals,{cache:'no-store'}).then(r=>r.json()).then(applyLiveSignals).catch(e=>console.error('[TopoRuntime] 拉取实时数据失败：',e));
+  pull();
+  if(_rtCfg.interval>0){ if(_rtTimer)clearInterval(_rtTimer); _rtTimer=setInterval(pull,_rtCfg.interval); }
+}
+function enterRuntimeMode(cfg){
+  _rtCfg=cfg||{fit:true};
+  previewMode=true;
+  document.body.classList.add('rt'); if(!_rtCfg.interactive)document.body.classList.add('rt-lock');
+  // 注入只读样式：隐藏编辑器全部外壳，画布铺满容器
+  if(!document.getElementById('topo-rt-style')){
+    const st=document.createElement('style');st.id='topo-rt-style';
+    st.textContent='body.rt #topbar,body.rt #ebar,body.rt #alignbar,body.rt #sidebar-wrap,body.rt #props,body.rt .panel-toggle,body.rt #chint,body.rt #ehint,body.rt #corner-info,body.rt #bgpanel,body.rt #bgpanel-overlay,body.rt #simpanel,body.rt #jpanel,body.rt #ctxmenu,body.rt #uo{display:none!important}'
+      +'body.rt #main{height:100vh}body.rt #cwrap{width:100vw;height:100vh}body.rt.rt-lock #c{pointer-events:none}';
+    document.head.appendChild(st);
+  }
+  resizeCanvas();
+  // 对外 JS API
+  window.TopoRuntime={ loadTopology:rtLoadTopology,
+    setSignals:o=>{signalValues={};applyLiveSignals(o);},
+    mergeSignals:applyLiveSignals,
+    fit:()=>{resizeCanvas();fitView();},
+    config:()=>_rtCfg };
+  // iframe 内嵌：接收父页面推送的拓扑与实时数据
+  window.addEventListener('message',ev=>{ const d=ev&&ev.data; if(!d||typeof d!=='object')return;
+    if(d.type==='topo:topology'&&d.data)rtLoadTopology(d.data);
+    else if(d.type==='topo:signals'&&d.data){ signalValues={}; applyLiveSignals(d.data); }
+    else if(d.type==='topo:merge'&&d.data) applyLiveSignals(d.data); });
+  // 容器尺寸变化时重新适配
+  window.addEventListener('resize',()=>{ resizeCanvas(); if(_rtCfg.fit!==false)fitView(); });
+  // 初始拓扑 → 实时数据
+  if(_rtCfg.topology){ rtLoadTopology(_rtCfg.topology).then(_rtStartSignalFeed); }
+  else { _rtStartSignalFeed(); }
+  // 通知宿主已就绪（iframe 场景可据此再 postMessage 数据）
+  try{ if(window.parent&&window.parent!==window)window.parent.postMessage({type:'topo:ready'},'*'); }catch(e){}
+}
 setTheme('blue_screen');
 </script>
 </body></html>
