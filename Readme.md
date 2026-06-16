@@ -249,4 +249,4 @@ const state = resolveDynamic(topology, liveSignals);
 
 **前端**：① 部署元素库包（图标/runtime.js）→ ② 用方案 A 嵌入编辑器 HTML → ③ 下发画布 JSON → ④ 按信号命名规则推送实时数据（轮询或 WebSocket → postMessage/merge）→ ⑤ 核对显隐/流向/字段与运营端一致。
 
-> 可参考随附的 **`运行端接入示例.html`**（iframe + postMessage + 模拟实时数据的可运行示例）。
+> 可参考随附的 **`demo.html`**（iframe + postMessage + 模拟实时数据的可运行示例）。

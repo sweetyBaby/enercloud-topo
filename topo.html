@@ -47,6 +47,9 @@
           <div class="mi" onclick="openTemplates();closeMenus()" data-i18n="📂 打开示例模板">📂 打开示例模板</div>
           <div class="mi" onclick="document.getElementById('fi-json').click();closeMenus()" data-i18n="📥 导入画布 JSON">📥 导入画布 JSON</div>
           <div class="mi" onclick="showJSON();closeMenus()" data-i18n="⎙ 导出画布 JSON">⎙ 导出画布 JSON</div>
+          <div class="mi" onclick="flashHint(saveDraftNow()?'草稿已保存':'草稿保存失败');closeMenus()" data-i18n="💾 保存草稿">💾 保存草稿</div>
+          <div class="mi" onclick="restoreDraftManual();closeMenus()" data-i18n="↺ 恢复草稿">↺ 恢复草稿</div>
+          <div class="mi" onclick="clearDraft();closeMenus()" data-i18n="🧹 清除草稿">🧹 清除草稿</div>
           <div class="mi" onclick="dlAllIconsZip();closeMenus()" data-i18n="🗂 导出元素库包 (ZIP)">🗂 导出元素库包 (ZIP)</div>
         </div>
       </div>
@@ -115,8 +118,8 @@
     <div id="side-tabs"></div>
     <div id="side-search" style="display:none"><input id="dev-search" type="text" placeholder="搜索元素…" oninput="filterSidebar()" autocomplete="off"><span id="dev-search-clr" title="清除" onclick="clearDevSearch()">✕</span></div>
     <div id="side-acc-tools">
-      <button class="side-tool side-tool-expand" onclick="setSidebarGroups(true)" title="展开全部分组" aria-label="展开全部分组">▾</button>
-      <button class="side-tool side-tool-collapse" onclick="setSidebarGroups(false)" title="折叠全部分组" aria-label="折叠全部分组">▸</button>
+      <button class="side-tool side-tool-expand" onclick="setSidebarGroups(true)" title="展开全部分组" aria-label="展开全部分组" data-i18n="▾ 全部展开">▾ 全部展开</button>
+      <button class="side-tool side-tool-collapse" onclick="setSidebarGroups(false)" title="折叠全部分组" aria-label="折叠全部分组" data-i18n="▸ 全部折叠">▸ 全部折叠</button>
     </div>
     <div id="sidebar"></div>
   </div>
@@ -193,12 +196,28 @@
         <div class="pr"><label data-i18n="English Label">English Label</label><input id="p-label-en" oninput="applyNP()"></div>
         <div class="pr" id="prow-vis"><label data-i18n="画布显示">画布显示</label>
           <div style="display:flex;gap:16px;flex-wrap:wrap">
-            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-show-label" onchange="applyVis()" style="width:auto"> <span data-i18n="显示名称">显示名称</span></label>
-            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-show-fields" onchange="applyVis()" style="width:auto"> <span data-i18n="显示数据字段">显示数据字段</span></label>
+            <label id="p-show-label-wrap" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-show-label" onchange="applyVis()" style="width:auto"> <span id="p-show-label-text" data-i18n="显示名称">显示名称</span></label>
+            <label id="p-show-fields-wrap" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-show-fields" onchange="applyVis()" style="width:auto"> <span data-i18n="显示数据字段">显示数据字段</span></label>
           </div></div>
         <div class="pr" id="prow-rule"><label data-i18n="显示条件（数据驱动）">显示条件（数据驱动）</label>
           <div class="rule-line"><span id="np-rule-sum" class="rule-sum">无（始终显示）</span>
             <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editNodeRule()" data-i18n="编辑">编辑</button></div></div>
+        <div class="pr" id="prow-action"><label data-i18n="事件绑定">事件绑定</label>
+          <select id="p-action-trigger" onchange="applyNodeAction()">
+            <option value="none" data-i18n="不绑定">不绑定</option>
+            <option value="click" data-i18n="左键点击">左键点击</option>
+            <option value="contextmenu" data-i18n="右键点击">右键点击</option>
+            <option value="dblclick" data-i18n="双击">双击</option>
+          </select>
+          <div class="pr-inline" style="margin-top:6px">
+            <input id="p-action-url" placeholder="/station/detail?id=1" oninput="applyNodeAction()">
+            <select id="p-action-target" style="flex:0 0 92px" onchange="applyNodeAction()">
+              <option value="same" data-i18n="当前页">当前页</option>
+              <option value="blank" data-i18n="新窗口">新窗口</option>
+            </select>
+          </div>
+          <div class="phint" style="margin-top:4px" data-i18n="预览/运行态触发；URL 可填写前端路由路径，如 /station/detail?id=1。">预览/运行态触发；URL 可填写前端路由路径，如 /station/detail?id=1。</div>
+        </div>
         <div class="pr" id="prow-type"><label data-i18n="类型">类型</label><select id="p-type" onchange="applyNP()"></select></div>
         <div class="pr" id="prow-status"><label>初始状态（中文）<span style="color:#ff6b6b">*</span></label><input id="p-status" placeholder="待机/充电/放电" oninput="applyNP()"></div>
         <div class="pr" id="prow-status-en"><label>初始状态（English）<span style="color:#ff6b6b">*</span></label><input id="p-status-en" placeholder="如 Standby / Charging" oninput="applyNP()"></div>
@@ -229,14 +248,6 @@
             <input type="text" id="p-border-color-hex" style="flex:1" oninput="applyTextStyle()"></div></div>
           <div class="pr"><label>圆角 <span id="p-radius-v">6</span>px</label>
             <div class="pr-inline"><input type="range" id="p-radius" min="0" max="24" value="6" oninput="applyTextStyle()"></div></div>
-          <div class="pr"><label>关联变量</label>
-            <select id="p-text-bind" onchange="applyTextBind()"></select>
-            <div class="pr-inline" style="margin-top:6px">
-              <input id="p-text-bind-custom" placeholder="或输入信号名，如 totalCharge" oninput="applyTextBind(true)">
-              <button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="clearTextBind()">清除</button>
-            </div>
-            <div class="phint" style="margin-top:4px">绑定后显示“文本标签：实时值”。可绑定全局信号，也可直接输入运行端推送的信号名。</div>
-          </div>
         </div>
         <div id="anchor-style" style="display:none">
           <div class="psep"></div>

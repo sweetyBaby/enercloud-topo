@@ -10,6 +10,8 @@ const THEMES={
 };
 let curTheme='blue_screen';
 const ET={
+  plain:   {label:'普通直线',   labelEn:'Plain Line', color:'#d8e4f0',w:2,  dash:[],    anim:'none',     spd:0,  desc:'普通静态实线'},
+  plain_dash:{label:'普通虚线', labelEn:'Plain Dashed', color:'#d8e4f0',w:2,  dash:[7,6], anim:'none',     spd:0,  desc:'普通静态虚线'},
   ac_power: {label:'交流电力', labelEn:'AC Power', color:'#e74c3c',w:2.5,dash:[],    anim:'flow',     spd:.5, desc:'电网交流传输，红色流动'},
   dc_power: {label:'直流电力', labelEn:'DC Power', color:'#e67e22',w:2.5,dash:[],    anim:'flow',     spd:.5, desc:'直流母线传输'},
   pipe_blue:{label:'蓝光管道', labelEn:'Blue Pipe', color:'#3aa0ff',w:2.5,dash:[],    anim:'pipe',     spd:.7, desc:'母线管道，蓝色光点流动'},
@@ -51,6 +53,7 @@ let dragChip=null,dchox=0,dchoy=0,dragWaypoint=null,dragBus=null,dragResize=null
 let selSet=new Set(),selChips=new Set(),rubber=null,_groupDrag=false,_groupStart={},alignGuides=[],_overlapHandles=[]; // 多选集合 + 选中字段 + 框选矩形 + 对齐辅助线 + 重叠线拐点浅色手柄
 let ids={},animT=0,ctxTgt=null,ctxKind=null,bgColor='#0a1f40',showGrid=true,showEdgeLabels=true,showFieldChips=true,showAnchors=true,busMerge=true,busMergeGap=16,busTrunkBold=true,busStyle='busbar',busOffsets={},busShareTrunk=false,busShowHandles=false,routeStyle=3,busAggregation=false;
 let history=[],histIdx=-1;
+let suppressNodeActionClick=false;
 // ★ 数据驱动（动态显隐/流向）：规则随信号实时求值并自动生效；面板开关与「运行视图」互相独立
 // previewMode=运行视图（彻底隐藏被规则隐藏的元素）；panelOpen=「规则与信号」侧栏是否展开；
 // _drawAlpha=当前绘制透明度（编辑态把被规则隐藏的元素「虚化」仍可点选编辑）
@@ -61,17 +64,56 @@ const GHOST_A=0.16,GHOST_SEL=0.5; // 虚化透明度：普通/选中
 let _ruleHovering=false,_ruleHoverPrev=null;   // 规则总览悬停高亮：是否正在悬停、进入列表前的选中态
 let sidebarCollapsed=new Set();                // 左侧元素分类折叠状态（按 tab + 分类标题记忆）
 let sidebarAccInited=new Set();                // 每个 tab 首次进入时：默认首组展开，其余折叠
+const DRAFT_KEY='topology-editor-local-draft-v1';
+let draftReady=false,draftTimer=null,loadingDraft=false;
 function genId(t){ids[t]=(ids[t]||0)+1;return t+'_'+ids[t];}
 
-function snapshot(){const s=JSON.stringify({nodes,edges,bgColor,routeStyle});history=history.slice(0,histIdx+1);history.push(s);if(history.length>21)history.shift();histIdx=history.length-1;updUR();}
+function snapshot(){const s=JSON.stringify({nodes,edges,bgColor,routeStyle});history=history.slice(0,histIdx+1);history.push(s);if(history.length>21)history.shift();histIdx=history.length-1;updUR();if(draftReady&&!loadingDraft)scheduleDraftSave();}
 function undo(){if(histIdx<=0)return;histIdx--;const s=JSON.parse(history[histIdx]);nodes=s.nodes;edges=s.edges;if(s.bgColor!==undefined)bgColor=s.bgColor;if(s.routeStyle!==undefined)routeStyle=s.routeStyle;selNode=selEdge=null;selSet.clear();selChips.clear();updateAlignBar();showPanel('none');_pathCacheSig='';updUR();}
 function redo(){if(histIdx>=history.length-1)return;histIdx++;const s=JSON.parse(history[histIdx]);nodes=s.nodes;edges=s.edges;if(s.bgColor!==undefined)bgColor=s.bgColor;if(s.routeStyle!==undefined)routeStyle=s.routeStyle;selNode=selEdge=null;selSet.clear();selChips.clear();updateAlignBar();showPanel('none');_pathCacheSig='';updUR();}
 function updUR(){document.getElementById('btn-undo').disabled=histIdx<=0;document.getElementById('btn-redo').disabled=histIdx>=history.length-1;}
+function scheduleDraftSave(){
+  if(loadingDraft)return;
+  clearTimeout(draftTimer);
+  draftTimer=setTimeout(saveDraftNow,260);
+}
+function saveDraftNow(){
+  if(loadingDraft)return false;
+  try{
+    localStorage.setItem(DRAFT_KEY,buildJSON());
+    localStorage.setItem(DRAFT_KEY+':time',new Date().toISOString());
+    return true;
+  }catch(err){console.warn('save draft failed',err);return false;}
+}
+function restoreDraft(opts){
+  const silent=!!(opts&&opts.silent);
+  let raw=null;
+  try{raw=localStorage.getItem(DRAFT_KEY);}catch(err){return false;}
+  if(!raw)return false;
+  let obj;
+  try{obj=JSON.parse(raw);}catch(err){if(!silent)flashHint('本地草稿已损坏');return false;}
+  if(!obj||!Array.isArray(obj.nodes)){if(!silent)flashHint('本地草稿不是有效画布');return false;}
+  loadingDraft=true;
+  Promise.resolve(importCanvasJSON(obj)).then(()=>{
+    if(!silent)flashHint('已恢复本地草稿');
+  }).catch(err=>{
+    console.warn('restore draft failed',err);
+    if(!silent)flashHint('恢复草稿失败');
+  }).finally(()=>{loadingDraft=false;});
+  return true;
+}
+function restoreDraftManual(){ if(!restoreDraft({silent:false}))flashHint('暂无本地草稿'); }
+function clearDraft(){
+  try{localStorage.removeItem(DRAFT_KEY);localStorage.removeItem(DRAFT_KEY+':time');}catch(err){}
+  flashHint('本地草稿已清除');
+}
 
 function init(){buildSidebar();buildEdgeBar();buildSelects();buildBg();resizeCanvas();snapshot();
   const _rt=topoRuntimeConfig();
   if(_rt){ enterRuntimeMode(_rt); }            // ★ 运营端配置好后，前端以「只读运行模式」用同一份渲染器+规则渲染（动态拉 JSON/实时数据）
-  else { loadDefaultTemplate(); }
+  else { if(!restoreDraft({silent:true}))loadDefaultTemplate(); draftReady=true; scheduleDraftSave(); }
+  document.addEventListener('input',()=>{if(draftReady&&!loadingDraft)scheduleDraftSave();});
+  document.addEventListener('change',()=>{if(draftReady&&!loadingDraft)scheduleDraftSave();});
   requestAnimationFrame(loop);
   // 拖动提示 6 秒后淡出
   setTimeout(()=>{const ph=document.getElementById('pan-hint');if(ph)ph.style.opacity='0';},6000);
@@ -134,7 +176,7 @@ function buildSidebar(){
     const key=sidebarKey(activeTab,g),collapsed=sidebarCollapsed.has(key);
     h.classList.toggle('is-collapsed',collapsed);
     h.setAttribute('aria-expanded',collapsed?'false':'true');
-    const chev=document.createElement('span');chev.className='gchev';chev.textContent=collapsed?'▸':'▾';
+    const chev=document.createElement('span');chev.className='gchev';chev.textContent=collapsed?'▾':'▴';
     const title=document.createElement('span');title.className='gtitle';title.textContent=lang==='en'?(g.title_en||g.title):g.title;
     h.appendChild(title);h.appendChild(chev);sb.appendChild(h);
     const body=document.createElement('div');body.className='grpbody'+(collapsed?' collapsed':'');body.dataset.groupKey=key;
@@ -216,7 +258,12 @@ function buildSelects(){
   const pt=document.getElementById('p-type'),ep=document.getElementById('ep-type');
   pt.innerHTML='';ep.innerHTML='';
   DEVICE_GROUPS.forEach(g=>g.devices.forEach(d=>{const o=document.createElement('option');o.value=d.type;o.textContent=(lang==='en'?(d.label_en||d.label):d.label);pt.appendChild(o);}));
-  Object.entries(ET).forEach(([k,v])=>{const o=document.createElement('option');o.value=k;o.textContent=etLabel(k);o.style.color=v.color;ep.appendChild(o);});
+  const edgeOrder=edgeTypeOrder();
+  edgeOrder.forEach(k=>{const v=ET[k]||ET.ac_power;const o=document.createElement('option');o.value=k;o.textContent=etLabel(k);o.style.color=v.color;ep.appendChild(o);});
+}
+function edgeTypeOrder(){
+  const first=['plain','plain_dash'];
+  return first.filter(k=>ET[k]).concat(Object.keys(ET).filter(k=>!first.includes(k)));
 }
 // 生成一个「流动线型」预览元素（颜色/虚实/速度均按该类型）
 // 统一的「线型预览」元素：圆角线条（实线/按真实虚线比例的虚线）+ 流动高光。
@@ -240,7 +287,10 @@ function epTypePreviewEl(k){ return linePreviewEl(k, 56); }
 // 构建下拉列表项（名称 + 右侧流动预览）
 function buildEpTypeList(){
   const list=document.getElementById('ep-type-list'); if(!list)return; list.innerHTML='';
-  Object.keys(ET).forEach(k=>{
+  const addSec=(txt)=>{const s=document.createElement('div');s.className='etdd-section';s.textContent=txt;list.appendChild(s);};
+  edgeTypeOrder().forEach((k,i)=>{
+    if(i===0)addSec(lang==='en'?'Basic line styles':'基础线型');
+    if(i===2)addSec(lang==='en'?'Dynamic / semantic types':'动态/语义线型');
     const it=document.createElement('div');it.className='etdd-item';it.dataset.k=k;
     const name=document.createElement('span');name.className='etdd-name';name.textContent=etLabel(k);name.style.color=ET[k].color;
     it.appendChild(name);it.appendChild(epTypePreviewEl(k));
@@ -299,6 +349,14 @@ function togglePanel(side){
   const t0=performance.now();
   (function tick(){ resizeCanvas(); if(performance.now()-t0<280) requestAnimationFrame(tick); })();
 }
+function ensurePropsOpen(){
+  const el=document.getElementById('props'),btn=document.getElementById('right-toggle');
+  if(!el||!el.classList.contains('collapsed'))return;
+  el.classList.remove('collapsed');
+  if(btn)btn.textContent='▶';
+  const t0=performance.now();
+  (function tick(){ resizeCanvas(); if(performance.now()-t0<280) requestAnimationFrame(tick); })();
+}
 window.addEventListener('resize',()=>resizeCanvas());
 function toWorld(sx,sy){return [(sx-panX)/zoom,(sy-panY)/zoom];}
 
@@ -337,20 +395,21 @@ const I18N={
   '🎨 外观与主题':'🎨 Appearance & Theme','▦ 网格':'▦ Grid','🏷 全部线标签':'🏷 All Line Labels','📊 数据字段':'📊 Data Fields',
   '📍 占位点标记':'📍 Anchor Markers','占位点填充色':'Anchor Fill','透明':'Clear',
   '📁 文件 ▾':'📁 File ▾','📂 打开示例模板':'📂 Open Templates','📥 导入画布 JSON':'📥 Import Canvas JSON','⎙ 导出画布 JSON':'⎙ Export Canvas JSON',
+  '💾 保存草稿':'💾 Save Draft','↺ 恢复草稿':'↺ Restore Draft','🧹 清除草稿':'🧹 Clear Draft',
   '▶ 数据预览':'▶ Data Preview','▶ 数据预览（注入信号）':'▶ Data Preview (inject signals)',
   '显示条件（数据驱动）':'Show condition (data-driven)','流向规则（数据驱动）':'Direction rules (data-driven)','编辑':'Edit',
   '流向（按规则确定）':'Flow (set by rules)','固定流向（兜底）':'Fixed direction (fallback)',
   '按信号实时匹配规则确定流向；规则都不命中时用下面的固定流向':'Direction is matched live from signal rules; falls back to the fixed direction below when no rule matches',
   '条件不满足→不画此连线（适合"动态建立的连线"）':'If condition fails → edge is not drawn (use for "dynamically created links")',
   '清空条件':'Clear','取消':'Cancel','保存':'Save','+ 信号':'+ Signal','应用JSON':'Apply JSON','清空注入':'Reset',
-  '分组':'Groups','全部展开':'Expand all','全部折叠':'Collapse all','＋ 全部展开':'+ Expand all','－ 全部折叠':'- Collapse all','▼ 全部展开':'▼ Expand all','▶ 全部折叠':'▶ Collapse all',
+  '分组':'Groups','全部展开':'Expand all','全部折叠':'Collapse all','＋ 全部展开':'+ Expand all','－ 全部折叠':'- Collapse all','▼ 全部展开':'▼ Expand all','▶ 全部折叠':'▶ Collapse all','▾ 全部展开':'▾ Expand all','▸ 全部折叠':'▸ Collapse all',
   '注入信号':'Inject Signals','（覆盖预览数据；不填用静态值）':'(override preview values; blank = static)','自定义全局信号':'Custom Global Signals',
   '（规则可引用，随图导出）':'(usable in rules, exported with the diagram)','批量样例 JSON':'Bulk Sample JSON','+ 添加注入':'+ Add Injection',
   '规则总览':'Rules Overview','（元素/连线的显隐与流向规则，与属性面板同步）':'(show/direction rules for nodes & edges, synced with the property panel)',
   '+ 规则':'+ Rule','（一次性设置多个信号的值）':'(set many signal values at once)','填入当前':'Fill Current',
   '粘贴 {信号名:值} 批量覆盖注入；点「填入当前」生成模板再改。':'Paste {signal:value} to bulk-override injections; click "Fill Current" to generate a template, then edit.',
   '🗂 导出元素库包 (ZIP)':'🗂 Export Element Library Pack (ZIP)','🗂 元素库包(ZIP)':'🗂 Library Pack (ZIP)','⬇ 下载画布JSON':'⬇ Download Canvas JSON','📋 画布 JSON':'📋 Canvas JSON',
-  '画布显示':'Canvas Display','显示名称':'Show Name','显示数据字段':'Show Data Fields',
+  '画布显示':'Canvas Display','显示名称':'Show Name','显示文本':'Show Text','显示数据字段':'Show Data Fields',
   '批量(所选元素)':'Batch (selected)','隐藏名称':'Hide Name','显示字段':'Show Fields','隐藏字段':'Hide Fields','⊘ 取消选择':'⊘ Deselect',
   '语言':'Language',
   '线型：':'Line:','走线：':'Route:','直线':'Straight','L型折线':'L-Bend','弧线':'Arc','粗细：':'Width:',
@@ -361,6 +420,8 @@ const I18N={
   '属性面板':'Properties','未选中':'Nothing selected','点击节点或连线编辑':'Click a node or edge to edit',
   '💡 快捷键':'💡 Shortcuts','Del删除 · Ctrl+Z撤销':'Del · Ctrl+Z Undo','Ctrl+Y重做 · 滚轮缩放':'Ctrl+Y Redo · Scroll Zoom','中键/空格拖拽平移':'Middle/Space Drag Pan',
   '节点 ID':'Node ID','中文标签':'Chinese Label','English Label':'English Label','类型':'Type',
+  '事件绑定':'Action Binding','不绑定':'None','左键点击':'Left Click','右键点击':'Right Click','双击':'Double Click','当前页':'Same Page','新窗口':'New Window',
+  '预览/运行态触发；URL 可填写前端路由路径，如 /station/detail?id=1。':'Triggers in preview/runtime mode; URL can be a frontend route, e.g. /station/detail?id=1.',
   '图标大小':'Icon Size','旋转':'Rotation','归零':'Reset','标签字号':'Label Font Size','标签颜色':'Label Color',
   '背景填充':'Background','无':'None','边框样式':'Border Style','无边框':'No Border','实线':'Solid','虚线':'Dashed','边框颜色':'Border Color','圆角':'Radius',
   '数据字段':'Data Fields','中文字段名':'Chinese Name','英文字段名':'English Name','数值':'Value','+ 添加字段':'+ Add Field',
@@ -718,10 +779,31 @@ canvas.addEventListener('mouseup',()=>{
     _pathCacheSig='';snapshot();canvas.style.cursor='default';return;}
   if(dragChipGroup){dragChipGroup=null;snapshot();canvas.style.cursor='default';return;}
   if(dragChip){dragChip=null;snapshot();canvas.style.cursor='default';return;}
-  if(dragNode){_dragging=false;_groupDrag=false;_dragIds=new Set();_pathCacheSig='';alignGuides=[];snapshot();}
+  if(dragNode){suppressNodeActionClick=true;setTimeout(()=>{suppressNodeActionClick=false;},0);_dragging=false;_groupDrag=false;_dragIds=new Set();_pathCacheSig='';alignGuides=[];snapshot();}
   dragNode=null;canvas.style.cursor=edgeMode?'crosshair':'default';
 });
 canvas.addEventListener('mouseleave',()=>{dragNode=null;isPanning=false;});
+function isNodeActionRuntime(){return previewMode||document.body.classList.contains('rt');}
+function openNodeAction(action){
+  if(!action||!action.url)return false;
+  const url=String(action.url).trim();
+  if(!url)return false;
+  if(action.target==='blank')window.open(url,'_blank','noopener');
+  else window.location.href=url;
+  return true;
+}
+function triggerNodeAction(n,trigger){
+  if(!isNodeActionRuntime()||!n||!n.action)return false;
+  const a=n.action;
+  if((a.trigger||'click')!==trigger)return false;
+  return openNodeAction(a);
+}
+canvas.addEventListener('click',e=>{
+  if(suppressNodeActionClick||edgeMode)return;
+  const r=canvas.getBoundingClientRect();const[wx,wy]=toWorld(e.clientX-r.left,e.clientY-r.top);
+  const n=nodeAt(wx,wy);
+  if(n)triggerNodeAction(n,'click');
+});
 canvas.addEventListener('dblclick',e=>{
   const r=canvas.getBoundingClientRect();const[wx,wy]=toWorld(e.clientX-r.left,e.clientY-r.top);
   // 双击选中连线的拐点 → 删除该拐点
@@ -744,6 +826,7 @@ canvas.addEventListener('dblclick',e=>{
   // 双击节点 → 编辑标签（当前语言）
   const n=nodeAt(wx,wy);
   if(n){
+    if(triggerNodeAction(n,'dblclick'))return;
     if(n.type==='text'){ openTextEditor(n, e.clientX, e.clientY); return; }
     const isEn=lang==='en';
     const cur=isEn?(n.labelEn||''):(n.labelZh||n.label||'');
@@ -829,6 +912,7 @@ window.addEventListener('keyup',e=>{if(e.code==='Space'){spaceDown=false;canvas.
 canvas.addEventListener('contextmenu',e=>{
   e.preventDefault();const r=canvas.getBoundingClientRect();const[wx,wy]=toWorld(e.clientX-r.left,e.clientY-r.top);
   const n=nodeAt(wx,wy),ed=edgeAt(wx,wy),m=document.getElementById('ctxmenu');
+  if(n&&triggerNodeAction(n,'contextmenu'))return;
   if(n||ed){ctxTgt=n||ed;ctxKind=n?'node':'edge';
     document.getElementById('ctx-conn').style.display=n?'flex':'none';
     document.getElementById('ctx-copy').style.display=n?'flex':'none';
@@ -856,7 +940,8 @@ function addNode(type,x,y){
   else { labelZh=dev?.label||type; labelEn=dev?.label_en||type; }
   snapshot();
   if(type==='text'){
-    nodes.push({id,type,labelZh:'文本内容',labelEn:'Text',x,y,fontSize:18,fontColor:'#ffffff',scale:1,data:[]});
+    nodes.push({id,type,labelZh:'文本内容',labelEn:'Text',x,y,fontSize:18,fontColor:'#ffffff',scale:1,
+      data:[{key:'数值',keyEn:'Value',dv:''}]});
     snapshot();selectNode(id);return;
   }
   nodes.push({id,type,labelZh,labelEn,x,y,status:'待机',fontSize:14,fontColor:'#e8f4ff',scale:(type==='anchor'?0.1:1),
@@ -1942,7 +2027,7 @@ function drawEdge(e){
     strokePolyline(pts,cfg.dash.map(d=>d/zoom));ctx.globalAlpha=_drawAlpha;ctx.shadowBlur=0;
     if(cfg.anim==='flow'||cfg.anim==='dash'){
       const pl=cfg.anim==='dash'?3:8,gap=cfg.anim==='dash'?8:16,off=(animT*cfg.spd*55)%(pl+gap);
-      ctx.strokeStyle='rgba(255,255,255,0.92)';ctx.lineWidth=Math.max(2.2,Math.min(cfg.w*.66,5.2))/zoom;
+      ctx.strokeStyle='rgba(255,255,255,0.94)';ctx.lineWidth=Math.max(2.4,Math.min(cfg.w*.78,8.5))/zoom;
       if(dir==='both'){strokePolyline(pts,[pl/zoom,gap/zoom],-off/zoom);strokePolyline(pts,[pl/zoom,gap/zoom],off/zoom);}
       else strokePolyline(pts,[pl/zoom,gap/zoom],(dir==='reverse'?off:-off)/zoom);
     }
@@ -2002,10 +2087,10 @@ function drawEdge(e){
 }
 function drawArrowSeg(p1,p2,color,w){
   const ang=Math.atan2(p2[1]-p1[1],p2[0]-p1[0]);
-  const t=.6,ax=p1[0]+(p2[0]-p1[0])*t,ay=p1[1]+(p2[1]-p1[1])*t,as=Math.max(4,w*2.6)/zoom;
-  ctx.save();ctx.translate(ax,ay);ctx.rotate(ang);ctx.strokeStyle=color;ctx.lineWidth=Math.max(.8,w*.6)/zoom;
+  const t=.6,ax=p1[0]+(p2[0]-p1[0])*t,ay=p1[1]+(p2[1]-p1[1])*t,as=Math.max(8,w*3.8)/zoom;
+  ctx.save();ctx.translate(ax,ay);ctx.rotate(ang);ctx.fillStyle=color;ctx.strokeStyle=color;ctx.lineWidth=Math.max(1.1,w*.55)/zoom;
   ctx.setLineDash([]);ctx.shadowColor=color;ctx.shadowBlur=3/zoom;
-  ctx.beginPath();ctx.moveTo(-as,-as*.5);ctx.lineTo(0,0);ctx.lineTo(-as,as*.5);ctx.stroke();ctx.restore();
+  ctx.beginPath();ctx.moveTo(as*.18,0);ctx.lineTo(-as,-as*.58);ctx.lineTo(-as*.62,0);ctx.lineTo(-as,as*.58);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
 }
 
 function rotatePt(px,py,cx,cy,rad){if(!rad)return [px,py];const c=Math.cos(rad),s=Math.sin(rad);const dx=px-cx,dy=py-cy;return [cx+dx*c-dy*s, cy+dx*s+dy*c];}
@@ -2093,12 +2178,15 @@ function drawNode(n){
 }
 function textNodeDisplay(n){
   const label=nodeLabel(n);
-  if(n.textBind){
+  const f=(n.data||[]).find(x=>!x.hidden&&x.key);
+  if(f){
     const ctxv=buildCtx(signalValues);
-    if(Object.prototype.hasOwnProperty.call(ctxv,n.textBind)){
-      const v=ctxv[n.textBind];
+    const sig=n.id+'.'+f.key;
+    if(Object.prototype.hasOwnProperty.call(ctxv,sig)){
+      const v=ctxv[sig];
       if(v!==''&&v!=null)return label?(label+'：'+v):String(v);
     }
+    if(f.dv!==''&&f.dv!=null)return label?(label+'：'+f.dv):String(f.dv);
   }
   return label;
 }
@@ -2118,13 +2206,13 @@ function drawTextNode(n){
   n._textBox={x:n.x-maxW/2-padX,y:n.y-totalH/2-padY,w:maxW+padX*2,h:totalH+padY*2};
   const b=n._textBox, rr=(n.radius!=null?n.radius:6);
   // 背景填充
-  if(n.bg && n.bg!=='none'){
+  if(!n.hideLabel && n.bg && n.bg!=='none'){
     ctx.fillStyle=n.bg;ctx.beginPath();
     if(ctx.roundRect)ctx.roundRect(b.x,b.y,b.w,b.h,rr);else ctx.rect(b.x,b.y,b.w,b.h);
     ctx.fill();
   }
   // 边框
-  if(n.border && n.border!=='none'){
+  if(!n.hideLabel && n.border && n.border!=='none'){
     ctx.strokeStyle=n.borderColor||'#4dd0ff';ctx.lineWidth=(n.borderWidth||1.5)/zoom;
     if(n.border==='dashed')ctx.setLineDash([6/zoom,4/zoom]);
     ctx.beginPath();
@@ -2151,9 +2239,11 @@ function drawTextNode(n){
       ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(rcx,rcy,2/zoom,0,Math.PI*2);ctx.fill();
     }
   }
-  ctx.fillStyle=n.fontColor||'#ffffff';
-  if(!n.bg||n.bg==='none'){ctx.shadowColor='rgba(0,0,0,0.6)';ctx.shadowBlur=3/zoom;}
-  lines.forEach((l,i)=>{ctx.fillText(l,n.x,n.y-totalH/2+lh*(i+0.5));});
+  if(!n.hideLabel){
+    ctx.fillStyle=n.fontColor||'#ffffff';
+    if(!n.bg||n.bg==='none'){ctx.shadowColor='rgba(0,0,0,0.6)';ctx.shadowBlur=3/zoom;}
+    lines.forEach((l,i)=>{ctx.fillText(l,n.x,n.y-totalH/2+lh*(i+0.5));});
+  }
   ctx.shadowBlur=0;ctx.restore();
 }
 // 计算某字段 chip 的默认位置（节点右侧堆叠）。全部用世界坐标常量，缩放稳定
@@ -2317,6 +2407,7 @@ function bgPlate(){
 }
 
 function selectNode(id){
+  ensurePropsOpen();
   selNode=id;selEdge=null;const n=nodes.find(x=>x.id===id);if(!n){showPanel('none');return;}
   showPanel('node');
   document.getElementById('p-id').value=n.id;
@@ -2331,12 +2422,16 @@ function selectNode(id){
   document.getElementById('p-rot').value=n.rotation||0;document.getElementById('p-rot-v').textContent=n.rotation||0;
   document.getElementById('p-fc').value=n.fontColor||'#e8f4ff';document.getElementById('p-fc-hex').value=n.fontColor||'#e8f4ff';
   document.getElementById('p-x').textContent=n.x.toFixed(0);document.getElementById('p-y').textContent=n.y.toFixed(0);
-  // 文本框元素：隐藏类型/状态/图标大小/数据字段，改用文字相关字段
+  // 文本框元素：隐藏类型/状态/图标大小/数据字段，保留显示开关与规则条件
   const isText=n.type==='text';
-  ['prow-type','prow-status','prow-status-en','prow-scale','prow-data','prow-datasep','prow-vis','prow-rule'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isText?'none':'';});
+  ['prow-type','prow-status','prow-status-en','prow-scale'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isText?'none':'';});
+  ['prow-data','prow-datasep'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});
   // 画布显示开关：反映当前节点的 hideLabel / hideFields
   const slEl=document.getElementById('p-show-label'),sfEl=document.getElementById('p-show-fields');
   if(slEl)slEl.checked=!n.hideLabel; if(sfEl)sfEl.checked=!n.hideFields;
+  const slTxt=document.getElementById('p-show-label-text'),sfWrap=document.getElementById('p-show-fields-wrap');
+  if(slTxt){slTxt.textContent=isText?(lang==='en'?'Show Text':'显示文本'):(lang==='en'?'Show Name':'显示名称');slTxt.setAttribute('data-i18n',isText?'显示文本':'显示名称');}
+  if(sfWrap)sfWrap.style.display=isText?'none':'flex';
   // 占位点外观：仅 anchor 类型显示填充/不透明度
   const isAnchor=n.type==='anchor';
   document.getElementById('anchor-style').style.display=isAnchor?'block':'none';
@@ -2360,8 +2455,8 @@ function selectNode(id){
     document.getElementById('p-border-color-hex').value=n.borderColor||'#4dd0ff';
     document.getElementById('p-radius').value=n.radius!=null?n.radius:6;
     document.getElementById('p-radius-v').textContent=n.radius!=null?n.radius:6;
-    renderTextBindControls(n);
   }
+  renderNodeActionControls(n);
   renderDFs(n);
   refreshNodeRuleSummary(n);
 }
@@ -2379,24 +2474,22 @@ function applyTextStyle(){
   document.getElementById('p-radius-v').textContent=n.radius;
 }
 function clearTextBg(){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.bg='none';document.getElementById('p-bg-hex').value='';}
-function renderTextBindControls(n){
-  const sel=document.getElementById('p-text-bind'),custom=document.getElementById('p-text-bind-custom');if(!sel||!custom)return;
-  const cur=n.textBind||'';sel.innerHTML='';
-  const add=(v,t)=>{const o=document.createElement('option');o.value=v;o.textContent=t;sel.appendChild(o);};
-  add('', '不绑定变量');
-  const sigs=collectSignals(),seen=new Set(['']);
-  sigs.forEach(s=>{seen.add(s.name);add(s.name,s.label+'  ['+s.name+']');});
-  if(cur&&!seen.has(cur))add(cur,'自定义：'+cur);
-  sel.value=cur;custom.value=(cur&&!seen.has(cur))?cur:'';
+function renderNodeActionControls(n){
+  const trigger=document.getElementById('p-action-trigger'),url=document.getElementById('p-action-url'),target=document.getElementById('p-action-target');
+  if(!trigger||!url||!target)return;
+  const a=n.action||{};
+  trigger.value=a.url?(a.trigger||'click'):'none';
+  url.value=a.url||'';
+  target.value=a.target||'same';
 }
-function applyTextBind(fromCustom){
+function applyNodeAction(){
   const n=nodes.find(x=>x.id===selNode);if(!n)return;
-  const sel=document.getElementById('p-text-bind'),custom=document.getElementById('p-text-bind-custom');
-  const v=(fromCustom?custom.value:sel.value).trim();
-  if(v)n.textBind=v;else delete n.textBind;
-  if(fromCustom&&v&&sel.value!==v)renderTextBindControls(n);
+  const trigger=document.getElementById('p-action-trigger').value;
+  const url=document.getElementById('p-action-url').value.trim();
+  const target=document.getElementById('p-action-target').value;
+  if(trigger==='none'||!url){delete n.action;return;}
+  n.action={trigger,url,target:(target==='blank'?'blank':'same')};
 }
-function clearTextBind(){const n=nodes.find(x=>x.id===selNode);if(!n)return;delete n.textBind;renderTextBindControls(n);}
 // 占位点(anchor)外观：填充色 + 不透明度
 function applyAnchorStyle(){
   const n=nodes.find(x=>x.id===selNode);if(!n)return;
@@ -2413,6 +2506,7 @@ function routeToOption(r){ return (r==='arc'||r==='manual'||r==='line') ? r : 's
 // 属性面板选项 → 内部走线值；「智能」用统一的内部值 'smart'
 function optionToRoute(o){ return (o==='arc'||o==='manual'||o==='line') ? o : 'smart'; }
 function selectEdge(e){
+  ensurePropsOpen();
   selEdge=e;selNode=null;showPanel('edge');
   document.getElementById('ep-type').value=e.et||'ac_power';document.getElementById('ep-route').value=routeToOption(e.route);
   document.getElementById('ep-dir').value=e.dir||'forward';document.getElementById('ep-lbl').value=e.lbl||'';
@@ -2458,13 +2552,13 @@ function syncColor(id,v){if(/^#[0-9a-fA-F]{6}$/.test(v)){document.getElementById
 function applyVis(){
   const n=nodes.find(x=>x.id===selNode);if(!n)return;snapshot();
   n.hideLabel=!document.getElementById('p-show-label').checked;
-  n.hideFields=!document.getElementById('p-show-fields').checked;
+  if(n.type!=='text')n.hideFields=!document.getElementById('p-show-fields').checked;
   snapshot();
 }
 // 批量：对所有选中节点统一显示/隐藏 名称(label) 或 数据字段(fields)
 function batchVis(which,show){
   const ns=selectedNodes();if(ns.length<1)return;snapshot();
-  ns.forEach(n=>{ if(n.type==='text')return; if(which==='label')n.hideLabel=!show; else n.hideFields=!show; });
+  ns.forEach(n=>{ if(which==='label')n.hideLabel=!show; else if(n.type!=='text')n.hideFields=!show; });
   const cur=nodes.find(x=>x.id===selNode);
   if(cur){const a=document.getElementById('p-show-label'),b=document.getElementById('p-show-fields');if(a)a.checked=!cur.hideLabel;if(b)b.checked=!cur.hideFields;}
   snapshot();
@@ -3097,9 +3191,9 @@ function buildJSON(){
       o.textStyle={bg:n.bg||'none',border:n.border||'none',borderColor:n.borderColor||'#4dd0ff',
         borderWidth:(n.borderWidth!=null?n.borderWidth:1.5), radius:(n.radius!=null?n.radius:6),
         padX:(n.padX!=null?n.padX:10), padY:(n.padY!=null?n.padY:6)};
-      if(n.textBind)o.textStyle.bind=n.textBind;
     }
     if(n.type==='anchor') o.anchorStyle={fill:n.fill||'none', opacity:(n.opacity!=null?n.opacity:1)};
+    if(n.action&&n.action.url)o.action={trigger:n.action.trigger||'click',url:n.action.url,target:n.action.target||'same'};
     if(n.visibleWhen!=null) o.visibleWhen=n.visibleWhen;   // ★ 数据驱动：显示条件（条件不满足→运行端隐藏该元素）
     return o;
   };
@@ -3206,9 +3300,12 @@ function parseImportedNode(o){
   if(o.type==='text'){const t=o.textStyle||{};n.bg=t.bg||o.bg||'none';n.border=t.border||o.border||'none';
     n.borderColor=t.borderColor||o.borderColor||'#4dd0ff';n.borderWidth=(t.borderWidth!=null?t.borderWidth:(o.borderWidth!=null?o.borderWidth:1.5));
     n.radius=(t.radius!=null?t.radius:(o.radius!=null?o.radius:6));n.padX=(t.padX!=null?t.padX:(o.padX!=null?o.padX:10));n.padY=(t.padY!=null?t.padY:(o.padY!=null?o.padY:6));
-    if(t.bind||o.textBind)n.textBind=t.bind||o.textBind;}
+    const oldBind=t.bind||o.textBind;
+    if(oldBind&&!n.data.length)n.data=[{key:String(oldBind).split('.').pop()||'数值',keyEn:'Value',dv:''}];
+    if(!n.data.length)n.data=[{key:'数值',keyEn:'Value',dv:''}];}
   // 占位点样式
   if(o.type==='anchor'){const a=o.anchorStyle||{};n.fill=a.fill||o.fill||'none';n.opacity=(a.opacity!=null?a.opacity:(o.opacity!=null?o.opacity:1));}
+  if(o.action&&o.action.url)n.action={trigger:o.action.trigger||'click',url:String(o.action.url),target:(o.action.target==='blank'?'blank':'same')};
   if(o.visibleWhen!=null)n.visibleWhen=o.visibleWhen;   // ★ 数据驱动：显示条件
   return n;
 }

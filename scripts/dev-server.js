@@ -1,0 +1,132 @@
+const fs = require('fs');
+const http = require('http');
+const path = require('path');
+const url = require('url');
+
+const root = path.resolve(__dirname, '..');
+const startPort = Number(process.env.PORT || 5173);
+const host = process.env.HOST || '127.0.0.1';
+const clients = new Set();
+const logFile = path.join(root, '.dev-server.log');
+
+const types = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.md': 'text/markdown; charset=utf-8',
+};
+
+function log(message) {
+  const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+  console.log(line);
+  fs.appendFileSync(logFile, `${line}\n`);
+}
+
+function warn(message) {
+  const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+  console.warn(line);
+  fs.appendFileSync(logFile, `${line}\n`);
+}
+
+const liveReloadSnippet = `
+<script>
+(() => {
+  const es = new EventSource('/__live-reload');
+  es.addEventListener('reload', () => location.reload());
+})();
+</script>`;
+
+fs.writeFileSync(logFile, '');
+log(`Starting dev server in ${root}`);
+
+function insideRoot(file) {
+  const rel = path.relative(root, file);
+  return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+function send(res, status, body, type = 'text/plain; charset=utf-8') {
+  res.writeHead(status, {
+    'Content-Type': type,
+    'Cache-Control': 'no-store',
+  });
+  res.end(body);
+}
+
+function serveFile(req, res) {
+  const parsed = url.parse(req.url);
+  let pathname = decodeURIComponent(parsed.pathname || '/');
+  if (pathname === '/') pathname = '/topo.html';
+
+  let file = path.join(root, pathname);
+  if (!insideRoot(file)) return send(res, 403, 'Forbidden');
+  if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
+  if (!fs.existsSync(file)) return send(res, 404, 'Not Found');
+
+  const ext = path.extname(file).toLowerCase();
+  let body = fs.readFileSync(file);
+  if (ext === '.html') {
+    body = body.toString('utf8').replace('</body>', `${liveReloadSnippet}\n</body>`);
+  }
+  send(res, 200, body, types[ext] || 'application/octet-stream');
+}
+
+function createServer() {
+  return http.createServer((req, res) => {
+    if (req.url === '/__live-reload') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-store',
+        Connection: 'keep-alive',
+      });
+      res.write('\n');
+      clients.add(res);
+      req.on('close', () => clients.delete(res));
+      return;
+    }
+    serveFile(req, res);
+  });
+}
+
+function notifyReload() {
+  for (const client of clients) client.write('event: reload\ndata: now\n\n');
+}
+
+let timer = null;
+function scheduleReload(file) {
+  const rel = path.relative(root, file);
+  if (!rel || rel.startsWith('dist') || rel.startsWith('.git') || rel.includes('node_modules')) return;
+  clearTimeout(timer);
+  timer = setTimeout(notifyReload, 80);
+}
+
+try {
+  fs.watch(root, { recursive: true }, (_event, filename) => {
+    if (filename) scheduleReload(path.join(root, filename));
+  });
+} catch (err) {
+  warn(`File watch disabled: ${err.message}`);
+}
+
+function listen(port) {
+  const server = createServer();
+  server.once('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      warn(`Port ${port} is in use, trying ${port + 1}...`);
+      server.close();
+      listen(port + 1);
+      return;
+    }
+    warn(err.stack || String(err));
+    process.exit(1);
+  });
+  server.listen(port, host, () => {
+    log(`Dev server ready: http://${host}:${port}/topo.html`);
+    log('Hot reload enabled. Press Ctrl+C to stop.');
+  });
+}
+
+listen(startPort);

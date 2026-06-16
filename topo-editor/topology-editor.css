@@ -83,6 +83,8 @@ body{background:var(--bg);color:var(--ui-text);font-family:-apple-system,'Segoe 
 .etdd-caret{color:var(--ui-text2);font-size:10px;flex-shrink:0}
 .etdd-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:50;max-height:300px;overflow-y:auto;background:var(--ui-bg);border:1px solid var(--ui-border);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.55);display:none;padding:4px}
 .etdd-list.show{display:block}
+.etdd-section{padding:6px 8px 4px;font-size:11px;color:var(--ui-text2);font-weight:700;letter-spacing:.5px;border-top:1px solid var(--ui-border);opacity:.85}
+.etdd-section:first-child{border-top:none}
 .etdd-item{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:5px;cursor:pointer}
 .etdd-item:hover{background:color-mix(in srgb,var(--ui-accent) 14%,transparent)}
 .etdd-item.sel{background:color-mix(in srgb,var(--ui-accent) 24%,transparent)}
@@ -107,17 +109,18 @@ body{background:var(--bg);color:var(--ui-text);font-family:-apple-system,'Segoe 
 #side-search #dev-search-clr{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--ui-text2);font-size:12px;cursor:pointer;padding:2px;display:none}
 #side-search.has-q #dev-search-clr{display:block}
 #side-search #dev-search-clr:hover{color:var(--ui-accent)}
-#side-acc-tools{display:none;justify-content:flex-end;gap:4px;padding:4px 6px 5px;background:var(--ui-bg2);border-bottom:1px solid var(--ui-border);flex-shrink:0}
-#side-acc-tools .side-tool{width:22px;height:22px;background:transparent;border:1px solid var(--ui-border);color:var(--ui-text2);font-size:12px;font-weight:700;padding:0;border-radius:5px;cursor:pointer;line-height:1;display:inline-flex;align-items:center;justify-content:center}
-#side-acc-tools .side-tool:hover{border-color:var(--ui-accent);color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 10%,transparent)}
+#side-acc-tools{display:none;justify-content:stretch;gap:6px;padding:6px;background:var(--ui-bg2);border-bottom:1px solid var(--ui-border);flex-shrink:0}
+#side-acc-tools .side-tool{flex:1;min-width:0;height:28px;background:var(--ui-btn-bg);border:1px solid var(--ui-border);color:var(--ui-text2);font-size:12px;font-weight:700;padding:0 6px;border-radius:6px;cursor:pointer;line-height:1;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}
+#side-acc-tools .side-tool:hover{border-color:var(--ui-accent);color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 12%,var(--ui-btn-bg))}
 .ni.search-hidden{display:none!important}
 .grptitle.search-hidden{display:none!important}
 #sidebar{flex:1;display:flex;flex-direction:column;overflow-y:auto;padding-top:4px}
-.grptitle{font-size:12px;color:var(--gc,#4dd0ff);letter-spacing:1px;padding:8px 10px 5px;border-bottom:1px solid var(--ui-border);display:flex;align-items:center;gap:7px;font-weight:bold;cursor:pointer;user-select:none}
-.grptitle:hover{background:color-mix(in srgb,var(--gc,#4dd0ff) 8%,transparent)}
-.grptitle::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gc);flex-shrink:0}
-.grptitle .gchev{margin-left:auto;width:14px;text-align:center;color:var(--ui-text2);font-size:11px;font-weight:700;line-height:1;letter-spacing:0;flex-shrink:0}
-.grptitle.is-collapsed .gchev{color:var(--ui-text2)}
+.grptitle{font-size:12px;color:var(--ui-text);letter-spacing:.5px;padding:8px 8px 6px 10px;border-bottom:1px solid var(--ui-border);display:flex;align-items:center;gap:7px;font-weight:700;cursor:pointer;user-select:none}
+.grptitle:hover{background:color-mix(in srgb,var(--ui-accent) 8%,transparent)}
+.grptitle::before{display:none}
+.grptitle .gchev{margin-left:auto;width:22px;height:22px;border:none;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;text-align:center;color:var(--ui-text2);background:transparent;font-size:16px;font-weight:800;line-height:1;letter-spacing:0;flex-shrink:0}
+.grptitle:hover .gchev{color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 10%,transparent)}
+.grptitle.is-collapsed .gchev{color:var(--ui-text2);background:transparent}
 .grptitle .gtitle{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .grpbody.collapsed{display:none}
 .ni{display:flex;align-items:center;gap:9px;padding:7px 10px;cursor:grab;border-bottom:1px solid var(--ui-border);transition:background .12s;user-select:none}
