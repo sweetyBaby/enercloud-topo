@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>储能拓扑编辑器 v5</title>
+<link rel="stylesheet" href="topo-editor/topology-editor.css">
+</head>
+<body>
+<div id="topbar">
+  <span class="logo">⚡ <span class="logo-txt">储能拓扑编辑器</span></span>
+  <div class="tgroup">
+    <span class="tgroup-cap" data-i18n="历史">历史</span>
+    <div class="tgroup-body">
+      <button class="tb" id="btn-undo" onclick="undo()" disabled title="撤销 Ctrl+Z" data-i18n="↩ 撤销">↩ 撤销</button>
+      <button class="tb" id="btn-redo" onclick="redo()" disabled title="重做 Ctrl+Y" data-i18n="↪ 重做">↪ 重做</button>
+    </div>
+  </div>
+  <div class="tgroup">
+    <span class="tgroup-cap" data-i18n="模式">模式</span>
+    <div class="tgroup-body">
+      <button class="tb mode-btn" id="btn-select" onclick="toggleSelectMode()" title="选择模式：左键拖空白=框选；关闭时左键拖空白=平移画布" data-i18n="⬚ 选择模式">⬚ 选择模式</button>
+      <button class="tb mode-btn" id="btn-edge" onclick="toggleEdgeMode()" title="连线模式：点击节点之间连线" data-i18n="🔗 连线模式">🔗 连线模式</button>
+    </div>
+  </div>
+  <div class="tgroup">
+    <span class="tgroup-cap" data-i18n="布局与连线">布局与连线</span>
+    <div class="tgroup-body">
+      <button class="tb" id="btn-autolayout" onclick="autoLayout()" title="一键智能布局：紧凑排布节点 + 母线汇流走线（最短·避障·少交叉）" data-i18n="✨ 自动布局">✨ 自动布局</button>
+      <button class="tb danger-btn" onclick="clearAll()" title="清空画布上所有内容" data-i18n="⊘ 清空">⊘ 清空</button>
+    </div>
+  </div>
+  <div class="tgroup">
+    <span class="tgroup-cap" data-i18n="视图与文件">视图与文件</span>
+    <div class="tgroup-body">
+      <div class="menu" id="menu-view">
+        <button class="tb menu-btn" onclick="toggleMenu('menu-view')" data-i18n="👁 视图 ▾">👁 视图 ▾</button>
+        <div class="menu-pop">
+          <div class="mi" onclick="resetZoom();closeMenus()" data-i18n="⊙ 缩放复位 100%">⊙ 缩放复位 100%</div>
+          <div class="mi" onclick="toggleBgPanel();closeMenus()" data-i18n="🎨 外观与主题">🎨 外观与主题</div>
+          <label class="mi mi-toggle"><input type="checkbox" checked onchange="toggleGrid()"> ▦ 网格</label>
+          <label class="mi mi-toggle"><input type="checkbox" checked onchange="toggleEdgeLabels()"> 🏷 全部线标签</label>
+          <label class="mi mi-toggle"><input type="checkbox" checked onchange="toggleFieldChips()"> 📊 数据字段</label>
+          <label class="mi mi-toggle"><input type="checkbox" checked onchange="toggleAnchors()"> 📍 占位点标记</label>
+        </div>
+      </div>
+      <div class="menu" id="menu-file">
+        <button class="tb menu-btn" onclick="toggleMenu('menu-file')" data-i18n="📁 文件 ▾">📁 文件 ▾</button>
+        <div class="menu-pop">
+          <div class="mi" onclick="openTemplates();closeMenus()" data-i18n="📂 打开示例模板">📂 打开示例模板</div>
+          <div class="mi" onclick="document.getElementById('fi-json').click();closeMenus()" data-i18n="📥 导入画布 JSON">📥 导入画布 JSON</div>
+          <div class="mi" onclick="showJSON();closeMenus()" data-i18n="⎙ 导出画布 JSON">⎙ 导出画布 JSON</div>
+          <div class="mi" onclick="dlAllIconsZip();closeMenus()" data-i18n="🗂 导出元素库包 (ZIP)">🗂 导出元素库包 (ZIP)</div>
+        </div>
+      </div>
+      <button class="tb" id="btn-preview" onclick="toggleSigPanel()" title="规则与信号：总览全部显隐/流向规则、管理全局信号、注入测试数据（规则在画布上始终实时生效）" data-i18n="⚙ 规则与信号">⚙ 规则与信号</button>
+      <button class="tb" id="btn-runview" onclick="toggleRunView()" title="预览效果：按规则彻底隐藏不该显示的元素/连线，并应用数据驱动流向，查看整个图的运行效果" data-i18n="▶ 预览效果">▶ 预览效果</button>
+    </div>
+  </div>
+  <div class="tgroup">
+    <span class="tgroup-cap" data-i18n="语言">语言</span>
+    <div class="tgroup-body">
+      <button class="tb" id="btn-lang" onclick="toggleLang()" title="切换中英文">🌐 中/EN</button>
+    </div>
+  </div>
+  </div>
+<div id="ebar">
+  <span class="eblabel" data-i18n="线型：">线型：</span>
+  <span id="routing-toggle">
+    <span class="eblabel" style="margin-left:6px" data-i18n="粗细：">粗细：</span>
+    <input type="range" id="global-w" min="0.5" max="3" step="0.1" value="1" style="width:80px;vertical-align:middle" oninput="setGlobalWidth(this.value)">
+    <span class="eblabel" id="global-w-v" style="margin-left:2px">1.0×</span>
+    <span class="eblabel" style="margin:0 4px">|</span>
+    <label class="eblabel" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;color:var(--ui-text2)" title="开启后可连续连线，不自动退出；关闭则连完一条自动回到普通模式"><input type="checkbox" id="edge-continuous" style="width:auto;margin:0"> 连续连线</label>
+    <span class="eblabel" style="margin:0 4px">|</span>
+    <button class="rt-btn" id="btn-exit-edge" onclick="toggleEdgeMode()" title="退出连线模式，回到普通编辑" style="border-color:var(--danger,#e05a5a);color:var(--danger,#e05a5a)">✕ 退出连线模式</button>
+  </span>
+</div>
+<div id="alignbar">
+  <span class="eblabel" id="align-count">已选 0 个元素</span>
+  <span style="margin-left:8px">
+    <button class="rt-btn" onclick="alignSel('left')" title="左对齐" data-i18n="⫷ 左">⫷ 左</button>
+    <button class="rt-btn" onclick="alignSel('hcenter')" title="水平居中" data-i18n="⊟ 水平居中">⊟ 水平居中</button>
+    <button class="rt-btn" onclick="alignSel('right')" title="右对齐" data-i18n="右 ⫸">右 ⫸</button>
+    <span class="eblabel" style="margin:0 4px">|</span>
+    <button class="rt-btn" onclick="alignSel('top')" title="顶部对齐" data-i18n="⊤ 顶">⊤ 顶</button>
+    <button class="rt-btn" onclick="alignSel('vcenter')" title="垂直居中" data-i18n="⊞ 垂直居中">⊞ 垂直居中</button>
+    <button class="rt-btn" onclick="alignSel('bottom')" title="底部对齐" data-i18n="底 ⊥">底 ⊥</button>
+    <span class="eblabel" style="margin:0 4px">|</span>
+    <button class="rt-btn" onclick="alignSel('hdist')" title="水平等距分布（中心间距相等）" data-i18n="↔ 水平分布">↔ 水平分布</button>
+    <button class="rt-btn" onclick="alignSel('vdist')" title="垂直等距分布（中心间距相等）" data-i18n="↕ 垂直分布">↕ 垂直分布</button>
+    <button class="rt-btn" onclick="alignSel('hdistedge')" title="水平均匀分布（边缘间距相等）" data-i18n="↔ 边缘分布">↔ 边缘分布</button>
+    <button class="rt-btn" onclick="alignSel('vdistedge')" title="垂直均匀分布（边缘间距相等）" data-i18n="↕ 边缘分布">↕ 边缘分布</button>
+    <span class="eblabel" style="margin:0 4px">|</span>
+    <span class="eblabel" data-i18n="间距">间距</span>
+    <input type="number" id="align-gap" value="120" min="0" max="600" style="width:56px;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-size:12px;padding:3px 5px;border-radius:4px;margin:0 3px">px
+    <button class="rt-btn" onclick="alignSel('hgap')" title="按指定间距水平排列" data-i18n="↔ 水平间距">↔ 水平间距</button>
+    <button class="rt-btn" onclick="alignSel('vgap')" title="按指定间距垂直排列" data-i18n="↕ 垂直间距">↕ 垂直间距</button>
+    <span class="eblabel" style="margin:0 4px">|</span>
+    <button class="rt-btn" onclick="alignSel('row')" title="一键排成一行" data-i18n="⚍ 排成一行">⚍ 排成一行</button>
+    <button class="rt-btn" onclick="alignSel('col')" title="一键排成一列" data-i18n="⚌ 排成一列">⚌ 排成一列</button>
+    <button class="rt-btn" onclick="alignSel('matrix')" title="矩阵排列（网格状）" data-i18n="⊞ 矩阵">⊞ 矩阵</button>
+    <span class="eblabel" style="margin:0 4px">|</span>
+    <button class="rt-btn" onclick="alignSel('canvasH')" title="水平居中于画布" data-i18n="⊡ 画布水平居中">⊡ 画布水平居中</button>
+    <button class="rt-btn" onclick="alignSel('canvasV')" title="垂直居中于画布" data-i18n="⊡ 画布垂直居中">⊡ 画布垂直居中</button>
+    <span class="eblabel" style="margin:0 4px">|</span>
+    <span class="eblabel" data-i18n="批量(所选元素)">批量(所选元素)</span>
+    <button class="rt-btn" onclick="batchVis('label',true)" title="显示所选元素的名称" data-i18n="显示名称">显示名称</button>
+    <button class="rt-btn" onclick="batchVis('label',false)" title="隐藏所选元素的名称" data-i18n="隐藏名称">隐藏名称</button>
+    <button class="rt-btn" onclick="batchVis('fields',true)" title="显示所选元素的数据字段" data-i18n="显示字段">显示字段</button>
+    <button class="rt-btn" onclick="batchVis('fields',false)" title="隐藏所选元素的数据字段" data-i18n="隐藏字段">隐藏字段</button>
+    <span class="eblabel" style="margin:0 4px">|</span>
+    <button class="rt-btn" onclick="clearMultiSel()" title="取消选择（清除当前多选）" data-i18n="⊘ 取消选择">⊘ 取消选择</button>
+  </span>
+</div>
+<div id="main">
+  <div id="sidebar-wrap">
+    <div id="side-tabs"></div>
+    <div id="side-search" style="display:none"><input id="dev-search" type="text" placeholder="搜索元素…" oninput="filterSidebar()" autocomplete="off"><span id="dev-search-clr" title="清除" onclick="clearDevSearch()">✕</span></div>
+    <div id="side-acc-tools">
+      <button class="side-tool side-tool-expand" onclick="setSidebarGroups(true)" title="展开全部分组" aria-label="展开全部分组">▾</button>
+      <button class="side-tool side-tool-collapse" onclick="setSidebarGroups(false)" title="折叠全部分组" aria-label="折叠全部分组">▸</button>
+    </div>
+    <div id="sidebar"></div>
+  </div>
+  <div id="cwrap">
+    <canvas id="c"></canvas>
+    <button id="left-toggle" class="panel-toggle" onclick="togglePanel('left')" title="折叠/展开左侧面板">◀</button>
+    <button id="right-toggle" class="panel-toggle" onclick="togglePanel('right')" title="折叠/展开右侧面板">▶</button>
+    <div id="chint">← 拖拽设备到画布<br>左键拖空白处平移 · 滚轮缩放 · Ctrl+Z 撤销</div>
+    <div id="ehint">连线模式：点击起始节点…</div>
+    <div id="corner-info">
+      <div id="pan-hint">✋ 拖动空白处可平移</div>
+      <div id="zoom-ctrl">
+        <button onclick="zoomStep(1/1.15)" title="缩小">−</button>
+        <span id="zoom-info" onclick="resetZoom()" title="点击复位">100%</span>
+        <button onclick="zoomStep(1.15)" title="放大">+</button>
+      </div>
+    </div>
+    <div id="bgpanel-overlay" onclick="toggleBgPanel()"></div>
+    <div id="bgpanel">
+      <div id="bgpanel-head">
+        <h4>🎨 外观设置</h4>
+        <button id="bgpanel-close" onclick="toggleBgPanel()" title="关闭">✕</button>
+      </div>
+      <div id="bgpanel-body">
+      <div class="sub">① 界面主题风格</div>
+      <div class="theme-row" id="theme-row"></div>
+      <div class="sub">② 画布背景颜色</div>
+      <div class="cps" id="cps"></div>
+      <div id="bgcr">
+        <input type="color" id="bg-pick" value="#0a1f40" oninput="setBg(this.value)">
+        <input type="text" id="bg-hex" placeholder="#0a1f40" maxlength="7">
+        <button class="tb grn" style="padding:6px 10px;flex-shrink:0" onclick="applyBgHex()">应用背景色</button>
+      </div>
+      <div class="sub">③ 节点文字（统一设置）</div>
+      <div class="pr" style="margin-bottom:8px">
+        <label style="font-size:12px;color:var(--ui-text2);margin-bottom:4px;display:block">文字大小 <span id="gf-size-v">14</span>px</label>
+        <input type="range" id="gf-size" min="10" max="28" value="14" style="width:100%" oninput="document.getElementById('gf-size-v').textContent=this.value">
+      </div>
+      <label style="font-size:12px;color:var(--ui-text2);margin-bottom:4px;display:block">文字颜色</label>
+      <div id="gfcr" style="display:flex;gap:7px;align-items:center;margin-bottom:8px">
+        <input type="color" id="gf-color" value="#e8f4ff" style="width:36px;height:30px;padding:0;border:1px solid var(--ui-border);border-radius:4px;background:none;cursor:pointer;flex-shrink:0">
+        <input type="text" id="gf-color-hex" value="#e8f4ff" style="flex:1;min-width:0;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:6px 8px;border-radius:4px;outline:none" oninput="if(/^#[0-9a-fA-F]{6}$/.test(this.value))document.getElementById('gf-color').value=this.value">
+      </div>
+      <button class="tb grn" style="width:100%" onclick="applyGlobalFont()">✓ 应用文字样式到所有节点</button>
+      <div class="psep" style="margin:12px 0"></div>
+      <div style="font-size:12px;color:var(--ui-text2);margin-bottom:8px;font-weight:600">🔀 汇流合并</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ui-text2);margin-bottom:8px;cursor:pointer">
+        <input type="checkbox" id="bm-bold" checked onchange="busTrunkBold=this.checked;drawAll()" style="width:auto"> 主干线加粗显示（像母线）
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ui-text2);margin-bottom:8px;cursor:pointer">
+        <input type="checkbox" id="bm-share" checked onchange="busShareTrunk=this.checked;_pathCacheSig='';drawAll()" style="width:auto"> 跨设备共享主干（邻近主干合并为一条）
+      </label>
+      <label style="font-size:12px;color:var(--ui-text2);display:block;margin-bottom:4px">母线样式</label>
+      <select id="bm-style" onchange="busStyle=this.value;drawAll()" style="width:100%;margin-bottom:8px;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:6px 8px;border-radius:4px">
+        <option value="busbar" data-i18n="母线汇流排（带端帽）">母线汇流排（带端帽）</option>
+        <option value="solid" data-i18n="加粗实线">加粗实线</option>
+        <option value="double" data-i18n="双线母线">双线母线</option>
+        <option value="glow" data-i18n="发光母线">发光母线</option>
+      </select>
+      <label style="font-size:12px;color:var(--ui-text2);display:block;margin-bottom:4px">主干通道间距 <span id="bm-gap-v">28</span>px</label>
+      <input type="range" id="bm-gap" min="12" max="80" value="28" style="width:100%" oninput="busMergeGap=parseInt(this.value);document.getElementById('bm-gap-v').textContent=this.value;_pathCacheSig=''">
+      <div class="phint" style="margin-top:6px">💡 主干中点有白色圆点手柄，拖动可微调该母线离设备的距离</div>
+      <button class="tb" style="width:100%;margin-top:6px;font-size:12px" onclick="busOffsets={};_pathCacheSig='';drawAll()">↺ 重置所有主干位置</button>
+      </div>
+    </div>
+  </div>
+  <div id="props">
+    <h3 data-i18n="属性面板">属性面板</h3>
+    <div id="pbody">
+      <div id="pnone">未选中<br><br>点击节点或连线编辑<br><br>💡 快捷键<br>Del删除 · Ctrl+Z撤销<br>Ctrl+Y重做 · 滚轮缩放<br>中键/空格拖拽平移</div>
+      <div id="pnode" style="display:none">
+        <div class="pr"><label data-i18n="节点 ID">节点 ID</label><input id="p-id" oninput="applyNP()"></div>
+        <div class="pr"><label data-i18n="中文标签">中文标签</label><input id="p-label-zh" oninput="applyNP()"></div>
+        <div class="pr"><label data-i18n="English Label">English Label</label><input id="p-label-en" oninput="applyNP()"></div>
+        <div class="pr" id="prow-vis"><label data-i18n="画布显示">画布显示</label>
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-show-label" onchange="applyVis()" style="width:auto"> <span data-i18n="显示名称">显示名称</span></label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-show-fields" onchange="applyVis()" style="width:auto"> <span data-i18n="显示数据字段">显示数据字段</span></label>
+          </div></div>
+        <div class="pr" id="prow-rule"><label data-i18n="显示条件（数据驱动）">显示条件（数据驱动）</label>
+          <div class="rule-line"><span id="np-rule-sum" class="rule-sum">无（始终显示）</span>
+            <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editNodeRule()" data-i18n="编辑">编辑</button></div></div>
+        <div class="pr" id="prow-type"><label data-i18n="类型">类型</label><select id="p-type" onchange="applyNP()"></select></div>
+        <div class="pr" id="prow-status"><label>初始状态（中文）<span style="color:#ff6b6b">*</span></label><input id="p-status" placeholder="待机/充电/放电" oninput="applyNP()"></div>
+        <div class="pr" id="prow-status-en"><label>初始状态（English）<span style="color:#ff6b6b">*</span></label><input id="p-status-en" placeholder="如 Standby / Charging" oninput="applyNP()"></div>
+        <div class="psep"></div>
+        <div class="pr" id="prow-scale"><label>图标大小 <span id="p-scale-v">100</span>%</label>
+          <div class="pr-inline"><input type="range" id="p-scale" min="5" max="800" value="100" oninput="applyNP()"></div></div>
+        <div class="pr"><label>旋转 <span id="p-rot-v">0</span>°</label>
+          <div class="pr-inline"><input type="range" id="p-rot" min="0" max="359" value="0" oninput="applyNP()"><button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="resetRotation()" data-i18n="归零">归零</button></div></div>
+        <div class="pr"><label id="p-fs-label">标签字号 <span id="p-fs-v">14</span>px</label>
+          <div class="pr-inline"><input type="range" id="p-fs" min="10" max="48" value="14" oninput="applyNP()"></div></div>
+        <div class="pr"><label id="p-fc-label" data-i18n="标签颜色">标签颜色</label>
+          <div class="pr-inline"><input type="color" id="p-fc" value="#e8f4ff" oninput="applyNP()">
+          <input type="text" id="p-fc-hex" style="flex:1" oninput="syncColor('p-fc',this.value)"></div></div>
+        <div id="text-style" style="display:none">
+          <div class="psep"></div>
+          <div class="pr"><label data-i18n="背景填充">背景填充</label>
+            <div class="pr-inline">
+              <input type="color" id="p-bg" value="#102a52" oninput="applyTextStyle()">
+              <input type="text" id="p-bg-hex" style="flex:1" placeholder="无填充留空" oninput="applyTextStyle()">
+              <button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="clearTextBg()">无</button>
+            </div></div>
+          <div class="pr"><label data-i18n="边框样式">边框样式</label>
+            <select id="p-border" onchange="applyTextStyle()">
+              <option value="none" data-i18n="无边框">无边框</option><option value="solid" data-i18n="实线">实线</option><option value="dashed" data-i18n="虚线">虚线</option>
+            </select></div>
+          <div class="pr"><label data-i18n="边框颜色">边框颜色</label>
+            <div class="pr-inline"><input type="color" id="p-border-color" value="#4dd0ff" oninput="applyTextStyle()">
+            <input type="text" id="p-border-color-hex" style="flex:1" oninput="applyTextStyle()"></div></div>
+          <div class="pr"><label>圆角 <span id="p-radius-v">6</span>px</label>
+            <div class="pr-inline"><input type="range" id="p-radius" min="0" max="24" value="6" oninput="applyTextStyle()"></div></div>
+          <div class="pr"><label>关联变量</label>
+            <select id="p-text-bind" onchange="applyTextBind()"></select>
+            <div class="pr-inline" style="margin-top:6px">
+              <input id="p-text-bind-custom" placeholder="或输入信号名，如 totalCharge" oninput="applyTextBind(true)">
+              <button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="clearTextBind()">清除</button>
+            </div>
+            <div class="phint" style="margin-top:4px">绑定后显示“文本标签：实时值”。可绑定全局信号，也可直接输入运行端推送的信号名。</div>
+          </div>
+        </div>
+        <div id="anchor-style" style="display:none">
+          <div class="psep"></div>
+          <div class="pr"><label data-i18n="占位点填充色">占位点填充色</label>
+            <div class="pr-inline">
+              <input type="color" id="p-anchor-fill" value="#4dd0ff" oninput="applyAnchorStyle()">
+              <input type="text" id="p-anchor-fill-hex" style="flex:1" placeholder="透明留空" oninput="applyAnchorStyle()">
+              <button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="clearAnchorFill()" data-i18n="透明">透明</button>
+            </div></div>
+          <div class="pr"><label>不透明度 <span id="p-anchor-op-v">100</span>%</label>
+            <div class="pr-inline"><input type="range" id="p-anchor-op" min="0" max="100" value="100" oninput="applyAnchorStyle()"></div></div>
+          <div class="phint">💡 把填充设为画布同色、或不透明度调到 0，用户即看不到此点；研发可在「视图 ▾ → 📍 占位点标记」总开关查看/隐藏全部占位点位置。</div>
+        </div>
+        <div class="psep" id="prow-datasep"></div>
+        <div class="pr" id="prow-data"><label data-i18n="数据字段">数据字段</label>
+          <div class="df-head">
+            <span class="df-col df-col-zh" data-i18n="中文字段名">中文字段名</span>
+            <span class="df-col df-col-en" data-i18n="英文字段名">英文字段名</span>
+            <span class="df-col df-col-val" data-i18n="数值">数值</span>
+            <span style="width:24px"></span>
+          </div>
+          <div id="dfields"></div>
+          <button class="tb" style="width:100%;margin-top:4px;font-size:12px" onclick="addDF()" data-i18n="+ 添加字段">+ 添加字段</button></div>
+        <div class="psep"></div>
+        <div class="phint">坐标: <span id="p-x">—</span>, <span id="p-y">—</span></div>
+      </div>
+      <div id="pedge" style="display:none">
+        <div style="font-size:12px;color:var(--accent);margin-bottom:8px;font-weight:bold" data-i18n="🔗 连线属性">🔗 连线属性</div>
+        <div class="pr"><label data-i18n="连线类型">连线类型</label>
+          <div id="ep-type-dd" class="etdd">
+            <button type="button" id="ep-type-btn" class="etdd-btn" onclick="toggleEpTypeDD(event)">
+              <span id="ep-type-btn-label" class="etdd-label"></span>
+              <span id="ep-type-btn-prev" class="et-prev"></span>
+              <span class="etdd-caret">▾</span>
+            </button>
+            <div id="ep-type-list" class="etdd-list"></div>
+          </div>
+          <select id="ep-type" onchange="applyEP();refreshEpTypeBtn()" style="display:none"></select></div>
+        <div class="pr"><label>线条颜色</label>
+          <div class="pr-inline"><input type="color" id="ep-color" value="#e74c3c" oninput="applyEP()">
+            <input type="text" id="ep-color-hex" style="flex:1" placeholder="跟随类型" oninput="applyEP()">
+            <button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="clearEdgeColor()">跟随</button></div></div>
+        <div class="pr"><label>线条样式</label>
+          <select id="ep-style" onchange="applyEP()">
+            <option value="inherit">跟随连线类型</option>
+            <option value="solid">实线</option>
+            <option value="dashed">虚线</option>
+          </select></div>
+        <div class="pr"><label data-i18n="走线方式">走线方式</label><select id="ep-route" onchange="applyEP()">
+          <option value="smart" data-i18n="智能（最短·自动避障）">智能（最短·自动避障）</option><option value="line" data-i18n="直线">直线</option><option value="arc" data-i18n="弧线">弧线</option><option value="manual" data-i18n="手动拐点">手动拐点</option></select></div>
+        <div class="phint" style="margin-bottom:6px">💡 选中连线后：直接拖蓝色方块(拐点)即可对齐/汇合（自动吸附其他节点的水平/垂直线与网格）</div>
+        <div class="pr" id="ep-ortho-row" style="display:none"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ep-ortho" checked onchange="applyEP()" style="width:auto"> 拐点强制横平竖直（正交）</label></div>
+        <div class="pr"><label data-i18n="显示条件（数据驱动）">显示条件（数据驱动）</label>
+          <div class="rule-line"><span id="ep-show-sum" class="rule-sum">无（始终显示）</span>
+            <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editEdgeShowRule()" data-i18n="编辑">编辑</button></div>
+          <div class="phint" style="margin-top:3px" data-i18n="条件不满足→不画此连线（适合"动态建立的连线"）">条件不满足→不画此连线（适合"动态建立的连线"）</div></div>
+        <div class="pr"><label data-i18n="流向（按规则确定）">流向（按规则确定）</label>
+          <div class="rule-line"><span id="ep-dir-sum" class="rule-sum">无规则（用下面的固定流向）</span>
+            <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editEdgeDirRules()" data-i18n="编辑">编辑</button></div>
+          <div class="phint" style="margin:4px 0" data-i18n="按信号实时匹配规则确定流向；规则都不命中时用下面的固定流向">按信号实时匹配规则确定流向；规则都不命中时用下面的固定流向</div>
+          <div class="pr-inline"><span style="font-size:12px;color:var(--ui-text2);flex-shrink:0" data-i18n="固定流向（兜底）">固定流向（兜底）</span>
+            <select id="ep-dir" onchange="applyEP()" style="flex:1">
+            <option value="forward" data-i18n="正向 →">正向 →</option><option value="reverse" data-i18n="反向 ←">反向 ←</option>
+            <option value="both" data-i18n="双向 ↔">双向 ↔</option><option value="none" data-i18n="无流向">无流向</option></select></div></div>
+        <div class="pr"><label>标签（可选）</label><input id="ep-lbl" oninput="applyEP()"></div>
+        <div class="pr"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ep-showlbl" onchange="applyEP()" style="width:auto"> 单独显示本条连线标签</label>
+          <div class="phint" style="margin-top:3px">提示：受顶部「全部线标签」总开关控制，总开关关闭时本条也不显示</div></div>
+        <div class="pr"><label>线条粗细 <span id="ep-w-v">1.0</span>×</label>
+          <div class="pr-inline"><input type="range" id="ep-w" min="0.5" max="3" step="0.1" value="1" oninput="applyEP()"></div></div>
+        <div class="psep"></div>
+        <div class="phint" id="ep-desc" style="color:var(--accent)"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="jpanel"><div id="jpi"><h3 data-i18n="📋 画布 JSON">📋 画布 JSON</h3>
+  <div style="font-size:12px;color:var(--ui-text2);margin-bottom:8px;line-height:1.6">
+    画布 JSON 轻量，仅含节点/连线实例信息，通过 <b>meta.libraryRef</b> 引用元素库版本，并自带本图用到的连线类型样式(edgeStyles)。完整元素库+字典+图标请点「🗂 元素库包」导出。
+    数据驱动规则随图导出：节点 <b>visibleWhen</b>、连线 <b>showWhen</b>/<b>dirRules</b>、顶层 <b>signals</b>/<b>sampleSignals</b>；运行端用元素库包内的 <b>runtime.js</b> 的 <b>resolveDynamic(topology, signals)</b> 还原显隐与流向（与编辑器内规则实时生效的效果一致）。
+    全局视图设置（线标签/数据字段/线宽/走线风格/汇流合并）记录在 <b>meta.view</b>，导入时一并还原，复原整张拓扑图外观。
+  </div>
+  <div id="jout"></div>
+  <div id="jpa"><button class="tb" onclick="copyJSON()" data-i18n="📋 复制JSON">📋 复制JSON</button>
+    <button class="tb grn" onclick="dlJSON()" data-i18n="⬇ 下载画布JSON">⬇ 下载画布JSON</button>
+    <button class="tb grn" onclick="dlAllIconsZip()" data-i18n="🗂 元素库包(ZIP)">🗂 元素库包(ZIP)</button>
+    <button class="tb red" onclick="hideJSON()" data-i18n="✕ 关闭">✕ 关闭</button></div></div></div>
+<!-- ★ 数据驱动：规则编辑模态 + 信号注入/预览面板 -->
+
+<div id="rulemodal-ov" onclick="if(event.target===this)closeRuleModal()">
+  <div id="rulemodal">
+    <h3 id="rm-title">动态规则</h3>
+    <div id="rm-target" class="rm-target"></div>
+    <div id="rm-body"></div>
+    <div id="rm-foot">
+      <button class="tb red" onclick="clearRuleModalState()" data-i18n="清空条件">清空条件</button>
+      <span style="flex:1"></span>
+      <button class="tb" onclick="closeRuleModal()" data-i18n="取消">取消</button>
+      <button class="tb grn" onclick="saveRuleModal()" data-i18n="保存">保存</button>
+    </div>
+  </div>
+</div>
+<div id="simpanel">
+  <div id="sim-head"><span data-i18n="⚙ 规则与信号">⚙ 规则与信号</span>
+    <span id="sim-close" onclick="toggleSigPanel()" title="关闭面板">✕</span></div>
+  <div id="sim-body">
+    <label id="sim-runview-row" title="开启后彻底隐藏被规则隐藏的元素，预览运行效果；关闭时编辑态把它们「虚化」仍可点选编辑">
+      <input type="checkbox" id="sim-runview" onchange="toggleRunView(this.checked)">
+      <span data-i18n="运行视图（彻底隐藏被规则隐藏者）">运行视图（彻底隐藏被规则隐藏者）</span></label>
+    <div class="sim-hint" data-i18n="规则随信号实时生效：编辑态被隐藏的元素/连线会「虚化」显示，仍可点选并编辑；勾选「运行视图」可预览真实显隐效果。">规则随信号实时生效：编辑态被隐藏的元素/连线会「虚化」显示，仍可点选并编辑；勾选「运行视图」可预览真实显隐效果。</div>
+
+    <div class="sim-sec"><span data-i18n="全局信号">全局信号</span><span class="sim-sec-x" data-i18n="（添加后画布上所有元素/连线的规则均可引用，随图导出）">（添加后画布上所有元素/连线的规则均可引用，随图导出）</span></div>
+    <div id="sim-custom"></div>
+    <div id="sim-add">
+      <input id="sim-newname" placeholder="信号名 如 mode">
+      <select id="sim-newtype" class="sim-sel" style="flex:0 0 84px" onchange="onNewSigType()">
+        <option value="number" data-i18n="数值">数值</option>
+        <option value="bool" data-i18n="布尔">布尔</option>
+        <option value="enum" data-i18n="枚举">枚举</option>
+        <option value="text" data-i18n="文本">文本</option>
+      </select>
+      <input id="sim-newval" placeholder="当前值">
+      <button class="tb" style="flex-shrink:0;padding:5px 9px" onclick="addCustomSignal()" data-i18n="+ 信号">+ 信号</button>
+    </div>
+    <input id="sim-newopts" style="width:100%;margin-top:5px;display:none" placeholder="枚举可选值，逗号分隔，如 自动,手动,离网">
+
+    <div class="sim-sec"><span data-i18n="规则总览">规则总览</span><span class="sim-sec-x" data-i18n="（仅查看；新增/修改请选中元素或连线，在右侧属性面板里设置）">（仅查看；新增/修改请选中元素或连线，在右侧属性面板里设置）</span></div>
+    <div id="sim-rules"></div>
+
+    <div class="sim-sec"><span data-i18n="注入信号（测试）">注入信号（测试）</span><span class="sim-sec-x" data-i18n="（临时覆盖某信号的值，验证规则；不填用当前值）">（临时覆盖某信号的值，验证规则；不填用当前值）</span></div>
+    <div id="sim-inj-tools">
+      <button type="button" class="sim-acc-btn" onclick="injExpandAll()" title="展开全部分组" data-i18n="▼ 全部展开">▼ 全部展开</button>
+      <button type="button" class="sim-acc-btn" onclick="injCollapseAll()" title="折叠全部分组" data-i18n="▶ 全部折叠">▶ 全部折叠</button>
+    </div>
+    <div id="sim-inj"></div>
+    <button id="sim-add-inj" class="rm-add" style="margin:2px 0 4px" onclick="addInjRow()" data-i18n="+ 添加注入">+ 添加注入</button>
+    <div class="sim-sec"><span data-i18n="批量样例 JSON">批量样例 JSON</span><span class="sim-sec-x" data-i18n="（一次性设置多个信号的值）">（一次性设置多个信号的值）</span></div>
+    <div class="sim-hint" data-i18n="粘贴 {信号名:值} 批量覆盖注入；点「填入当前」生成模板再改。">粘贴 {信号名:值} 批量覆盖注入；点「填入当前」生成模板再改。</div>
+    <textarea id="sim-json" oninput="autoGrowSimJSON()" placeholder='{"bms_1.SOC(%)":20,"grid_1.online":true}'></textarea>
+    <div id="sim-foot">
+      <button class="tb" onclick="fillSimTemplate()" data-i18n="填入当前">填入当前</button>
+      <button class="tb" onclick="pasteSimJSON()" data-i18n="应用JSON">应用JSON</button>
+      <button class="tb red" onclick="clearSim()" data-i18n="清空注入">清空注入</button>
+    </div>
+  </div>
+</div>
+<div id="ctxmenu">
+  <div class="cti" id="ctx-conn" onclick="ctxConn()" title="以此元素为起点开始连线"><span>🔗</span> 从此连线</div>
+  <div class="cti" id="ctx-copy" onclick="ctxCopy()" title="复制该元素"><span>⧉</span> 复制</div>
+  <div class="cti" id="ctx-straight" onclick="ctxStraight()" title="重置该连线为智能走线（最短·自动避障）"><span>📏</span> 智能走线</div>
+  <div class="cti" id="ctx-line" onclick="ctxLine()" title="将该连线设为直线（起止直连，不避障）"><span>／</span> 直线走线</div>
+  <div class="ctsep"></div>
+  <div class="cti cd" id="ctx-del-edge" onclick="ctxDelEdge()" title="仅删除这条连线，不影响两端的元素"><span>✕</span> 删除连线</div>
+  <div class="cti cd" id="ctx-del" onclick="ctxDel()" title="删除该元素及其相连的所有连线"><span>🗑</span> 删除</div>
+</div>
+<div id="uo"><div id="ub"><h4 id="ub-title">📁 上传自定义图标</h4>
+  <img id="upv" src="" alt="预览"/>
+  <div id="dz" onclick="document.getElementById('fi').click()">
+    <div class="ic">🖼</div><p id="dz-p1">点击选择 PNG / SVG 文件</p>
+    <p id="dz-p2" style="color:var(--ui-text2);opacity:.7;margin-top:4px">建议 100×100 透明背景</p></div>
+  <input type="file" id="fi" accept="image/png,image/svg+xml,image/jpeg" style="display:none" onchange="onFile(event)">
+  <input type="file" id="fi-json" accept="application/json,.json" style="display:none" onchange="onImportJSON(event)">
+  <div class="uf">
+    <label class="uf-label"><span class="df-tag df-zh">中</span> <span id="uf-zh-label">中文名称</span> <span class="req" id="uf-zh-req">*必填</span></label>
+    <input type="text" id="un" placeholder="如：自定义设备">
+  </div>
+  <div class="uf">
+    <label class="uf-label"><span class="df-tag df-en">EN</span> <span id="uf-en-label">英文名称</span> <span class="req" id="uf-en-req">*必填</span></label>
+    <input type="text" id="un-en" placeholder="如：Custom Device">
+  </div>
+  <div id="ua"><button class="tb grn" id="ub-ok" onclick="confirmUp()">✓ 添加</button>
+    <button class="tb red" id="ub-cancel" onclick="closeUp()">✕ 取消</button></div>
+</div></div>
+
+<!-- 自定义确认弹框 -->
+<div id="confirm-overlay"><div id="confirm-box">
+  <div id="confirm-icon">⚠️</div>
+  <div id="confirm-msg">确定执行此操作？</div>
+  <div id="confirm-actions">
+    <button class="tb red" id="confirm-ok">确定</button>
+    <button class="tb" id="confirm-cancel">取消</button>
+  </div>
+</div></div>
+
+<!-- 示例模板选择器 -->
+<div id="tpl-overlay"><div id="tpl-box">
+  <h4 id="tpl-title">📂 选择示例模板</h4>
+  <div id="tpl-grid"></div>
+  <div style="text-align:right;margin-top:14px">
+    <button class="tb" id="tpl-close" onclick="closeTemplates()">关闭</button>
+  </div>
+</div></div>
+
+<script src="topo-editor/topology-editor-icons.js"></script>
+<script src="topo-editor/topology-editor.js"></script>
+</body></html>
