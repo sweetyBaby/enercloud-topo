@@ -1,0 +1,262 @@
+{
+  "schemaVersion": "tpl-1",
+  "template": {
+    "id": "t2b_busbar",
+    "name": "母线汇流式",
+    "nameEn": "Busbar Collector",
+    "desc": "主电网 + 关口/并网表，母线下挂多个电池柜",
+    "builtin": true
+  },
+  "seed": {
+    "nodes": [
+      {
+        "id": "grid_1",
+        "type": "grid",
+        "labelZh": "主电网",
+        "labelEn": "Grid",
+        "x": 550,
+        "y": 51.2,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "meter_1",
+        "type": "meter2",
+        "labelZh": "关口表",
+        "labelEn": "Gateway Meter",
+        "x": 176,
+        "y": 192,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": 200
+          }
+        ]
+      },
+      {
+        "id": "meter_2",
+        "type": "meter2",
+        "labelZh": "并网表",
+        "labelEn": "Grid-tie Meter",
+        "x": 176,
+        "y": 294.40000000000003,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "load_1",
+        "type": "load",
+        "labelZh": "用户负载",
+        "labelEn": "Load",
+        "x": 726,
+        "y": 217.60000000000002,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "data": [
+          {
+            "key": "负载功率(kW)",
+            "keyEn": "Load(kW)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "bus_1",
+        "type": "busbar",
+        "labelZh": "交流母线",
+        "labelEn": "AC Busbar",
+        "x": 550,
+        "y": 332.8,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#4dd0ff",
+        "data": [
+          {
+            "key": "母线电压(V)",
+            "keyEn": "Bus V(V)",
+            "dv": 782
+          }
+        ]
+      },
+      {
+        "id": "c1",
+        "type": "cabinet",
+        "labelZh": "1#柜",
+        "labelEn": "Rack 1",
+        "x": 220,
+        "y": 524.8,
+        "status": "并网运行",
+        "fontSize": 14,
+        "fontColor": "#3aa0ff",
+        "data": [
+          {
+            "key": "平均温度(℃)",
+            "keyEn": "Temp(℃)",
+            "dv": 25
+          },
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": 53
+          }
+        ]
+      },
+      {
+        "id": "c2",
+        "type": "cabinet",
+        "labelZh": "2#柜",
+        "labelEn": "Rack 2",
+        "x": 440,
+        "y": 524.8,
+        "status": "并网运行",
+        "fontSize": 14,
+        "fontColor": "#3aa0ff",
+        "data": [
+          {
+            "key": "平均温度(℃)",
+            "keyEn": "Temp(℃)",
+            "dv": 26
+          },
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": 53
+          }
+        ]
+      },
+      {
+        "id": "c3",
+        "type": "cabinet",
+        "labelZh": "3#柜",
+        "labelEn": "Rack 3",
+        "x": 660,
+        "y": 524.8,
+        "status": "并网运行",
+        "fontSize": 14,
+        "fontColor": "#3aa0ff",
+        "data": [
+          {
+            "key": "平均温度(℃)",
+            "keyEn": "Temp(℃)",
+            "dv": 26
+          },
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": 53
+          }
+        ]
+      },
+      {
+        "id": "c4",
+        "type": "cabinet",
+        "labelZh": "4#柜",
+        "labelEn": "Rack 4",
+        "x": 880,
+        "y": 524.8,
+        "status": "并网运行",
+        "fontSize": 14,
+        "fontColor": "#3aa0ff",
+        "data": [
+          {
+            "key": "平均温度(℃)",
+            "keyEn": "Temp(℃)",
+            "dv": 26
+          },
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": 53
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "grid_1",
+        "to": "bus_1",
+        "et": "ac_power",
+        "route": "ortho",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "meter_1",
+        "to": "bus_1",
+        "et": "ac_power",
+        "route": "ortho",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "meter_2",
+        "to": "bus_1",
+        "et": "ac_power",
+        "route": "ortho",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "bus_1",
+        "to": "load_1",
+        "et": "discharge",
+        "route": "ortho",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "bus_1",
+        "to": "c1",
+        "et": "charge",
+        "route": "ortho",
+        "dir": "both",
+        "lbl": ""
+      },
+      {
+        "from": "bus_1",
+        "to": "c2",
+        "et": "charge",
+        "route": "ortho",
+        "dir": "both",
+        "lbl": ""
+      },
+      {
+        "from": "bus_1",
+        "to": "c3",
+        "et": "charge",
+        "route": "ortho",
+        "dir": "both",
+        "lbl": ""
+      },
+      {
+        "from": "bus_1",
+        "to": "c4",
+        "et": "charge",
+        "route": "ortho",
+        "dir": "both",
+        "lbl": ""
+      }
+    ]
+  }
+}

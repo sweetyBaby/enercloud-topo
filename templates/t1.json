@@ -1,0 +1,486 @@
+{
+  "schemaVersion": "tpl-1",
+  "template": {
+    "id": "t1",
+    "name": "发散式拓扑",
+    "nameEn": "general template1",
+    "desc": "",
+    "builtin": true
+  },
+  "canvas": {
+    "schemaVersion": "2.0",
+    "meta": {
+      "app": "储能拓扑编辑器",
+      "generatedAt": "2026-06-23T02:52:25.271Z",
+      "lang": "zh",
+      "libraryRef": {
+        "name": "energy-topology",
+        "version": "2.0.0"
+      },
+      "canvas": {
+        "bgColor": "#0a1f40",
+        "zoom": 0.2,
+        "panX": 57.8,
+        "panY": 116.5,
+        "grid": {
+          "show": true,
+          "stepPx": 40
+        },
+        "showAnchors": true
+      },
+      "view": {
+        "showEdgeLabels": true,
+        "showFieldChips": true,
+        "globalWidth": 1,
+        "routeStyle": 3,
+        "busMerge": true,
+        "busMergeGap": 16,
+        "busTrunkBold": true,
+        "busStyle": "busbar",
+        "busShareTrunk": false,
+        "busAggregation": false
+      }
+    },
+    "edgeStyles": {
+      "pv_power": {
+        "labelZh": "光伏出力",
+        "labelEn": "PV Output",
+        "color": "#f9ca24",
+        "width": 2.5,
+        "dash": [],
+        "anim": "flow",
+        "speed": 0.6
+      },
+      "charge": {
+        "labelZh": "充电中",
+        "labelEn": "Charging",
+        "color": "#2ecc71",
+        "width": 2.5,
+        "dash": [],
+        "anim": "flow",
+        "speed": 0.9
+      },
+      "ac_power": {
+        "labelZh": "交流电力",
+        "labelEn": "AC Power",
+        "color": "#e74c3c",
+        "width": 2.5,
+        "dash": [],
+        "anim": "flow",
+        "speed": 0.5
+      },
+      "discharge": {
+        "labelZh": "放电中",
+        "labelEn": "Discharging",
+        "color": "#3498db",
+        "width": 2.5,
+        "dash": [],
+        "anim": "flow",
+        "speed": 0.9
+      }
+    },
+    "nodes": [
+      {
+        "id": "pcs_1",
+        "type": "pcs",
+        "label": {
+          "zh": "PCS变流器",
+          "en": "PCS"
+        },
+        "position": {
+          "x": 2632,
+          "y": 990.3
+        },
+        "sizeWorld": 388,
+        "scale": 1,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#2ecc71",
+        "display": {
+          "showLabel": true,
+          "showFields": true
+        },
+        "data": [
+          {
+            "key": {
+              "zh": "P(kW)",
+              "en": "P(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "key": {
+              "zh": "I(A)",
+              "en": "I(A)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "key": {
+              "zh": "U(V)",
+              "en": "U(V)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": 0,
+              "y": 0
+            }
+          }
+        ],
+        "status": {
+          "zh": "运行",
+          "en": "Running"
+        }
+      },
+      {
+        "id": "solar_1",
+        "type": "solar",
+        "label": {
+          "zh": "光伏",
+          "en": "PV"
+        },
+        "position": {
+          "x": 1082,
+          "y": 274.5
+        },
+        "sizeWorld": 435,
+        "scale": 1,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#f9ca24",
+        "display": {
+          "showLabel": true,
+          "showFields": true
+        },
+        "data": [
+          {
+            "key": {
+              "zh": "P(kW)",
+              "en": "P(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": 6,
+              "y": -18
+            }
+          },
+          {
+            "key": {
+              "zh": "Vpv(V)",
+              "en": "Vpv(V)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": 6,
+              "y": -22
+            }
+          }
+        ],
+        "status": {
+          "zh": "发电",
+          "en": "Generating"
+        }
+      },
+      {
+        "id": "bms_1",
+        "type": "bms",
+        "label": {
+          "zh": "电池BMS",
+          "en": "Battery BMS"
+        },
+        "position": {
+          "x": 2632,
+          "y": 2002.8
+        },
+        "sizeWorld": 388,
+        "scale": 1,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#3aa0ff",
+        "display": {
+          "showLabel": true,
+          "showFields": true
+        },
+        "data": [
+          {
+            "key": {
+              "zh": "SOC(%)",
+              "en": "SOC(%)"
+            },
+            "value": 60,
+            "hidden": false,
+            "offset": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "key": {
+              "zh": "温度(℃)",
+              "en": "Temp(℃)"
+            },
+            "value": 26,
+            "hidden": false,
+            "offset": {
+              "x": 0,
+              "y": 0
+            }
+          }
+        ],
+        "status": {
+          "zh": "充电",
+          "en": "Charging"
+        }
+      },
+      {
+        "id": "grid_1",
+        "type": "grid",
+        "label": {
+          "zh": "市电",
+          "en": "Grid"
+        },
+        "position": {
+          "x": 1028.1,
+          "y": 1121.3
+        },
+        "sizeWorld": 470,
+        "scale": 1,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "display": {
+          "showLabel": true,
+          "showFields": true
+        },
+        "data": [
+          {
+            "key": {
+              "zh": "P(kW)",
+              "en": "P(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -3,
+              "y": -33
+            }
+          },
+          {
+            "key": {
+              "zh": "今日用电(kWh)",
+              "en": "Today(kWh)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -7,
+              "y": -35
+            }
+          }
+        ],
+        "status": {
+          "zh": "在线",
+          "en": "Online"
+        }
+      },
+      {
+        "id": "load_1",
+        "type": "load",
+        "label": {
+          "zh": "用户负载",
+          "en": "Load"
+        },
+        "position": {
+          "x": 2632,
+          "y": 283
+        },
+        "sizeWorld": 388,
+        "scale": 1,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "display": {
+          "showLabel": true,
+          "showFields": true
+        },
+        "data": [
+          {
+            "key": {
+              "zh": "负载功率(kW)",
+              "en": "Load(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -7,
+              "y": 6
+            }
+          }
+        ],
+        "status": {
+          "zh": "在线",
+          "en": "Online"
+        }
+      },
+      {
+        "id": "gen_1",
+        "type": "generator",
+        "label": {
+          "zh": "发电机",
+          "en": "Generator"
+        },
+        "position": {
+          "x": 999.9,
+          "y": 1960.3
+        },
+        "sizeWorld": 400,
+        "scale": 1,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "display": {
+          "showLabel": true,
+          "showFields": true
+        },
+        "data": [
+          {
+            "key": {
+              "zh": "P(kW)",
+              "en": "P(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -5,
+              "y": 44
+            }
+          }
+        ],
+        "status": {
+          "zh": "备用",
+          "en": "Standby"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": "solar_1",
+        "to": "pcs_1",
+        "edgeType": "pv_power",
+        "edgeTypeLabel": {
+          "zh": "光伏出力",
+          "en": "PV Output"
+        },
+        "color": "#f9ca24",
+        "dash": [],
+        "route": "smart",
+        "dir": "forward",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "fromPort": "right",
+        "toPort": "left"
+      },
+      {
+        "from": "pcs_1",
+        "to": "bms_1",
+        "edgeType": "charge",
+        "edgeTypeLabel": {
+          "zh": "充电中",
+          "en": "Charging"
+        },
+        "color": "#2ecc71",
+        "dash": [],
+        "route": "smart",
+        "dir": "both",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "fromPort": "bottom",
+        "toPort": "top"
+      },
+      {
+        "from": "grid_1",
+        "to": "pcs_1",
+        "edgeType": "ac_power",
+        "edgeTypeLabel": {
+          "zh": "交流电力",
+          "en": "AC Power"
+        },
+        "color": "#e74c3c",
+        "dash": [],
+        "route": "smart",
+        "dir": "forward",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "fromPort": "right",
+        "toPort": "left"
+      },
+      {
+        "from": "pcs_1",
+        "to": "load_1",
+        "edgeType": "discharge",
+        "edgeTypeLabel": {
+          "zh": "放电中",
+          "en": "Discharging"
+        },
+        "color": "#3498db",
+        "dash": [],
+        "route": "smart",
+        "dir": "forward",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "fromPort": "top",
+        "toPort": "bottom"
+      },
+      {
+        "from": "gen_1",
+        "to": "pcs_1",
+        "edgeType": "ac_power",
+        "edgeTypeLabel": {
+          "zh": "交流电力",
+          "en": "AC Power"
+        },
+        "color": "#e74c3c",
+        "dash": [],
+        "route": "smart",
+        "dir": "forward",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "fromPort": "right",
+        "toPort": "left"
+      }
+    ]
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "tpl-1",
+  "template": {
+    "id": "t2",
+    "name": "三角拓扑",
+    "nameEn": "Triangle Layout",
+    "desc": "电网/电池/负载三角连接，储能居中调度",
+    "builtin": true
+  },
+  "seed": {
+    "nodes": [
+      {
+        "id": "bms_1",
+        "type": "bms",
+        "labelZh": "储能电池",
+        "labelEn": "Battery",
+        "x": 620,
+        "y": 124,
+        "status": "并网运行",
+        "fontSize": 14,
+        "fontColor": "#3aa0ff",
+        "data": [
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": 55
+          },
+          {
+            "key": "温度(℃)",
+            "keyEn": "Temp(℃)",
+            "dv": 27
+          },
+          {
+            "key": "电压(V)",
+            "keyEn": "U(V)",
+            "dv": 785
+          },
+          {
+            "key": "电流(A)",
+            "keyEn": "I(A)",
+            "dv": 266
+          },
+          {
+            "key": "今日充电(kWh)",
+            "keyEn": "Charge(kWh)",
+            "dv": 620
+          },
+          {
+            "key": "今日放电(kWh)",
+            "keyEn": "Discharge(kWh)",
+            "dv": 310
+          }
+        ]
+      },
+      {
+        "id": "grid_1",
+        "type": "grid",
+        "labelZh": "市电",
+        "labelEn": "Grid",
+        "x": 180,
+        "y": 458.8,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "data": [
+          {
+            "key": "实时功率(kW)",
+            "keyEn": "P(kW)",
+            "dv": 383
+          },
+          {
+            "key": "今日用电(kWh)",
+            "keyEn": "Today(kWh)",
+            "dv": 2299
+          }
+        ]
+      },
+      {
+        "id": "load_1",
+        "type": "load",
+        "labelZh": "用户负载",
+        "labelEn": "Load",
+        "x": 780,
+        "y": 458.8,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "data": [
+          {
+            "key": "实时功率(kW)",
+            "keyEn": "P(kW)",
+            "dv": 174
+          },
+          {
+            "key": "今日用电(kWh)",
+            "keyEn": "Today(kWh)",
+            "dv": 2001
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "grid_1",
+        "to": "bms_1",
+        "et": "pipe_blue",
+        "route": "straight",
+        "dir": "both",
+        "lbl": ""
+      },
+      {
+        "from": "grid_1",
+        "to": "load_1",
+        "et": "pipe_blue",
+        "route": "straight",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "bms_1",
+        "to": "load_1",
+        "et": "pipe_blue",
+        "route": "straight",
+        "dir": "forward",
+        "lbl": ""
+      }
+    ]
+  }
+}

@@ -394,7 +394,7 @@ const I18N={
   '视图与文件':'View & File','👁 视图 ▾':'👁 View ▾','⊙ 缩放复位 100%':'⊙ Reset Zoom 100%',
   '🎨 外观与主题':'🎨 Appearance & Theme','▦ 网格':'▦ Grid','🏷 全部线标签':'🏷 All Line Labels','📊 数据字段':'📊 Data Fields',
   '📍 占位点标记':'📍 Anchor Markers','占位点填充色':'Anchor Fill','透明':'Clear',
-  '📁 文件 ▾':'📁 File ▾','📂 打开示例模板':'📂 Open Templates','📥 导入画布 JSON':'📥 Import Canvas JSON','⎙ 导出画布 JSON':'⎙ Export Canvas JSON',
+  '📁 文件 ▾':'📁 File ▾','📂 打开示例模板':'📂 Open Templates','📂 模板库':'📂 Templates','💾 保存为模板':'💾 Save as Template','📥 导入画布 JSON':'📥 Import Canvas JSON','⎙ 导出画布 JSON':'⎙ Export Canvas JSON',
   '💾 保存草稿':'💾 Save Draft','↺ 恢复草稿':'↺ Restore Draft','🧹 清除草稿':'🧹 Clear Draft',
   '▶ 数据预览':'▶ Data Preview','▶ 数据预览（注入信号）':'▶ Data Preview (inject signals)',
   '显示条件（数据驱动）':'Show condition (data-driven)','流向规则（数据驱动）':'Direction rules (data-driven)','编辑':'Edit',
@@ -4737,254 +4737,233 @@ function dlAllIconsZip(){
 }
 
 // ══════════════════════════════════════════════
-// 示例模板库（4 种典型储能拓扑）
+// 模板系统：每个模板是 templates/ 目录下的单独 JSON 文件，按需加载（不一次性载入全部）。
+//   读列表/读模板 = 静态 fetch；保存/编辑/重命名/删除 = 调 /api/templates 自动落盘并更新 index.json。
+//   模板文件两种形态：内置 seed（节点/连线种子，加载时自动布局）；用户保存 canvas（完整画布 JSON，保留原布局）。
 // ══════════════════════════════════════════════
-function mkData(pairs){return pairs.map(([k,e,v])=>({key:k,keyEn:e,dv:(v==null?'':v)}));}
-const TEMPLATES={
-  t1:{
-    name:'发散式拓扑', nameEn:'Radial Layout', desc:'PCS 居中，光伏/电网/电池/负载/发电机十字分布',
-    build(){
-      const W=900,H=600;
-      const nodes=[
-        {id:'pcs_1',type:'pcs',labelZh:'PCS变流器',labelEn:'PCS',x:W*.5,y:H*.5,status:'运行',fontSize:14,fontColor:'#2ecc71',data:mkData([['P(kW)','P(kW)'],['I(A)','I(A)'],['U(V)','U(V)']])},
-        {id:'solar_1',type:'solar',labelZh:'光伏',labelEn:'PV',x:W*.28,y:H*.22,status:'发电',fontSize:14,fontColor:'#f9ca24',data:mkData([['P(kW)','P(kW)'],['Vpv(V)','Vpv(V)']])},
-        {id:'bms_1',type:'bms',labelZh:'电池BMS',labelEn:'Battery BMS',x:W*.72,y:H*.22,status:'充电',fontSize:14,fontColor:'#3aa0ff',data:mkData([['SOC(%)','SOC(%)',60],['温度(℃)','Temp(℃)',26]])},
-        {id:'grid_1',type:'grid',labelZh:'市电',labelEn:'Grid',x:W*.28,y:H*.78,status:'在线',fontSize:14,fontColor:'#e8f4ff',data:mkData([['P(kW)','P(kW)'],['今日用电(kWh)','Today(kWh)']])},
-        {id:'load_1',type:'load',labelZh:'用户负载',labelEn:'Load',x:W*.72,y:H*.78,status:'在线',fontSize:14,fontColor:'#e8f4ff',data:mkData([['负载功率(kW)','Load(kW)']])},
-        {id:'gen_1',type:'generator',labelZh:'发电机',labelEn:'Generator',x:W*.5,y:H*.86,status:'备用',fontSize:14,fontColor:'#e8f4ff',data:mkData([['P(kW)','P(kW)']])},
-      ];
-      const edges=[
-        {from:'solar_1',to:'pcs_1',et:'pv_power',route:'straight',dir:'forward',lbl:''},
-        {from:'pcs_1',to:'bms_1',et:'charge',route:'straight',dir:'both',lbl:''},
-        {from:'grid_1',to:'pcs_1',et:'ac_power',route:'straight',dir:'forward',lbl:''},
-        {from:'pcs_1',to:'load_1',et:'discharge',route:'straight',dir:'forward',lbl:''},
-        {from:'gen_1',to:'pcs_1',et:'ac_power',route:'straight',dir:'forward',lbl:''},
-      ];
-      return {nodes,edges};
-    }
-  },
-  t2:{
-    name:'三角拓扑', nameEn:'Triangle Layout', desc:'电网/电池/负载三角连接，储能居中调度',
-    build(){
-      const W=1000,H=620;
-      const nodes=[
-        {id:'bms_1',type:'bms',labelZh:'储能电池',labelEn:'Battery',x:W*.62,y:H*.20,status:'并网运行',fontSize:14,fontColor:'#3aa0ff',data:mkData([['SOC(%)','SOC(%)',55],['温度(℃)','Temp(℃)',27],['电压(V)','U(V)',785],['电流(A)','I(A)',266],['今日充电(kWh)','Charge(kWh)',620],['今日放电(kWh)','Discharge(kWh)',310]])},
-        {id:'grid_1',type:'grid',labelZh:'市电',labelEn:'Grid',x:W*.18,y:H*.74,status:'在线',fontSize:14,fontColor:'#e8f4ff',data:mkData([['实时功率(kW)','P(kW)',383],['今日用电(kWh)','Today(kWh)',2299]])},
-        {id:'load_1',type:'load',labelZh:'用户负载',labelEn:'Load',x:W*.78,y:H*.74,status:'在线',fontSize:14,fontColor:'#e8f4ff',data:mkData([['实时功率(kW)','P(kW)',174],['今日用电(kWh)','Today(kWh)',2001]])},
-      ];
-      const edges=[
-        {from:'grid_1',to:'bms_1',et:'pipe_blue',route:'straight',dir:'both',lbl:''},
-        {from:'grid_1',to:'load_1',et:'pipe_blue',route:'straight',dir:'forward',lbl:''},
-        {from:'bms_1',to:'load_1',et:'pipe_blue',route:'straight',dir:'forward',lbl:''},
-      ];
-      return {nodes,edges};
-    }
-  },
-  t2b_busbar:{
-    name:'母线汇流式', nameEn:'Busbar Collector', desc:'主电网 + 关口/并网表，母线下挂多个电池柜',
-    build(){
-      const W=1100,H=640;
-      const nodes=[
-        {id:'grid_1',type:'grid',labelZh:'主电网',labelEn:'Grid',x:W*.5,y:H*.08,status:'在线',fontSize:14,fontColor:'#e8f4ff',data:mkData([['P(kW)','P(kW)']])},
-        {id:'meter_1',type:'meter2',labelZh:'关口表',labelEn:'Gateway Meter',x:W*.16,y:H*.30,status:'在线',fontSize:14,fontColor:'#e8f4ff',data:mkData([['P(kW)','P(kW)',200]])},
-        {id:'meter_2',type:'meter2',labelZh:'并网表',labelEn:'Grid-tie Meter',x:W*.16,y:H*.46,status:'在线',fontSize:14,fontColor:'#e8f4ff',data:mkData([['P(kW)','P(kW)']])},
-        {id:'load_1',type:'load',labelZh:'用户负载',labelEn:'Load',x:W*.66,y:H*.34,status:'在线',fontSize:14,fontColor:'#e8f4ff',data:mkData([['负载功率(kW)','Load(kW)']])},
-        {id:'bus_1',type:'busbar',labelZh:'交流母线',labelEn:'AC Busbar',x:W*.5,y:H*.52,status:'在线',fontSize:14,fontColor:'#4dd0ff',data:mkData([['母线电压(V)','Bus V(V)',782]])},
-        {id:'c1',type:'cabinet',labelZh:'1#柜',labelEn:'Rack 1',x:W*.2,y:H*.82,status:'并网运行',fontSize:14,fontColor:'#3aa0ff',data:mkData([['平均温度(℃)','Temp(℃)',25],['SOC(%)','SOC(%)',53]])},
-        {id:'c2',type:'cabinet',labelZh:'2#柜',labelEn:'Rack 2',x:W*.4,y:H*.82,status:'并网运行',fontSize:14,fontColor:'#3aa0ff',data:mkData([['平均温度(℃)','Temp(℃)',26],['SOC(%)','SOC(%)',53]])},
-        {id:'c3',type:'cabinet',labelZh:'3#柜',labelEn:'Rack 3',x:W*.6,y:H*.82,status:'并网运行',fontSize:14,fontColor:'#3aa0ff',data:mkData([['平均温度(℃)','Temp(℃)',26],['SOC(%)','SOC(%)',53]])},
-        {id:'c4',type:'cabinet',labelZh:'4#柜',labelEn:'Rack 4',x:W*.8,y:H*.82,status:'并网运行',fontSize:14,fontColor:'#3aa0ff',data:mkData([['平均温度(℃)','Temp(℃)',26],['SOC(%)','SOC(%)',53]])},
-      ];
-      const edges=[
-        {from:'grid_1',to:'bus_1',et:'ac_power',route:'ortho',dir:'forward',lbl:''},
-        {from:'meter_1',to:'bus_1',et:'ac_power',route:'ortho',dir:'forward',lbl:''},
-        {from:'meter_2',to:'bus_1',et:'ac_power',route:'ortho',dir:'forward',lbl:''},
-        {from:'bus_1',to:'load_1',et:'discharge',route:'ortho',dir:'forward',lbl:''},
-        {from:'bus_1',to:'c1',et:'charge',route:'ortho',dir:'both',lbl:''},
-        {from:'bus_1',to:'c2',et:'charge',route:'ortho',dir:'both',lbl:''},
-        {from:'bus_1',to:'c3',et:'charge',route:'ortho',dir:'both',lbl:''},
-        {from:'bus_1',to:'c4',et:'charge',route:'ortho',dir:'both',lbl:''},
-      ];
-      return {nodes,edges};
-    }
-  },
-  t3:{
-    name:'环形回路', nameEn:'Ring Circuit', desc:'电网→高压箱→PCS→电池双路环线',
-    build(){
-      const W=760,H=640;
-      const nodes=[
-        {id:'grid_1',type:'grid',labelZh:'主电网',labelEn:'Grid',x:W*.5,y:H*.10,status:'在线',fontSize:14,fontColor:'#e8f4ff',data:mkData([['P(kW)','P(kW)']])},
-        {id:'pcs_1',type:'pcs',labelZh:'变流器',labelEn:'PCS',x:W*.5,y:H*.34,status:'运行',fontSize:14,fontColor:'#2ecc71',data:mkData([['P(kW)','P(kW)'],['U(V)','U(V)']])},
-        {id:'hv_1',type:'highvolt',labelZh:'高压箱',labelEn:'HV Box',x:W*.5,y:H*.56,status:'在线',fontSize:14,fontColor:'#ff7a6a',data:mkData([['直流电压(V)','DC V(V)']])},
-        {id:'bms_1',type:'bms',labelZh:'电池',labelEn:'Battery',x:W*.5,y:H*.84,status:'充电',fontSize:14,fontColor:'#3aa0ff',data:mkData([['SOC(%)','SOC(%)',55],['温度(℃)','Temp(℃)',26]])},
-      ];
-      const edges=[
-        {from:'grid_1',to:'pcs_1',et:'pipe_blue',route:'ortho',dir:'forward',lbl:''},
-        {from:'pcs_1',to:'hv_1',et:'pipe_blue',route:'ortho',dir:'forward',lbl:''},
-        {from:'hv_1',to:'bms_1',et:'pipe_gold',route:'ortho',dir:'both',lbl:''},
-      ];
-      return {nodes,edges};
-    }
-  },
-  t4:{
-    name:'多级母线树状', nameEn:'Multi-level Tree', desc:'市电/发电机/负载→多组PCS→光伏+电池',
-    build(){
-      const W=1200,H=720;
-      const nodes=[
-        {id:'grid_1',type:'grid',labelZh:'市电',labelEn:'Grid',x:W*.25,y:H*.10,status:'在线',fontSize:14,fontColor:'#e8f4ff',data:mkData([['P(kW)','P(kW)']])},
-        {id:'gen_1',type:'generator',labelZh:'发电机',labelEn:'Generator',x:W*.5,y:H*.10,status:'备用',fontSize:14,fontColor:'#e8f4ff',data:mkData([['P(kW)','P(kW)']])},
-        {id:'load_1',type:'load',labelZh:'用户负载',labelEn:'Load',x:W*.75,y:H*.10,status:'在线',fontSize:14,fontColor:'#e8f4ff',data:mkData([['负载功率(kW)','Load(kW)']])},
-        {id:'bus_1',type:'busbar',labelZh:'主母线',labelEn:'Main Bus',x:W*.5,y:H*.36,status:'在线',fontSize:14,fontColor:'#4dd0ff',data:mkData([['母线电压(V)','Bus V(V)']])},
-        {id:'pcs_1',type:'pcs',labelZh:'PCS-1',labelEn:'PCS-1',x:W*.2,y:H*.58,status:'运行',fontSize:13,fontColor:'#2ecc71',data:mkData([['SOC(%)','SOC(%)']])},
-        {id:'pcs_2',type:'pcs',labelZh:'PCS-2',labelEn:'PCS-2',x:W*.4,y:H*.58,status:'运行',fontSize:13,fontColor:'#2ecc71',data:mkData([['SOC(%)','SOC(%)']])},
-        {id:'pcs_3',type:'pcs',labelZh:'PCS-3',labelEn:'PCS-3',x:W*.6,y:H*.58,status:'运行',fontSize:13,fontColor:'#2ecc71',data:mkData([['SOC(%)','SOC(%)']])},
-        {id:'pcs_4',type:'pcs',labelZh:'PCS-4',labelEn:'PCS-4',x:W*.8,y:H*.58,status:'运行',fontSize:13,fontColor:'#2ecc71',data:mkData([['SOC(%)','SOC(%)']])},
-        {id:'pv_1',type:'solar',labelZh:'光伏1',labelEn:'PV-1',x:W*.12,y:H*.86,status:'发电',fontSize:13,fontColor:'#f9ca24',data:mkData([['P(kW)','P(kW)']])},
-        {id:'b_1',type:'bms',labelZh:'电池1',labelEn:'Bat-1',x:W*.28,y:H*.86,status:'充电',fontSize:13,fontColor:'#3aa0ff',data:mkData([['SOC(%)','SOC(%)']])},
-        {id:'pv_2',type:'solar',labelZh:'光伏2',labelEn:'PV-2',x:W*.52,y:H*.86,status:'发电',fontSize:13,fontColor:'#f9ca24',data:mkData([['P(kW)','P(kW)']])},
-        {id:'b_2',type:'bms',labelZh:'电池2',labelEn:'Bat-2',x:W*.68,y:H*.86,status:'充电',fontSize:13,fontColor:'#3aa0ff',data:mkData([['SOC(%)','SOC(%)']])},
-      ];
-      const edges=[
-        {from:'grid_1',to:'bus_1',et:'ac_power',route:'ortho',dir:'forward',lbl:''},
-        {from:'gen_1',to:'bus_1',et:'ac_power',route:'ortho',dir:'forward',lbl:''},
-        {from:'bus_1',to:'load_1',et:'discharge',route:'ortho',dir:'forward',lbl:''},
-        {from:'bus_1',to:'pcs_1',et:'pipe_blue',route:'ortho',dir:'both',lbl:''},
-        {from:'bus_1',to:'pcs_2',et:'pipe_blue',route:'ortho',dir:'both',lbl:''},
-        {from:'bus_1',to:'pcs_3',et:'pipe_blue',route:'ortho',dir:'both',lbl:''},
-        {from:'bus_1',to:'pcs_4',et:'pipe_blue',route:'ortho',dir:'both',lbl:''},
-        {from:'pcs_1',to:'pv_1',et:'pv_power',route:'ortho',dir:'forward',lbl:''},
-        {from:'pcs_1',to:'b_1',et:'charge',route:'ortho',dir:'both',lbl:''},
-        {from:'pcs_3',to:'pv_2',et:'pv_power',route:'ortho',dir:'forward',lbl:''},
-        {from:'pcs_3',to:'b_2',et:'charge',route:'ortho',dir:'both',lbl:''},
-      ];
-      return {nodes,edges};
-    }
-  },
-  t5_series:{
-    name:'横向串联式', nameEn:'Series Chain', desc:'母线→交流断路器→PCS→直流断路器→电池，横向串联',
-    build(){
-      const W=1200,H=400;
-      const nodes=[
-        {id:'bus_1',type:'busbar',labelZh:'交流母线',labelEn:'AC Busbar',x:W*.12,y:H*.5,status:'在线',fontSize:14,fontColor:'#4dd0ff',data:mkData([['A相电流(A)','Ia(A)'],['B相电流(A)','Ib(A)'],['C相电流(A)','Ic(A)'],['充放电功率(kW)','P(kW)'],['电网频率(Hz)','Freq(Hz)',50],['直流电压(V)','DC V(V)']])},
-        {id:'sw_ac',type:'switch',labelZh:'交流断路器',labelEn:'AC Breaker',x:W*.36,y:H*.5,status:'闭合',fontSize:14,fontColor:'#ff7a6a',data:mkData([['状态','State']])},
-        {id:'pcs_1',type:'pcs',labelZh:'变流器',labelEn:'PCS',x:W*.56,y:H*.5,status:'运行',fontSize:14,fontColor:'#2ecc71',data:mkData([['P(kW)','P(kW)'],['U(V)','U(V)']])},
-        {id:'sw_dc',type:'switch',labelZh:'直流断路器',labelEn:'DC Breaker',x:W*.76,y:H*.5,status:'闭合',fontSize:14,fontColor:'#ff7a6a',data:mkData([['状态','State']])},
-        {id:'bms_1',type:'bms',labelZh:'电池',labelEn:'Battery',x:W*.94,y:H*.5,status:'充电',fontSize:14,fontColor:'#3aa0ff',data:mkData([['SOC(%)','SOC(%)',55]])},
-      ];
-      const edges=[
-        {from:'bus_1',to:'sw_ac',et:'ac_power',route:'straight',dir:'forward',lbl:''},
-        {from:'sw_ac',to:'pcs_1',et:'ac_power',route:'straight',dir:'forward',lbl:''},
-        {from:'pcs_1',to:'sw_dc',et:'dc_power',route:'straight',dir:'forward',lbl:''},
-        {from:'sw_dc',to:'bms_1',et:'charge',route:'straight',dir:'both',lbl:''},
-      ];
-      return {nodes,edges};
-    }
-  },
-  t6_lloop:{
-    name:'L型回路式', nameEn:'L-Shape Loop', desc:'交流母线→断路器→PCS→断路器→电池，L型走线',
-    build(){
-      const W=820,H=620;
-      const nodes=[
-        {id:'bus_1',type:'busbar',labelZh:'交流母线',labelEn:'AC Busbar',x:W*.62,y:H*.16,status:'在线',fontSize:14,fontColor:'#4dd0ff',data:mkData([['A相电流(A)','Ia(A)'],['B相电流(A)','Ib(A)'],['C相电流(A)','Ic(A)'],['交流有功(kW)','AC P(kW)'],['输出电压(V)','Uout(V)']])},
-        {id:'sw_ac',type:'switch',labelZh:'交流断路器',labelEn:'AC Breaker',x:W*.62,y:H*.36,status:'闭合',fontSize:14,fontColor:'#ff7a6a',data:mkData([['状态','State']])},
-        {id:'pcs_1',type:'pcs',labelZh:'变流器',labelEn:'PCS',x:W*.62,y:H*.54,status:'运行',fontSize:14,fontColor:'#2ecc71',data:mkData([['直流功率(kW)','DC P(kW)'],['直流电流(A)','DC I(A)'],['直流电压(V)','DC V(V)']])},
-        {id:'sw_dc',type:'switch',labelZh:'直流断路器',labelEn:'DC Breaker',x:W*.62,y:H*.72,status:'闭合',fontSize:14,fontColor:'#ff7a6a',data:mkData([['状态','State']])},
-        {id:'bms_1',type:'bms',labelZh:'电池',labelEn:'Battery',x:W*.34,y:H*.86,status:'充电',fontSize:14,fontColor:'#3aa0ff',data:mkData([['SOC(%)','SOC(%)',55]])},
-      ];
-      const edges=[
-        {from:'bus_1',to:'sw_ac',et:'pipe_blue',route:'ortho',dir:'forward',lbl:''},
-        {from:'sw_ac',to:'pcs_1',et:'ac_power',route:'ortho',dir:'forward',lbl:''},
-        {from:'pcs_1',to:'sw_dc',et:'dc_power',route:'ortho',dir:'forward',lbl:''},
-        {from:'sw_dc',to:'bms_1',et:'pipe_blue',route:'ortho',dir:'both',lbl:''},
-      ];
-      return {nodes,edges};
-    }
-  },
-  // ★ 数据驱动示例：规则随信号实时生效（编辑态虚化、运行视图隐藏）；点顶栏「⚙ 规则与信号」改 grid_1.online / pcs_1.P(kW) 看显隐与流向变化
-  t7_dynamic:{
-    name:'数据驱动示例', nameEn:'Data-Driven Demo', desc:'电网在线/PCS功率正负 → 元素与连线实时显隐、流向自动切换（规则即时生效；在「⚙ 规则与信号」里改信号值体验）',
-    build(){
-      const W=1000,H=620;
-      const nodes=[
-        {id:'pcs_1',type:'pcs',labelZh:'PCS变流器',labelEn:'PCS',x:W*.5,y:H*.5,status:'运行',fontSize:14,fontColor:'#2ecc71',
-          data:mkData([['P(kW)','P(kW)',-30],['U(V)','U(V)',750]])},
-        {id:'grid_1',type:'grid',labelZh:'市电',labelEn:'Grid',x:W*.18,y:H*.28,status:'在线',fontSize:14,fontColor:'#e8f4ff',
-          data:mkData([['P(kW)','P(kW)',200]])},
-        {id:'bms_1',type:'bms',labelZh:'储能电池',labelEn:'Battery',x:W*.82,y:H*.28,status:'充电',fontSize:14,fontColor:'#3aa0ff',
-          data:mkData([['SOC(%)','SOC(%)',55]])},
-        {id:'load_1',type:'load',labelZh:'用户负载',labelEn:'Load',x:W*.82,y:H*.72,status:'在线',fontSize:14,fontColor:'#e8f4ff',
-          data:mkData([['负载功率(kW)','Load(kW)',80]])},
-        // 发电机：仅在「市电离线(孤岛)」时显示（工况2：元素按数据动态显隐）
-        {id:'gen_1',type:'generator',labelZh:'柴油发电机',labelEn:'Generator',x:W*.18,y:H*.72,status:'备用',fontSize:14,fontColor:'#f5c518',
-          data:mkData([['P(kW)','P(kW)',0]]), visibleWhen:{var:'grid_1.online',op:'falsy'}},
-      ];
-      const edges=[
-        // 工况2：市电在线才有这条并网连线；离线时整条消失
-        {from:'grid_1',to:'pcs_1',et:'ac_power',route:'straight',dir:'forward',lbl:'并网',
-          showWhen:{var:'grid_1.online',op:'truthy'}},
-        // 工况1：PCS 功率正→充电(正向)，负→放电(反向)，由数据决定流向
-        {from:'pcs_1',to:'bms_1',et:'charge',route:'straight',dir:'both',lbl:'',
-          dirRules:[{when:{var:'pcs_1.P(kW)',op:'>',val:0},dir:'forward'},
-                    {when:{var:'pcs_1.P(kW)',op:'<',val:0},dir:'reverse'}]},
-        // 常显：PCS 向负载供电
-        {from:'pcs_1',to:'load_1',et:'discharge',route:'straight',dir:'forward',lbl:''},
-        // 工况2：仅孤岛(市电离线)时，发电机接入并供电
-        {from:'gen_1',to:'pcs_1',et:'ac_power',route:'straight',dir:'forward',lbl:'孤岛',
-          showWhen:{var:'grid_1.online',op:'falsy'}},
-      ];
-      return {nodes,edges};
-    }
-  },
-};
+// 读列表/读模板的静态目录；写操作(保存/编辑/重命名/删除)的接口。
+// 默认同源相对路径（dev-server / 生产 server 均提供）；如需对接父平台后端，
+// 可在加载本脚本前设置 window.TOPO_TPL_BASE / window.TOPO_TPL_API 覆盖（支持绝对 URL）。
+const TPL_BASE=(typeof window!=='undefined'&&window.TOPO_TPL_BASE)||'templates/';
+const TPL_API=(typeof window!=='undefined'&&window.TOPO_TPL_API)||'api/templates';
+let _tplManifest=null;           // 缓存的清单(index.json)，写操作后置空重新拉取
+let currentTemplateId=null;      // 最近加载的模板（保存时可作为「覆盖」目标）
+let _tplEditMode=false;          // true=经「编辑」进入，保存时默认勾选覆盖；普通「使用」则默认另存为新
+function tplEsc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
-function tplThumb(key){
-  // 生成简易缩略图 SVG
-  const t=TEMPLATES[key];const {nodes:tn,edges:te}=t.build();
+async function loadTplManifest(force){
+  if(_tplManifest&&!force)return _tplManifest;
+  const r=await fetch(TPL_BASE+'index.json',{cache:'no-store'});
+  if(!r.ok)throw new Error('manifest '+r.status);
+  _tplManifest=await r.json();
+  return _tplManifest;
+}
+async function fetchTplDoc(entry){
+  const file=entry.file||(entry.id+'.json');
+  const r=await fetch(TPL_BASE+file,{cache:'no-store'});
+  if(!r.ok)throw new Error('template '+r.status);
+  return r.json();
+}
+// 缩略图：用 index.json 里的轻量 preview（节点坐标+连线）渲染 SVG，无需加载整份模板文件
+function tplThumbFromPreview(pv){
+  if(!pv||!Array.isArray(pv.pts)||!pv.pts.length)return '<svg viewBox="0 0 300 130" xmlns="http://www.w3.org/2000/svg"></svg>';
   let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
-  tn.forEach(n=>{minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x);maxY=Math.max(maxY,n.y);});
+  pv.pts.forEach(p=>{minX=Math.min(minX,p[0]);minY=Math.min(minY,p[1]);maxX=Math.max(maxX,p[0]);maxY=Math.max(maxY,p[1]);});
   const w=maxX-minX||1,h=maxY-minY||1,pad=40;
   const sc=Math.min((300-pad)/w,(130-pad)/h);
   const ox=(300-w*sc)/2-minX*sc, oy=(130-h*sc)/2-minY*sc;
-  const px=n=>[n.x*sc+ox,n.y*sc+oy];
+  const px=p=>[p[0]*sc+ox,p[1]*sc+oy];
   let svg='<svg viewBox="0 0 300 130" xmlns="http://www.w3.org/2000/svg">';
-  te.forEach(e=>{const a=tn.find(n=>n.id===e.from),b=tn.find(n=>n.id===e.to);if(!a||!b)return;const[ax,ay]=px(a),[bx,by]=px(b);const col=(ET[e.et]||ET.ac_power).color;svg+=`<path d="M${ax} ${ay} L${bx} ${ay} L${bx} ${by}" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.8"/>`;});
-  tn.forEach(n=>{const[x,y]=px(n);svg+=`<circle cx="${x}" cy="${y}" r="4" fill="#4dd0ff"/>`;});
-  svg+='</svg>';
-  return svg;
+  (pv.edges||[]).forEach(e=>{const a=pv.pts[e[0]],b=pv.pts[e[1]];if(!a||!b)return;const A=px(a),B=px(b);svg+='<path d="M'+A[0]+' '+A[1]+' L'+B[0]+' '+A[1]+' L'+B[0]+' '+B[1]+'" fill="none" stroke="'+(e[2]||'#4dd0ff')+'" stroke-width="1.5" opacity="0.8"/>';});
+  pv.pts.forEach(p=>{const P=px(p);svg+='<circle cx="'+P[0]+'" cy="'+P[1]+'" r="4" fill="#4dd0ff"/>';});
+  return svg+'</svg>';
 }
-function openTemplates(){
-  const grid=document.getElementById('tpl-grid');grid.innerHTML='';
-  document.getElementById('tpl-title').textContent=lang==='en'?'📂 Choose a Template':'📂 选择示例模板';
+// 把模板文档应用到画布：seed→自动布局；canvas→按原样还原(importCanvasJSON)
+async function loadTemplateData(doc){
+  if(!doc)return;
+  if(doc.seed&&Array.isArray(doc.seed.nodes)){
+    const tn=doc.seed.nodes, te=Array.isArray(doc.seed.edges)?doc.seed.edges:[];
+    nodes=tn;edges=te;
+    selNode=selEdge=null;showPanel('none');
+    ids={};nodes.forEach(n=>{const m=String(n.id).match(/^(.+?)_?(\d+)$/);if(m){ids[m[1]]=Math.max(ids[m[1]]||0,parseInt(m[2]));}});
+    busMerge=true;
+    edges.forEach(e=>{ delete e.waypoints; });
+    autoLayout(true);          // 布局 + 整理走线（静默，不单独入历史）
+    history=[];histIdx=-1;snapshot();
+  }else{
+    const canvas=doc.canvas||doc;
+    nodes=[];edges=[];          // 已在调用处确认替换，清空以跳过 importCanvasJSON 内的二次确认
+    await importCanvasJSON(canvas);
+  }
+}
+async function loadTemplateById(id){
+  const mf=await loadTplManifest();
+  const entry=(mf.templates||[]).find(t=>t.id===id);
+  if(!entry){flashHint(lang==='en'?'Template not found':'模板不存在');return;}
+  const doc=await fetchTplDoc(entry);
+  await loadTemplateData(doc);
+  currentTemplateId=id;
+}
+async function loadDefaultTemplate(){
+  try{
+    const mf=await loadTplManifest(true);
+    const id=mf.default||((mf.templates||[])[0]&&mf.templates[0].id);
+    if(id)await loadTemplateById(id);
+  }catch(err){console.warn('load default template failed',err);flashHint(lang==='en'?'Failed to load templates':'加载模板失败');}
+}
+// 兼容旧调用
+async function loadDemo(){ openTemplates(); }
+
+// ───── 模板选择器 ─────
+async function openTemplates(){
+  const ov=document.getElementById('tpl-overlay');
+  const grid=document.getElementById('tpl-grid');
+  document.getElementById('tpl-title').textContent=lang==='en'?'📂 Templates':'📂 模板库';
   document.getElementById('tpl-close').textContent=lang==='en'?'Close':'关闭';
-  Object.keys(TEMPLATES).forEach((key,i)=>{
-    const t=TEMPLATES[key];
-    const card=document.createElement('div');card.className='tpl-card'+(i===0?' default':'');
-    card.onclick=()=>chooseTemplate(key);
-    const nm=lang==='en'?t.nameEn:t.name;
-    card.innerHTML='<div class="tpl-thumb">'+tplThumb(key)+'</div>'+
-      '<div class="tpl-name">'+nm+(i===0?'<span class="tpl-badge">'+(lang==='en'?'Default':'默认')+'</span>':'')+'</div>'+
-      '<div class="tpl-desc">'+(lang==='en'?'':t.desc)+'</div>';
+  const saveBtn=document.getElementById('tpl-saveas');
+  if(saveBtn)saveBtn.textContent=lang==='en'?'💾 Save current as template':'💾 保存当前画布为模板';
+  ov.classList.add('show');
+  grid.innerHTML='<div class="tpl-empty">'+(lang==='en'?'Loading…':'加载中…')+'</div>';
+  let mf;
+  try{ mf=await loadTplManifest(true); }
+  catch(err){ grid.innerHTML='<div class="tpl-empty" style="color:#ff7a6a">'+(lang==='en'?'Failed to load templates/index.json':'加载 templates/index.json 失败')+'</div>'; return; }
+  renderTemplateCards(mf);
+}
+function renderTemplateCards(mf){
+  const grid=document.getElementById('tpl-grid');grid.innerHTML='';
+  const list=(mf&&mf.templates)||[];
+  if(!list.length){grid.innerHTML='<div class="tpl-empty">'+(lang==='en'?'No templates yet. Click “Save current as template”.':'暂无模板，点上方「保存当前画布为模板」新建。')+'</div>';return;}
+  list.forEach(entry=>{
+    const isDef=entry.id===mf.default;
+    const card=document.createElement('div');card.className='tpl-card'+(isDef?' default':'');
+    const nm=(lang==='en'?(entry.nameEn||entry.name):entry.name)||entry.id;
+    const desc=entry.desc||'';
+    let badges=isDef?'<span class="tpl-badge">'+(lang==='en'?'Default':'默认')+'</span>':'';
+    if(!entry.builtin)badges+='<span class="tpl-badge tpl-badge-user">'+(lang==='en'?'Custom':'自定义')+'</span>';
+    card.innerHTML='<div class="tpl-thumb">'+tplThumbFromPreview(entry.preview)+'</div>'+
+      '<div class="tpl-name">'+tplEsc(nm)+badges+'</div>'+
+      '<div class="tpl-desc">'+tplEsc(desc)+'</div>'+
+      '<div class="tpl-card-acts">'+
+        '<button class="tpl-act" data-act="load">'+(lang==='en'?'Use':'使用')+'</button>'+
+        '<button class="tpl-act" data-act="edit">'+(lang==='en'?'Edit':'编辑')+'</button>'+
+        '<button class="tpl-act" data-act="rename">'+(lang==='en'?'Rename':'重命名')+'</button>'+
+        '<button class="tpl-act tpl-act-del" data-act="del">'+(lang==='en'?'Delete':'删除')+'</button>'+
+      '</div>';
+    card.querySelector('.tpl-thumb').onclick=()=>chooseTemplate(entry.id);
+    card.querySelectorAll('.tpl-act').forEach(b=>{
+      b.onclick=(ev)=>{ev.stopPropagation();const a=b.dataset.act;
+        if(a==='load')chooseTemplate(entry.id);
+        else if(a==='edit')editTemplate(entry.id);
+        else if(a==='rename')renameTemplate(entry.id);
+        else if(a==='del')deleteTemplateById(entry.id);};
+    });
     grid.appendChild(card);
   });
-  document.getElementById('tpl-overlay').classList.add('show');
 }
 function closeTemplates(){document.getElementById('tpl-overlay').classList.remove('show');}
-async function chooseTemplate(key){
-  if(nodes.length>0){const ok=await uiConfirm(lang==='en'?'Load template and replace current content?':'加载模板将替换当前内容，确定？',false);if(!ok){return;}}
-  loadTemplate(key);
-  closeTemplates();
+async function chooseTemplate(id){
+  if(nodes.length>0){const ok=await uiConfirm(lang==='en'?'Load template and replace current content?':'加载模板将替换当前内容，确定？',false);if(!ok)return;}
+  try{ await loadTemplateById(id); _tplEditMode=false; closeTemplates(); }
+  catch(err){ console.warn(err); flashHint(lang==='en'?'Failed to load template':'加载模板失败'); }
 }
-function loadTemplate(key){
-  const t=TEMPLATES[key];if(!t)return;
-  const {nodes:tn,edges:te}=t.build();
-  nodes=tn;edges=te;
-  selNode=selEdge=null;showPanel('none');
-  // 重建 id 计数
-  ids={};nodes.forEach(n=>{const m=n.id.match(/^(.+?)_?(\d+)$/);if(m){ids[m[1]]=Math.max(ids[m[1]]||0,parseInt(m[2]));}});
-  busMerge=true;
-  edges.forEach(e=>{ delete e.waypoints; });
-  autoLayout(true);          // 布局 + 整理走线（静默，不单独入历史）
-  history=[];histIdx=-1;snapshot();
+async function editTemplate(id){
+  if(nodes.length>0){const ok=await uiConfirm(lang==='en'?'Load this template for editing? Current canvas will be replaced.':'载入该模板进行编辑？当前画布将被替换。',false);if(!ok)return;}
+  try{
+    await loadTemplateById(id);    // 内部已设置 currentTemplateId=id
+    _tplEditMode=true;             // 标记为编辑：保存对话框默认勾选「覆盖此模板」
+    closeTemplates();
+    const mf=await loadTplManifest();const e=(mf.templates||[]).find(t=>t.id===id);
+    const nm=e?((lang==='en'?(e.nameEn||e.name):e.name)||id):id;
+    flashHint(lang==='en'?('Editing “'+nm+'” — change it, then File ▾ → Save as template → overwrite'):('正在编辑「'+nm+'」，改完点 文件▾ → 保存为模板 →（勾选覆盖此模板）'));
+  }catch(err){ console.warn(err); flashHint(lang==='en'?'Failed to load template':'加载模板失败'); }
+}
+
+// ───── 保存 / 重命名 对话框（promise 形式） ─────
+function tplDialog(opts){
+  return new Promise(resolve=>{
+    const ov=document.getElementById('tplsave-overlay');
+    document.getElementById('tplsave-title').textContent=opts.title;
+    const inName=document.getElementById('tplsave-name'),inEn=document.getElementById('tplsave-name-en'),inDesc=document.getElementById('tplsave-desc');
+    document.getElementById('tplsave-name-label').textContent=lang==='en'?'Name (Chinese)':'模板名称（中文）';
+    document.getElementById('tplsave-name-en-label').textContent=lang==='en'?'Name (English)':'模板名称（English）';
+    document.getElementById('tplsave-desc-label').textContent=lang==='en'?'Description':'描述';
+    inName.value=opts.name||'';inEn.value=opts.nameEn||'';inDesc.value=opts.desc||'';
+    const owRow=document.getElementById('tplsave-overwrite-row'),owCb=document.getElementById('tplsave-overwrite');
+    if(opts.showOverwrite){owRow.style.display='';owCb.checked=!!opts.overwriteDefault;
+      document.getElementById('tplsave-overwrite-text').textContent=(lang==='en'?'Overwrite current template ':'覆盖当前模板「')+(opts.curName||'')+(lang==='en'?'':'」');}
+    else{owRow.style.display='none';owCb.checked=false;}
+    const ok=document.getElementById('tplsave-ok'),ca=document.getElementById('tplsave-cancel');
+    ok.textContent=opts.okText||(lang==='en'?'Save':'保存');
+    ca.textContent=lang==='en'?'Cancel':'取消';
+    ov.classList.add('show');setTimeout(()=>inName.focus(),30);
+    const done=v=>{ov.classList.remove('show');ok.onclick=null;ca.onclick=null;resolve(v);};
+    ok.onclick=()=>{const name=inName.value.trim();if(!name){inName.focus();return;}
+      done({name,nameEn:inEn.value.trim()||name,desc:inDesc.value.trim(),overwrite:opts.showOverwrite&&owCb.checked});};
+    ca.onclick=()=>done(null);
+  });
+}
+function tplPreviewOfCanvas(){
+  const idx={};nodes.forEach((n,i)=>idx[n.id]=i);
+  const pts=nodes.map(n=>[Math.round(n.x),Math.round(n.y)]);
+  const eg=edges.map(e=>{const a=idx[e.from],b=idx[e.to];if(a==null||b==null)return null;return [a,b,(ET[e.et]||ET.ac_power).color];}).filter(Boolean);
+  return {pts,edges:eg};
+}
+async function saveCanvasAsTemplate(){
+  if(!nodes.length){flashHint(lang==='en'?'Canvas is empty':'画布为空，无法保存');return;}
+  let curName='';
+  if(currentTemplateId){try{const mf=await loadTplManifest();const e=(mf.templates||[]).find(t=>t.id===currentTemplateId);if(e)curName=(lang==='en'?(e.nameEn||e.name):e.name)||currentTemplateId;}catch(err){}}
+  const res=await tplDialog({title:lang==='en'?'💾 Save as template':'💾 保存为模板',
+    name:(_tplEditMode?curName:''),showOverwrite:!!(currentTemplateId&&curName),overwriteDefault:_tplEditMode,curName});
+  if(!res)return;
+  const canvas=JSON.parse(buildJSON());
+  const preview=tplPreviewOfCanvas();
+  const meta={name:res.name,nameEn:res.nameEn,desc:res.desc};
+  try{
+    if(res.overwrite&&currentTemplateId){
+      const r=await fetch(TPL_API+'/'+encodeURIComponent(currentTemplateId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({template:meta,canvas,preview})});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      _tplManifest=null;flashHint(lang==='en'?'Template updated':'模板已更新');
+    }else{
+      const r=await fetch(TPL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({template:meta,canvas,preview})});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const data=await r.json();if(data&&data.entry)currentTemplateId=data.entry.id;
+      _tplEditMode=true;          // 之后再保存默认覆盖这个新建模板
+      _tplManifest=null;flashHint(lang==='en'?'Template saved':'模板已保存');
+    }
+  }catch(err){
+    console.warn('save template failed',err);
+    // 无写入后端时兜底：下载模板 JSON，提示放入 templates/
+    const doc={schemaVersion:'tpl-1',template:{name:res.name,nameEn:res.nameEn,desc:res.desc,builtin:false},canvas,preview};
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(doc,null,2)],{type:'application/json'}));
+    a.download=(res.name||'template')+'.json';a.click();
+    flashHint(lang==='en'?'Save API unavailable — JSON downloaded; put it into templates/ and add to index.json':'保存接口不可用：已下载 JSON，请放入 templates/ 目录并登记到 index.json');
+    return;
+  }
+  if(document.getElementById('tpl-overlay').classList.contains('show')){try{renderTemplateCards(await loadTplManifest(true));}catch(e){}}
+}
+async function renameTemplate(id){
+  const mf=await loadTplManifest();const e=(mf.templates||[]).find(t=>t.id===id);if(!e)return;
+  const res=await tplDialog({title:lang==='en'?'✎ Rename template':'✎ 重命名模板',name:e.name,nameEn:e.nameEn,desc:e.desc,okText:lang==='en'?'Rename':'重命名'});
+  if(!res)return;
+  try{
+    const r=await fetch(TPL_API+'/'+encodeURIComponent(id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({template:{name:res.name,nameEn:res.nameEn,desc:res.desc}})});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    _tplManifest=null;flashHint(lang==='en'?'Renamed':'已重命名');
+    renderTemplateCards(await loadTplManifest(true));
+  }catch(err){console.warn(err);flashHint(lang==='en'?'Rename API unavailable (needs backend)':'重命名接口不可用（需后端支持）');}
+}
+async function deleteTemplateById(id){
+  const mf=await loadTplManifest();const e=(mf.templates||[]).find(t=>t.id===id);if(!e)return;
+  const nm=(lang==='en'?(e.nameEn||e.name):e.name)||id;
+  const ok=await uiConfirm(lang==='en'?('Delete template “'+nm+'”? Its JSON file will be removed.'):('确定删除模板「'+nm+'」？将删除其 JSON 文件。'),true);
+  if(!ok)return;
+  try{
+    const r=await fetch(TPL_API+'/'+encodeURIComponent(id),{method:'DELETE'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    if(currentTemplateId===id){currentTemplateId=null;_tplEditMode=false;}
+    _tplManifest=null;flashHint(lang==='en'?'Deleted':'已删除');
+    renderTemplateCards(await loadTplManifest(true));
+  }catch(err){console.warn(err);flashHint(lang==='en'?'Delete API unavailable (needs backend)':'删除接口不可用（需后端支持）');}
 }
 // 整理走线：无障碍走直线，有障碍走正交，交叉则尝试正交化（无提示版，供初始化调用）
 function _rawPathFor(e){ return edgePathRaw(e); }
@@ -5011,9 +4990,6 @@ function _countCrossRendered(){ return _countCross(); }
 function setRouteStyle(s){ routeStyle=parseInt(s); applyTidyRouting(); _pathCacheSig=''; snapshot();
   document.querySelectorAll('#seg-route .seg-btn').forEach(b=>b.classList.toggle('active',parseInt(b.dataset.rs)===routeStyle));
   flashHint(['','全部正交走线','直连优先','智能(默认)'][routeStyle]+' · 剩余交叉 '+_countCross()); }
-// 兼容旧调用：默认加载模板1
-async function loadDemo(){ openTemplates(); }
-function loadDefaultTemplate(){ loadTemplate('t1'); }
 
 // ══════════════════════════════════════════════════════════════
 // ★ 只读运行模式（前端嵌入/独立托管）：与运营端编辑器同一份渲染器 + 同一套规则引擎，

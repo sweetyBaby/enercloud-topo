@@ -1,0 +1,320 @@
+{
+  "schemaVersion": "tpl-1",
+  "template": {
+    "id": "t4",
+    "name": "多级母线树状",
+    "nameEn": "Multi-level Tree",
+    "desc": "市电/发电机/负载→多组PCS→光伏+电池",
+    "builtin": true
+  },
+  "seed": {
+    "nodes": [
+      {
+        "id": "grid_1",
+        "type": "grid",
+        "labelZh": "市电",
+        "labelEn": "Grid",
+        "x": 300,
+        "y": 72,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "gen_1",
+        "type": "generator",
+        "labelZh": "发电机",
+        "labelEn": "Generator",
+        "x": 600,
+        "y": 72,
+        "status": "备用",
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "load_1",
+        "type": "load",
+        "labelZh": "用户负载",
+        "labelEn": "Load",
+        "x": 900,
+        "y": 72,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "data": [
+          {
+            "key": "负载功率(kW)",
+            "keyEn": "Load(kW)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "bus_1",
+        "type": "busbar",
+        "labelZh": "主母线",
+        "labelEn": "Main Bus",
+        "x": 600,
+        "y": 259.2,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#4dd0ff",
+        "data": [
+          {
+            "key": "母线电压(V)",
+            "keyEn": "Bus V(V)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "pcs_1",
+        "type": "pcs",
+        "labelZh": "PCS-1",
+        "labelEn": "PCS-1",
+        "x": 240,
+        "y": 417.59999999999997,
+        "status": "运行",
+        "fontSize": 13,
+        "fontColor": "#2ecc71",
+        "data": [
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "pcs_2",
+        "type": "pcs",
+        "labelZh": "PCS-2",
+        "labelEn": "PCS-2",
+        "x": 480,
+        "y": 417.59999999999997,
+        "status": "运行",
+        "fontSize": 13,
+        "fontColor": "#2ecc71",
+        "data": [
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "pcs_3",
+        "type": "pcs",
+        "labelZh": "PCS-3",
+        "labelEn": "PCS-3",
+        "x": 720,
+        "y": 417.59999999999997,
+        "status": "运行",
+        "fontSize": 13,
+        "fontColor": "#2ecc71",
+        "data": [
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "pcs_4",
+        "type": "pcs",
+        "labelZh": "PCS-4",
+        "labelEn": "PCS-4",
+        "x": 960,
+        "y": 417.59999999999997,
+        "status": "运行",
+        "fontSize": 13,
+        "fontColor": "#2ecc71",
+        "data": [
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "pv_1",
+        "type": "solar",
+        "labelZh": "光伏1",
+        "labelEn": "PV-1",
+        "x": 144,
+        "y": 619.2,
+        "status": "发电",
+        "fontSize": 13,
+        "fontColor": "#f9ca24",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "b_1",
+        "type": "bms",
+        "labelZh": "电池1",
+        "labelEn": "Bat-1",
+        "x": 336.00000000000006,
+        "y": 619.2,
+        "status": "充电",
+        "fontSize": 13,
+        "fontColor": "#3aa0ff",
+        "data": [
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "pv_2",
+        "type": "solar",
+        "labelZh": "光伏2",
+        "labelEn": "PV-2",
+        "x": 624,
+        "y": 619.2,
+        "status": "发电",
+        "fontSize": 13,
+        "fontColor": "#f9ca24",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "b_2",
+        "type": "bms",
+        "labelZh": "电池2",
+        "labelEn": "Bat-2",
+        "x": 816.0000000000001,
+        "y": 619.2,
+        "status": "充电",
+        "fontSize": 13,
+        "fontColor": "#3aa0ff",
+        "data": [
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": ""
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "grid_1",
+        "to": "bus_1",
+        "et": "ac_power",
+        "route": "ortho",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "gen_1",
+        "to": "bus_1",
+        "et": "ac_power",
+        "route": "ortho",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "bus_1",
+        "to": "load_1",
+        "et": "discharge",
+        "route": "ortho",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "bus_1",
+        "to": "pcs_1",
+        "et": "pipe_blue",
+        "route": "ortho",
+        "dir": "both",
+        "lbl": ""
+      },
+      {
+        "from": "bus_1",
+        "to": "pcs_2",
+        "et": "pipe_blue",
+        "route": "ortho",
+        "dir": "both",
+        "lbl": ""
+      },
+      {
+        "from": "bus_1",
+        "to": "pcs_3",
+        "et": "pipe_blue",
+        "route": "ortho",
+        "dir": "both",
+        "lbl": ""
+      },
+      {
+        "from": "bus_1",
+        "to": "pcs_4",
+        "et": "pipe_blue",
+        "route": "ortho",
+        "dir": "both",
+        "lbl": ""
+      },
+      {
+        "from": "pcs_1",
+        "to": "pv_1",
+        "et": "pv_power",
+        "route": "ortho",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "pcs_1",
+        "to": "b_1",
+        "et": "charge",
+        "route": "ortho",
+        "dir": "both",
+        "lbl": ""
+      },
+      {
+        "from": "pcs_3",
+        "to": "pv_2",
+        "et": "pv_power",
+        "route": "ortho",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "pcs_3",
+        "to": "b_2",
+        "et": "charge",
+        "route": "ortho",
+        "dir": "both",
+        "lbl": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,173 @@
+{
+  "schemaVersion": "tpl-1",
+  "template": {
+    "id": "t7_dynamic",
+    "name": "数据驱动示例",
+    "nameEn": "Data-Driven Demo",
+    "desc": "电网在线/PCS功率正负 → 元素与连线实时显隐、流向自动切换（规则即时生效；在「⚙ 规则与信号」里改信号值体验）",
+    "builtin": true
+  },
+  "seed": {
+    "nodes": [
+      {
+        "id": "pcs_1",
+        "type": "pcs",
+        "labelZh": "PCS变流器",
+        "labelEn": "PCS",
+        "x": 500,
+        "y": 310,
+        "status": "运行",
+        "fontSize": 14,
+        "fontColor": "#2ecc71",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": -30
+          },
+          {
+            "key": "U(V)",
+            "keyEn": "U(V)",
+            "dv": 750
+          }
+        ]
+      },
+      {
+        "id": "grid_1",
+        "type": "grid",
+        "labelZh": "市电",
+        "labelEn": "Grid",
+        "x": 180,
+        "y": 173.60000000000002,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": 200
+          }
+        ]
+      },
+      {
+        "id": "bms_1",
+        "type": "bms",
+        "labelZh": "储能电池",
+        "labelEn": "Battery",
+        "x": 820,
+        "y": 173.60000000000002,
+        "status": "充电",
+        "fontSize": 14,
+        "fontColor": "#3aa0ff",
+        "data": [
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": 55
+          }
+        ]
+      },
+      {
+        "id": "load_1",
+        "type": "load",
+        "labelZh": "用户负载",
+        "labelEn": "Load",
+        "x": 820,
+        "y": 446.4,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "data": [
+          {
+            "key": "负载功率(kW)",
+            "keyEn": "Load(kW)",
+            "dv": 80
+          }
+        ]
+      },
+      {
+        "id": "gen_1",
+        "type": "generator",
+        "labelZh": "柴油发电机",
+        "labelEn": "Generator",
+        "x": 180,
+        "y": 446.4,
+        "status": "备用",
+        "fontSize": 14,
+        "fontColor": "#f5c518",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": 0
+          }
+        ],
+        "visibleWhen": {
+          "var": "grid_1.online",
+          "op": "falsy"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": "grid_1",
+        "to": "pcs_1",
+        "et": "ac_power",
+        "route": "straight",
+        "dir": "forward",
+        "lbl": "并网",
+        "showWhen": {
+          "var": "grid_1.online",
+          "op": "truthy"
+        }
+      },
+      {
+        "from": "pcs_1",
+        "to": "bms_1",
+        "et": "charge",
+        "route": "straight",
+        "dir": "both",
+        "lbl": "",
+        "dirRules": [
+          {
+            "when": {
+              "var": "pcs_1.P(kW)",
+              "op": ">",
+              "val": 0
+            },
+            "dir": "forward"
+          },
+          {
+            "when": {
+              "var": "pcs_1.P(kW)",
+              "op": "<",
+              "val": 0
+            },
+            "dir": "reverse"
+          }
+        ]
+      },
+      {
+        "from": "pcs_1",
+        "to": "load_1",
+        "et": "discharge",
+        "route": "straight",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "gen_1",
+        "to": "pcs_1",
+        "et": "ac_power",
+        "route": "straight",
+        "dir": "forward",
+        "lbl": "孤岛",
+        "showWhen": {
+          "var": "grid_1.online",
+          "op": "falsy"
+        }
+      }
+    ]
+  }
+}

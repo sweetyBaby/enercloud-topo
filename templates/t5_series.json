@@ -1,0 +1,168 @@
+{
+  "schemaVersion": "tpl-1",
+  "template": {
+    "id": "t5_series",
+    "name": "横向串联式",
+    "nameEn": "Series Chain",
+    "desc": "母线→交流断路器→PCS→直流断路器→电池，横向串联",
+    "builtin": true
+  },
+  "seed": {
+    "nodes": [
+      {
+        "id": "bus_1",
+        "type": "busbar",
+        "labelZh": "交流母线",
+        "labelEn": "AC Busbar",
+        "x": 144,
+        "y": 200,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#4dd0ff",
+        "data": [
+          {
+            "key": "A相电流(A)",
+            "keyEn": "Ia(A)",
+            "dv": ""
+          },
+          {
+            "key": "B相电流(A)",
+            "keyEn": "Ib(A)",
+            "dv": ""
+          },
+          {
+            "key": "C相电流(A)",
+            "keyEn": "Ic(A)",
+            "dv": ""
+          },
+          {
+            "key": "充放电功率(kW)",
+            "keyEn": "P(kW)",
+            "dv": ""
+          },
+          {
+            "key": "电网频率(Hz)",
+            "keyEn": "Freq(Hz)",
+            "dv": 50
+          },
+          {
+            "key": "直流电压(V)",
+            "keyEn": "DC V(V)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "sw_ac",
+        "type": "switch",
+        "labelZh": "交流断路器",
+        "labelEn": "AC Breaker",
+        "x": 432,
+        "y": 200,
+        "status": "闭合",
+        "fontSize": 14,
+        "fontColor": "#ff7a6a",
+        "data": [
+          {
+            "key": "状态",
+            "keyEn": "State",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "pcs_1",
+        "type": "pcs",
+        "labelZh": "变流器",
+        "labelEn": "PCS",
+        "x": 672.0000000000001,
+        "y": 200,
+        "status": "运行",
+        "fontSize": 14,
+        "fontColor": "#2ecc71",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": ""
+          },
+          {
+            "key": "U(V)",
+            "keyEn": "U(V)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "sw_dc",
+        "type": "switch",
+        "labelZh": "直流断路器",
+        "labelEn": "DC Breaker",
+        "x": 912,
+        "y": 200,
+        "status": "闭合",
+        "fontSize": 14,
+        "fontColor": "#ff7a6a",
+        "data": [
+          {
+            "key": "状态",
+            "keyEn": "State",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "bms_1",
+        "type": "bms",
+        "labelZh": "电池",
+        "labelEn": "Battery",
+        "x": 1128,
+        "y": 200,
+        "status": "充电",
+        "fontSize": 14,
+        "fontColor": "#3aa0ff",
+        "data": [
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": 55
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "bus_1",
+        "to": "sw_ac",
+        "et": "ac_power",
+        "route": "straight",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "sw_ac",
+        "to": "pcs_1",
+        "et": "ac_power",
+        "route": "straight",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "pcs_1",
+        "to": "sw_dc",
+        "et": "dc_power",
+        "route": "straight",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "sw_dc",
+        "to": "bms_1",
+        "et": "charge",
+        "route": "straight",
+        "dir": "both",
+        "lbl": ""
+      }
+    ]
+  }
+}

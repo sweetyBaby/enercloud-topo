@@ -1,0 +1,122 @@
+{
+  "schemaVersion": "tpl-1",
+  "template": {
+    "id": "t3",
+    "name": "环形回路",
+    "nameEn": "Ring Circuit",
+    "desc": "电网→高压箱→PCS→电池双路环线",
+    "builtin": true
+  },
+  "seed": {
+    "nodes": [
+      {
+        "id": "grid_1",
+        "type": "grid",
+        "labelZh": "主电网",
+        "labelEn": "Grid",
+        "x": 380,
+        "y": 64,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "pcs_1",
+        "type": "pcs",
+        "labelZh": "变流器",
+        "labelEn": "PCS",
+        "x": 380,
+        "y": 217.60000000000002,
+        "status": "运行",
+        "fontSize": 14,
+        "fontColor": "#2ecc71",
+        "data": [
+          {
+            "key": "P(kW)",
+            "keyEn": "P(kW)",
+            "dv": ""
+          },
+          {
+            "key": "U(V)",
+            "keyEn": "U(V)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "hv_1",
+        "type": "highvolt",
+        "labelZh": "高压箱",
+        "labelEn": "HV Box",
+        "x": 380,
+        "y": 358.40000000000003,
+        "status": "在线",
+        "fontSize": 14,
+        "fontColor": "#ff7a6a",
+        "data": [
+          {
+            "key": "直流电压(V)",
+            "keyEn": "DC V(V)",
+            "dv": ""
+          }
+        ]
+      },
+      {
+        "id": "bms_1",
+        "type": "bms",
+        "labelZh": "电池",
+        "labelEn": "Battery",
+        "x": 380,
+        "y": 537.6,
+        "status": "充电",
+        "fontSize": 14,
+        "fontColor": "#3aa0ff",
+        "data": [
+          {
+            "key": "SOC(%)",
+            "keyEn": "SOC(%)",
+            "dv": 55
+          },
+          {
+            "key": "温度(℃)",
+            "keyEn": "Temp(℃)",
+            "dv": 26
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "grid_1",
+        "to": "pcs_1",
+        "et": "pipe_blue",
+        "route": "ortho",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "pcs_1",
+        "to": "hv_1",
+        "et": "pipe_blue",
+        "route": "ortho",
+        "dir": "forward",
+        "lbl": ""
+      },
+      {
+        "from": "hv_1",
+        "to": "bms_1",
+        "et": "pipe_gold",
+        "route": "ortho",
+        "dir": "both",
+        "lbl": ""
+      }
+    ]
+  }
+}

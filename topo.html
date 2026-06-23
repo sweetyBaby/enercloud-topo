@@ -44,7 +44,8 @@
       <div class="menu" id="menu-file">
         <button class="tb menu-btn" onclick="toggleMenu('menu-file')" data-i18n="📁 文件 ▾">📁 文件 ▾</button>
         <div class="menu-pop">
-          <div class="mi" onclick="openTemplates();closeMenus()" data-i18n="📂 打开示例模板">📂 打开示例模板</div>
+          <div class="mi" onclick="openTemplates();closeMenus()" data-i18n="📂 模板库">📂 模板库</div>
+          <div class="mi" onclick="saveCanvasAsTemplate();closeMenus()" data-i18n="💾 保存为模板">💾 保存为模板</div>
           <div class="mi" onclick="document.getElementById('fi-json').click();closeMenus()" data-i18n="📥 导入画布 JSON">📥 导入画布 JSON</div>
           <div class="mi" onclick="showJSON();closeMenus()" data-i18n="⎙ 导出画布 JSON">⎙ 导出画布 JSON</div>
           <div class="mi" onclick="flashHint(saveDraftNow()?'草稿已保存':'草稿保存失败');closeMenus()" data-i18n="💾 保存草稿">💾 保存草稿</div>
@@ -431,12 +432,28 @@
   </div>
 </div></div>
 
-<!-- 示例模板选择器 -->
+<!-- 模板库选择器 -->
 <div id="tpl-overlay"><div id="tpl-box">
-  <h4 id="tpl-title">📂 选择示例模板</h4>
+  <div id="tpl-head">
+    <h4 id="tpl-title">📂 模板库</h4>
+    <button class="tb grn" id="tpl-saveas" onclick="saveCanvasAsTemplate()">💾 保存当前画布为模板</button>
+  </div>
   <div id="tpl-grid"></div>
   <div style="text-align:right;margin-top:14px">
     <button class="tb" id="tpl-close" onclick="closeTemplates()">关闭</button>
+  </div>
+</div></div>
+
+<!-- 模板 保存 / 重命名 对话框 -->
+<div id="tplsave-overlay"><div id="tplsave-box">
+  <h4 id="tplsave-title">💾 保存为模板</h4>
+  <div class="tplsave-field"><label id="tplsave-name-label">模板名称（中文）</label><input id="tplsave-name" type="text" placeholder="如：园区储能拓扑"></div>
+  <div class="tplsave-field"><label id="tplsave-name-en-label">模板名称（English）</label><input id="tplsave-name-en" type="text" placeholder="如：Campus ESS"></div>
+  <div class="tplsave-field"><label id="tplsave-desc-label">描述</label><input id="tplsave-desc" type="text" placeholder="可选，简述该模板用途"></div>
+  <label id="tplsave-overwrite-row" style="display:none"><input type="checkbox" id="tplsave-overwrite"> <span id="tplsave-overwrite-text"></span></label>
+  <div id="tplsave-actions">
+    <button class="tb" id="tplsave-cancel">取消</button>
+    <button class="tb grn" id="tplsave-ok">保存</button>
   </div>
 </div></div>
 

@@ -2,12 +2,14 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const url = require('url');
+const { createTemplateApi } = require('./template-store');
 
 const root = path.resolve(__dirname, '..');
 const startPort = Number(process.env.PORT || 5173);
 const host = process.env.HOST || '127.0.0.1';
 const clients = new Set();
 const logFile = path.join(root, '.dev-server.log');
+const tplDir = path.join(root, 'templates');
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -74,8 +76,15 @@ function serveFile(req, res) {
   send(res, 200, body, types[ext] || 'application/octet-stream');
 }
 
+// ───── 模板读写 API：保存/编辑/重命名/删除自动落盘到 templates/（dev 与生产共用 template-store） ─────
+const templateApi = createTemplateApi({ dir: tplDir, log, warn });
+
 function createServer() {
   return http.createServer((req, res) => {
+    const pathname = url.parse(req.url).pathname || '/';
+    if (templateApi.matches(pathname)) {
+      return templateApi.handle(req, res, pathname);
+    }
     if (req.url === '/__live-reload') {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
