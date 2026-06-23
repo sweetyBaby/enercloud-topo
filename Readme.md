@@ -250,3 +250,26 @@ const state = resolveDynamic(topology, liveSignals);
 **前端**：① 部署元素库包（图标/runtime.js）→ ② 用方案 A 嵌入编辑器 HTML → ③ 下发画布 JSON → ④ 按信号命名规则推送实时数据（轮询或 WebSocket → postMessage/merge）→ ⑤ 核对显隐/流向/字段与运营端一致。
 
 > 可参考随附的 **`demo.html`**（iframe + postMessage + 模拟实时数据的可运行示例）。
+
+---
+
+## 9. 模板库与部署（运营端「保存/编辑/重命名/删除模板」）
+
+运营端可把当前画布**保存为模板**，并对模板**编辑 / 重命名 / 删除**。每个模板是 `templates/` 下的**单独 JSON 文件**，由 `templates/index.json` 清单索引；打开模板库只拉清单，选中某个才按需加载它自己的 JSON（初始画布自动加载清单里的 `default`）。
+
+- **读取**（列模板 / 加载模板）：纯静态 `fetch('templates/...')`，任何托管都可用。
+- **写入**（保存 / 编辑 / 重命名 / 删除）：调用同源 `/api/templates` 接口，由服务器**自动落盘**到 `templates/` 并更新 `index.json`，**无需手动改文件**。
+
+### 部署方式
+
+| 场景 | 命令 | 模板写入 |
+|---|---|---|
+| 本地开发（热重载） | `npm run dev` | ✅ 写 `templates/` |
+| **生产（可写）** | `npm run build` 后 `npm start`（`node scripts/server.js`） | ✅ 写 `templates/` |
+| 纯静态托管（如 Nginx 直接挂 `dist/`） | 部署 `dist/` | ❌ 仅能读；保存会回退为「下载 JSON」 |
+
+生产服务器 `scripts/server.js`：静态资源默认取 `dist/`（压缩、无热重载），模板的**读和写都指向项目根的 `templates/` 目录**（版本受控、持久，`build` 重建 `dist/` 不会清空已保存模板）。可用环境变量覆盖：`PORT`（默认 3009）、`HOST`（默认 0.0.0.0）、`STATIC_ROOT`、`TEMPLATES_DIR`（建议在容器部署时挂载为持久卷）。
+
+> **对接父平台后端**：若模板由平台自有后端管理，可在加载 `topology-editor.js` 前设置 `window.TOPO_TPL_BASE`（读取列表/模板的基路径）与 `window.TOPO_TPL_API`（写接口，支持绝对 URL），前端即改走该后端；后端只需实现与 `/api/templates` 相同的 `GET/POST/PUT/DELETE` 契约。
+
+> 📑 **接口契约详情**见 [`docs/template-api.md`](docs/template-api.md)：四个接口的请求/响应/状态码、数据模型、后端重新实现要点、边界与校验，供后端同学对接。

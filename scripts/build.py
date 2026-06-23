@@ -53,6 +53,12 @@ outputs = {
 for rel, content in outputs.items():
     write(rel, content)
 
+# 模板库：原样拷贝 templates/ 到 dist（每个模板单独 JSON + index.json，前端按需加载）
+tpl_src = ROOT / "templates"
+if tpl_src.is_dir():
+    shutil.copytree(tpl_src, DIST / "templates")
+    print(f"Copied templates/ ({len(list(tpl_src.glob('*.json')))} files)")
+
 print("Build complete: dist/")
 for rel in outputs:
     size = (DIST / rel).stat().st_size / 1024
