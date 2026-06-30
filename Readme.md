@@ -127,6 +127,8 @@ const state = resolveDynamic(topology, liveSignals);
 
 ## 4. 数据契约（前后端必须对齐 · 最重要）
 
+> 📑 **实时数据接口的完整结构、下发方式、覆盖/合并语义与后端对接清单**见 [`docs/realtime-data-api.md`](docs/realtime-data-api.md)。本节是速览。
+
 ### 4.1 信号命名规则
 实时数据是一个**扁平对象** `{ 信号名: 值 }`，信号名规则：
 

@@ -1,0 +1,496 @@
+{
+  "schemaVersion": "1.0",
+  "note": "图标库清单：每个 device 的 file 指向 icons/ 下的图片。增删改图片后，dev-server/build 会自动同步此清单（未登记的图片归入「自定义图标」分组）。可手动编辑 label / 分组 / data 默认字段。",
+  "groups": [
+    {
+      "title": "电源侧",
+      "title_en": "Power Source",
+      "color": "#4dd0ff",
+      "tab": "device",
+      "devices": [
+        {
+          "type": "grid",
+          "label": "主电网",
+          "label_en": "Grid",
+          "badge": "grid",
+          "file": "grid.png",
+          "data": [
+            "P(kW)",
+            "Q(kvar)"
+          ]
+        },
+        {
+          "type": "solar",
+          "label": "光伏板",
+          "label_en": "PV Panel",
+          "badge": "solar",
+          "file": "solar.svg",
+          "data": [
+            "P(kW)",
+            "Vpv(V)"
+          ]
+        },
+        {
+          "type": "generator",
+          "label": "发电机",
+          "label_en": "Generator",
+          "badge": "generator",
+          "file": "generator.svg",
+          "data": [
+            "P(kW)",
+            "频率(Hz)"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "储能设备",
+      "title_en": "Storage",
+      "color": "#2ecc71",
+      "tab": "device",
+      "devices": [
+        {
+          "type": "pcs",
+          "label": "变流器PCS",
+          "label_en": "PCS",
+          "badge": "pcs",
+          "file": "pcs.png",
+          "data": [
+            "P(kW)",
+            "Q(kvar)",
+            "I(A)",
+            "U(V)"
+          ]
+        },
+        {
+          "type": "bms",
+          "label": "电池BMS",
+          "label_en": "Battery BMS",
+          "badge": "bms",
+          "file": "bms.png",
+          "data": [
+            "U(V)",
+            "I(A)",
+            "SOC(%)",
+            "温度(℃)"
+          ]
+        },
+        {
+          "type": "cabinet",
+          "label": "电池柜",
+          "label_en": "Battery Rack",
+          "badge": "cabinet",
+          "file": "cabinet.svg",
+          "data": [
+            "簇电压(V)",
+            "簇电流(A)",
+            "SOC(%)",
+            "温度(℃)",
+            "状态"
+          ]
+        },
+        {
+          "type": "h2_storage",
+          "label": "氢储能",
+          "label_en": "H2 Storage",
+          "badge": "h2_storage",
+          "file": "h2_storage.svg",
+          "data": [
+            "压力(MPa)",
+            "SOC(%)",
+            "温度(℃)"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "母线/主干线",
+      "title_en": "Busbar & Trunk",
+      "color": "#ff6b6b",
+      "tab": "device",
+      "devices": [
+        {
+          "type": "busbar",
+          "label": "母线",
+          "label_en": "Busbar",
+          "badge": "busbar",
+          "file": "busbar.svg",
+          "data": [
+            "母线电压(V)"
+          ]
+        },
+        {
+          "type": "trunk_ac",
+          "label": "交流主干线",
+          "label_en": "AC Trunk",
+          "badge": "busbar",
+          "file": "trunk_ac.svg",
+          "data": [
+            "电压(V)",
+            "电流(A)"
+          ]
+        },
+        {
+          "type": "trunk_dc",
+          "label": "直流主干线",
+          "label_en": "DC Trunk",
+          "badge": "busbar",
+          "file": "trunk_dc.svg",
+          "data": [
+            "电压(V)",
+            "电流(A)"
+          ]
+        },
+        {
+          "type": "tie_line",
+          "label": "联络线",
+          "label_en": "Tie Line",
+          "badge": "busbar",
+          "file": "tie_line.svg",
+          "data": [
+            "P(kW)"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "电气设备",
+      "title_en": "Electrical",
+      "color": "#e67e22",
+      "tab": "device",
+      "devices": [
+        {
+          "type": "transformer",
+          "label": "变压器",
+          "label_en": "Transformer",
+          "badge": "transformer",
+          "file": "transformer.svg",
+          "data": [
+            "输入电压(V)",
+            "输出电压(V)"
+          ]
+        },
+        {
+          "type": "switch",
+          "label": "断路器",
+          "label_en": "Breaker",
+          "badge": "switch",
+          "file": "switch.svg",
+          "data": [
+            "状态"
+          ]
+        },
+        {
+          "type": "highvolt",
+          "label": "高压箱",
+          "label_en": "HV Box",
+          "badge": "highvolt",
+          "file": "highvolt.svg",
+          "data": [
+            "直流电压(V)",
+            "直流电流(A)"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "计量与负载",
+      "title_en": "Meter & Load",
+      "color": "#f1c40f",
+      "tab": "device",
+      "devices": [
+        {
+          "type": "meter",
+          "label": "计量表",
+          "label_en": "Meter",
+          "badge": "meter",
+          "file": "meter.png",
+          "data": [
+            "P(kW)",
+            "Q(kvar)"
+          ]
+        },
+        {
+          "type": "meter2",
+          "label": "关口表",
+          "label_en": "Gateway Meter",
+          "badge": "meter2",
+          "file": "meter2.svg",
+          "data": [
+            "P(kW)",
+            "Q(kvar)",
+            "今日用电(kWh)"
+          ]
+        },
+        {
+          "type": "load",
+          "label": "用电负载",
+          "label_en": "Load",
+          "badge": "load",
+          "file": "load.svg",
+          "data": [
+            "负载功率(kW)",
+            "今日用电(kWh)"
+          ]
+        },
+        {
+          "type": "charger",
+          "label": "充电桩",
+          "label_en": "EV Charger",
+          "badge": "charger",
+          "file": "charger.svg",
+          "data": [
+            "功率(kW)",
+            "状态"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "开关元件",
+      "title_en": "Switching",
+      "color": "#ff6b60",
+      "tab": "device",
+      "devices": [
+        {
+          "type": "cb_closed",
+          "label": "断路器(闭合)",
+          "label_en": "Breaker (closed)",
+          "badge": "cb_closed",
+          "file": "cb_closed.svg",
+          "data": [
+            "状态",
+            "电流(A)"
+          ]
+        },
+        {
+          "type": "switch_open",
+          "label": "隔离开关(断开)",
+          "label_en": "Switch (open)",
+          "badge": "switch_open",
+          "file": "switch_open.svg",
+          "data": [
+            "状态"
+          ]
+        },
+        {
+          "type": "disconnector",
+          "label": "刀闸(合闸)",
+          "label_en": "Disconnector",
+          "badge": "disconnector",
+          "file": "disconnector.svg",
+          "data": [
+            "状态"
+          ]
+        },
+        {
+          "type": "contactor",
+          "label": "接触器",
+          "label_en": "Contactor",
+          "badge": "contactor",
+          "file": "contactor.svg",
+          "data": [
+            "状态"
+          ]
+        },
+        {
+          "type": "fuse",
+          "label": "熔断器",
+          "label_en": "Fuse",
+          "badge": "fuse",
+          "file": "fuse.svg",
+          "data": [
+            "额定电流(A)"
+          ]
+        },
+        {
+          "type": "iso_g",
+          "label": "隔离开关",
+          "label_en": "Isolator",
+          "badge": "iso_g",
+          "file": "iso_g.svg",
+          "data": [
+            "状态"
+          ]
+        },
+        {
+          "type": "lbs_g",
+          "label": "负荷开关",
+          "label_en": "Load Switch",
+          "badge": "lbs_g",
+          "file": "lbs_g.svg",
+          "data": [
+            "状态"
+          ]
+        },
+        {
+          "type": "disc_v_g",
+          "label": "竖向刀闸",
+          "label_en": "Vert. Disconnector",
+          "badge": "disc_v_g",
+          "file": "disc_v_g.svg",
+          "data": [
+            "状态"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "辅助系统",
+      "title_en": "Auxiliary",
+      "color": "#9b59b6",
+      "tab": "device",
+      "devices": [
+        {
+          "type": "ems",
+          "label": "EMS系统",
+          "label_en": "EMS",
+          "badge": "ems",
+          "file": "ems.svg",
+          "data": [
+            "运行模式",
+            "状态"
+          ]
+        },
+        {
+          "type": "aircon",
+          "label": "空调",
+          "label_en": "HVAC",
+          "badge": "aircon",
+          "file": "aircon.svg",
+          "data": [
+            "温度(℃)",
+            "状态"
+          ]
+        },
+        {
+          "type": "fire",
+          "label": "消防",
+          "label_en": "Fire Sys",
+          "badge": "fire",
+          "file": "fire.svg",
+          "data": [
+            "状态",
+            "告警"
+          ]
+        },
+        {
+          "type": "sensor",
+          "label": "传感器",
+          "label_en": "Sensor",
+          "badge": "sensor",
+          "file": "sensor.svg",
+          "data": [
+            "数值",
+            "单位"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "无源元件",
+      "title_en": "Passive",
+      "color": "#5dade2",
+      "tab": "device",
+      "devices": [
+        {
+          "type": "resistor",
+          "label": "电阻",
+          "label_en": "Resistor",
+          "badge": "resistor",
+          "file": "resistor.svg",
+          "data": [
+            "阻值(Ω)"
+          ]
+        },
+        {
+          "type": "inductor",
+          "label": "电感",
+          "label_en": "Inductor",
+          "badge": "inductor",
+          "file": "inductor.svg",
+          "data": [
+            "电感(mH)"
+          ]
+        },
+        {
+          "type": "capacitor",
+          "label": "电容",
+          "label_en": "Capacitor",
+          "badge": "capacitor",
+          "file": "capacitor.svg",
+          "data": [
+            "容值(μF)"
+          ]
+        },
+        {
+          "type": "ct",
+          "label": "电流互感器",
+          "label_en": "CT",
+          "badge": "ct",
+          "file": "ct.svg",
+          "data": [
+            "变比",
+            "二次电流(A)"
+          ]
+        },
+        {
+          "type": "pt",
+          "label": "电压互感器",
+          "label_en": "PT",
+          "badge": "pt",
+          "file": "pt.svg",
+          "data": [
+            "变比",
+            "二次电压(V)"
+          ]
+        },
+        {
+          "type": "spd",
+          "label": "避雷器",
+          "label_en": "SPD",
+          "badge": "spd",
+          "file": "spd.svg",
+          "data": [
+            "状态"
+          ]
+        },
+        {
+          "type": "ground",
+          "label": "接地",
+          "label_en": "Ground",
+          "badge": "ground",
+          "file": "ground.svg",
+          "data": []
+        }
+      ]
+    },
+    {
+      "title": "辅助元素",
+      "title_en": "Auxiliary",
+      "color": "#42a5f5",
+      "tab": "annot",
+      "devices": [
+        {
+          "type": "anchor",
+          "label": "占位点",
+          "label_en": "Anchor Point",
+          "badge": "point",
+          "file": "anchor.svg"
+        },
+        {
+          "type": "text",
+          "label": "文本框",
+          "label_en": "Text",
+          "badge": "text"
+        },
+        {
+          "type": "variable",
+          "label": "变量",
+          "label_en": "Variable",
+          "badge": "var"
+        }
+      ]
+    }
+  ]
+}

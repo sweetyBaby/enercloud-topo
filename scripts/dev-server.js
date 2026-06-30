@@ -18,9 +18,71 @@ const types = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
   '.ico': 'image/x-icon',
   '.md': 'text/markdown; charset=utf-8',
 };
+
+// ───── 图标库：自动扫描 icons/ 目录，与 icons/index.json 合并 ─────
+//  · 替换图片（同名）→ 直接生效；删除图片 → 对应元素从面板移除；
+//  · 新增未登记的图片 → 自动归入「自定义图标」分组；无需改动任何代码。
+const iconsDir = path.join(root, 'icons');
+const IMG_EXT = new Set(['.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp']);
+function listIconFiles() {
+  try {
+    return fs.readdirSync(iconsDir).filter((f) => IMG_EXT.has(path.extname(f).toLowerCase()));
+  } catch (err) {
+    return [];
+  }
+}
+function buildIconManifest() {
+  let curated = { groups: [] };
+  try {
+    curated = JSON.parse(fs.readFileSync(path.join(iconsDir, 'index.json'), 'utf8'));
+  } catch (err) {
+    warn(`读取 icons/index.json 失败：${err.message}`);
+  }
+  const existing = new Set(listIconFiles());
+  const referenced = new Set();
+  const groups = (curated.groups || [])
+    .map((g) => {
+      const devices = (g.devices || []).filter((d) => {
+        if (!d.file) return true; // 纯绘制元素（文本框/变量节点）无图片，保留
+        if (existing.has(d.file)) {
+          referenced.add(d.file);
+          return true;
+        }
+        return false; // 图片已删除 → 该元素从面板移除
+      });
+      return Object.assign({}, g, { devices });
+    })
+    .filter((g) => g.devices.length); // 丢弃空分组
+  const extras = [...existing].filter((f) => !referenced.has(f)).sort();
+  // 自动归组：未登记的图片按文件名前缀匹配已有元素类型（最长匹配），落到该类型所在分组；
+  //  例如 bms_charge.png → 前缀 bms → 归入「储能设备」。无任何匹配时才进「自定义图标」兜底。
+  const typeToGroupIdx = {};
+  groups.forEach((g, gi) => (g.devices || []).forEach((d) => { typeToGroupIdx[d.type] = gi; }));
+  const knownTypes = Object.keys(typeToGroupIdx);
+  const customDevices = [];
+  extras.forEach((f) => {
+    const stem = f.replace(/\.[^.]+$/, '');
+    if (knownTypes.includes(stem)) return; // 与已有类型同名，跳过避免重复
+    let best = null;
+    for (const t of knownTypes) {
+      if (stem.startsWith(t + '_') && (!best || t.length > best.length)) best = t;
+    }
+    const dev = { type: stem, label: stem, label_en: stem, badge: stem, file: f };
+    if (best) groups[typeToGroupIdx[best]].devices.push(dev);
+    else customDevices.push(dev);
+  });
+  if (customDevices.length) {
+    groups.push({ title: '自定义图标', title_en: 'Custom Icons', color: '#42a5f5', tab: 'device', devices: customDevices });
+  }
+  return Object.assign({}, curated, { groups });
+}
 
 function log(message) {
   const line = `[${new Date().toLocaleTimeString()}] ${message}`;
@@ -82,6 +144,9 @@ const templateApi = createTemplateApi({ dir: tplDir, log, warn });
 function createServer() {
   return http.createServer((req, res) => {
     const pathname = url.parse(req.url).pathname || '/';
+    if (pathname === '/icons/index.json') {
+      return send(res, 200, JSON.stringify(buildIconManifest(), null, 2), types['.json']);
+    }
     if (templateApi.matches(pathname)) {
       return templateApi.handle(req, res, pathname);
     }

@@ -1,0 +1,469 @@
+{
+  "schemaVersion": "2.0",
+  "meta": {
+    "app": "储能拓扑编辑器",
+    "generatedAt": "2026-06-30T01:11:55.906Z",
+    "lang": "zh",
+    "libraryRef": {
+      "name": "energy-topology",
+      "version": "2.0.0"
+    },
+    "canvas": {
+      "bgColor": "#0a1f40",
+      "zoom": 0.251,
+      "panX": 172.6,
+      "panY": 66.9,
+      "grid": {
+        "show": true,
+        "stepPx": 40
+      },
+      "showAnchors": true
+    },
+    "view": {
+      "showEdgeLabels": true,
+      "showFieldChips": true,
+      "globalWidth": 1,
+      "routeStyle": 3,
+      "busMerge": true,
+      "busMergeGap": 16,
+      "busTrunkBold": true,
+      "busStyle": "busbar",
+      "busShareTrunk": false,
+      "busAggregation": false
+    }
+  },
+  "edgeStyles": {
+    "charge": {
+      "labelZh": "充电中",
+      "labelEn": "Charging",
+      "color": "#2ecc71",
+      "width": 2.5,
+      "dash": [],
+      "anim": "flow",
+      "speed": 0.9
+    },
+    "ac_power": {
+      "labelZh": "交流电力",
+      "labelEn": "AC Power",
+      "color": "#e74c3c",
+      "width": 2.5,
+      "dash": [],
+      "anim": "flow",
+      "speed": 0.5
+    },
+    "discharge": {
+      "labelZh": "放电中",
+      "labelEn": "Discharging",
+      "color": "#3498db",
+      "width": 2.5,
+      "dash": [],
+      "anim": "flow",
+      "speed": 0.9
+    }
+  },
+  "nodes": [
+    {
+      "id": "pcs_1",
+      "type": "pcs",
+      "label": {
+        "zh": "PCS变流器",
+        "en": "PCS"
+      },
+      "position": {
+        "x": 2301.2,
+        "y": 990.3
+      },
+      "sizeWorld": 373,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#2ecc71",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "交流功率(kW)",
+            "en": "P(kW)"
+          },
+          "value": "",
+          "hidden": false,
+          "offset": {
+            "x": -270,
+            "y": -31
+          }
+        },
+        {
+          "key": {
+            "zh": "交流电流(A)",
+            "en": "I(A)"
+          },
+          "value": "",
+          "hidden": false,
+          "offset": {
+            "x": -271,
+            "y": -35
+          }
+        },
+        {
+          "key": {
+            "zh": "直流功率(KW)",
+            "en": "P(kW)"
+          },
+          "value": "",
+          "hidden": false,
+          "offset": {
+            "x": -34,
+            "y": 45
+          }
+        },
+        {
+          "key": {
+            "zh": "直流电压(V)",
+            "en": "U(V)"
+          },
+          "value": "",
+          "hidden": false,
+          "offset": {
+            "x": -34,
+            "y": 40
+          }
+        },
+        {
+          "key": {
+            "zh": "直流电流(A)",
+            "en": "I(A)"
+          },
+          "value": "",
+          "hidden": false,
+          "offset": {
+            "x": -34,
+            "y": 38
+          }
+        }
+      ],
+      "status": {
+        "zh": "运行",
+        "en": "Running"
+      }
+    },
+    {
+      "id": "bms_1",
+      "type": "bms",
+      "label": {
+        "zh": "电池BMS",
+        "en": "Battery BMS"
+      },
+      "position": {
+        "x": 2301.2,
+        "y": 2206
+      },
+      "sizeWorld": 373,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#3aa0ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "电压(v)",
+            "en": "U(V)"
+          },
+          "value": 60,
+          "hidden": false,
+          "offset": {
+            "x": -263,
+            "y": -33
+          }
+        },
+        {
+          "key": {
+            "zh": "电流(A)",
+            "en": "I(A)"
+          },
+          "value": 26,
+          "hidden": false,
+          "offset": {
+            "x": -263,
+            "y": -36
+          }
+        },
+        {
+          "key": {
+            "zh": "功率(kW)",
+            "en": "P(kW)"
+          },
+          "value": "",
+          "hidden": false,
+          "offset": {
+            "x": -264,
+            "y": -41
+          }
+        },
+        {
+          "key": {
+            "zh": "SOC",
+            "en": "SOC"
+          },
+          "value": "",
+          "hidden": false,
+          "offset": {
+            "x": -264,
+            "y": -46
+          }
+        },
+        {
+          "key": {
+            "zh": "状态",
+            "en": "State"
+          },
+          "value": "",
+          "hidden": false,
+          "offset": {
+            "x": 2,
+            "y": -110
+          }
+        }
+      ],
+      "status": {
+        "zh": "充电",
+        "en": "Charging"
+      }
+    },
+    {
+      "id": "grid_1",
+      "type": "grid",
+      "label": {
+        "zh": "市电",
+        "en": "Grid"
+      },
+      "position": {
+        "x": 286.7,
+        "y": 1007.7
+      },
+      "sizeWorld": 452,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#e8f4ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "P(kW)",
+            "en": "P(kW)"
+          },
+          "value": "",
+          "hidden": false,
+          "offset": {
+            "x": -6,
+            "y": -33
+          }
+        },
+        {
+          "key": {
+            "zh": "Q(kVar)",
+            "en": "Q(kVar)"
+          },
+          "value": "",
+          "hidden": false,
+          "offset": {
+            "x": -7,
+            "y": -35
+          }
+        }
+      ],
+      "status": {
+        "zh": "在线",
+        "en": "Online"
+      }
+    },
+    {
+      "id": "load_1",
+      "type": "load",
+      "label": {
+        "zh": "用户负载",
+        "en": "Load"
+      },
+      "position": {
+        "x": 4270.2,
+        "y": 990.3
+      },
+      "sizeWorld": 373,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#e8f4ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "负载功率(kW)",
+            "en": "Load(kW)"
+          },
+          "value": "",
+          "hidden": false,
+          "offset": {
+            "x": -115,
+            "y": 123
+          }
+        }
+      ],
+      "status": {
+        "zh": "在线",
+        "en": "Online"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "pcs_1",
+      "to": "bms_1",
+      "edgeType": "charge",
+      "edgeTypeLabel": {
+        "zh": "充电中",
+        "en": "Charging"
+      },
+      "color": "#2ecc71",
+      "dash": [],
+      "route": "smart",
+      "dir": "both",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true,
+      "fromPort": "bottom",
+      "toPort": "top"
+    },
+    {
+      "from": "grid_1",
+      "to": "pcs_1",
+      "edgeType": "ac_power",
+      "edgeTypeLabel": {
+        "zh": "交流电力",
+        "en": "AC Power"
+      },
+      "color": "#e74c3c",
+      "dash": [],
+      "route": "smart",
+      "dir": "forward",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true,
+      "fromPort": "right",
+      "toPort": "left"
+    },
+    {
+      "from": "pcs_1",
+      "to": "load_1",
+      "edgeType": "discharge",
+      "edgeTypeLabel": {
+        "zh": "放电中",
+        "en": "Discharging"
+      },
+      "color": "#3498db",
+      "dash": [],
+      "route": "smart",
+      "dir": "forward",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true,
+      "fromPort": "right",
+      "toPort": "left"
+    }
+  ],
+  "signals": [
+    {
+      "name": "P1",
+      "label": "P1",
+      "sample": 0,
+      "type": "number"
+    },
+    {
+      "name": "Q1",
+      "label": "Q1",
+      "sample": 0,
+      "type": "number"
+    },
+    {
+      "name": "PcsP",
+      "label": "PcsP",
+      "sample": 0,
+      "type": "number"
+    },
+    {
+      "name": "PcsI",
+      "label": "PcsI",
+      "sample": 0,
+      "type": "number"
+    },
+    {
+      "name": "PcsP1",
+      "label": "PcsP1",
+      "sample": 0,
+      "type": "number"
+    },
+    {
+      "name": "PcsU1",
+      "label": "PcsU1",
+      "sample": 0,
+      "type": "number"
+    },
+    {
+      "name": "PcsI1",
+      "label": "PcsI1",
+      "sample": 0,
+      "type": "number"
+    },
+    {
+      "name": "BmsU",
+      "label": "BmsU",
+      "sample": 0,
+      "type": "number"
+    },
+    {
+      "name": "BmsI",
+      "label": "BmsI",
+      "sample": 0,
+      "type": "number"
+    },
+    {
+      "name": "BmsP",
+      "label": "BmsP",
+      "sample": 0,
+      "type": "number"
+    },
+    {
+      "name": "BmsSoc",
+      "label": "BmsSoc",
+      "sample": 0,
+      "type": "number"
+    },
+    {
+      "name": "BmsState",
+      "label": "BmsState",
+      "sample": 0,
+      "type": "number"
+    }
+  ]
+}

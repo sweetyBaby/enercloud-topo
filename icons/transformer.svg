@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100"><defs><radialGradient id="gl" cx="50%" cy="62%" r="55%"><stop offset="0%" stop-color="#5dd0ff" stop-opacity="0.4"/><stop offset="60%" stop-color="#5dd0ff" stop-opacity="0.1"/><stop offset="100%" stop-color="#5dd0ff" stop-opacity="0"/></radialGradient><linearGradient id="pt" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5dd0ff" stop-opacity="0.55"/><stop offset="100%" stop-color="#5dd0ff" stop-opacity="0.15"/></linearGradient></defs><ellipse cx="60" cy="86" rx="44" ry="11" fill="url(#gl)"/><polygon points="20,80 60,92 100,80 60,68" fill="none" stroke="#5dd0ff" stroke-width="1.2" opacity="0.55"/><polygon points="20,74 60,86 100,74 60,62" fill="none" stroke="#5dd0ff" stroke-width="1.2" opacity="0.4"/><polygon points="20,68 60,80 100,68 60,56" fill="none" stroke="#5dd0ff" stroke-width="1.2" opacity="0.25000000000000006"/><polygon points="24,74 60,86 96,74 60,62" fill="url(#pt)" stroke="#5dd0ff" stroke-width="1.4" opacity="0.95"/>
+  <rect x="34" y="18" width="52" height="44" rx="6" fill="#14304c" stroke="#5dd0ff" stroke-width="1.8"/>
+  <circle cx="48" cy="40" r="11" fill="none" stroke="#7ee0ff" stroke-width="2.5"/>
+  <circle cx="48" cy="40" r="6.5" fill="none" stroke="#aef0ff" stroke-width="1.4"/>
+  <circle cx="72" cy="40" r="11" fill="none" stroke="#ffa860" stroke-width="2.5"/>
+  <circle cx="72" cy="40" r="6.5" fill="none" stroke="#ffc890" stroke-width="1.4"/>
+  <line x1="48" y1="27" x2="48" y2="20" stroke="#7ee0ff" stroke-width="2.5"/>
+  <line x1="72" y1="27" x2="72" y2="20" stroke="#ffa860" stroke-width="2.5"/>
+  <circle cx="48" cy="19" r="2.5" fill="#7ee0ff"/><circle cx="72" cy="19" r="2.5" fill="#ffa860"/>
+  <line x1="60" y1="62" x2="60" y2="70" stroke="#7a8a9a" stroke-width="2"/></svg>

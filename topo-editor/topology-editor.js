@@ -1,5 +1,6 @@
 // Topology editor runtime and UI logic.
-const DEVICE_GROUPS=[{"title": "电源侧", "title_en": "Power Source", "color": "#4dd0ff", "tab": "device", "devices": [{"type": "grid", "label": "主电网", "label_en": "Grid", "badge": "grid"}, {"type": "solar", "label": "光伏板", "label_en": "PV Panel", "badge": "solar"}, {"type": "generator", "label": "发电机", "label_en": "Generator", "badge": "generator"}]}, {"title": "储能设备", "title_en": "Storage", "color": "#2ecc71", "tab": "device", "devices": [{"type": "pcs", "label": "变流器PCS", "label_en": "PCS", "badge": "pcs"}, {"type": "bms", "label": "电池BMS", "label_en": "Battery BMS", "badge": "bms"}, {"type": "cabinet", "label": "电池柜", "label_en": "Battery Rack", "badge": "cabinet"}, {"type": "h2_storage", "label": "氢储能", "label_en": "H2 Storage", "badge": "h2_storage"}]}, {"title": "电气设备", "title_en": "Electrical", "color": "#e67e22", "tab": "device", "devices": [{"type": "transformer", "label": "变压器", "label_en": "Transformer", "badge": "transformer"}, {"type": "switch", "label": "断路器", "label_en": "Breaker", "badge": "switch"}, {"type": "highvolt", "label": "高压箱", "label_en": "HV Box", "badge": "highvolt"}]}, {"title": "开关元件", "title_en": "Switching", "color": "#ff6b60", "tab": "device", "devices": [{"type": "cb_closed", "label": "断路器(闭合)", "label_en": "Breaker (closed)", "badge": "cb_closed"}, {"type": "switch_open", "label": "隔离开关(断开)", "label_en": "Switch (open)", "badge": "switch_open"}, {"type": "disconnector", "label": "刀闸(合闸)", "label_en": "Disconnector", "badge": "disconnector"}, {"type": "contactor", "label": "接触器", "label_en": "Contactor", "badge": "contactor"}, {"type": "fuse", "label": "熔断器", "label_en": "Fuse", "badge": "fuse"}, {"type": "iso_g", "label": "隔离开关", "label_en": "Isolator", "badge": "iso_g"}, {"type": "lbs_g", "label": "负荷开关", "label_en": "Load Switch", "badge": "lbs_g"}, {"type": "disc_v_g", "label": "竖向刀闸", "label_en": "Vert. Disconnector", "badge": "disc_v_g"}]}, {"title": "无源元件", "title_en": "Passive", "color": "#5dade2", "tab": "device", "devices": [{"type": "resistor", "label": "电阻", "label_en": "Resistor", "badge": "resistor"}, {"type": "inductor", "label": "电感", "label_en": "Inductor", "badge": "inductor"}, {"type": "capacitor", "label": "电容", "label_en": "Capacitor", "badge": "capacitor"}, {"type": "ct", "label": "电流互感器", "label_en": "CT", "badge": "ct"}, {"type": "pt", "label": "电压互感器", "label_en": "PT", "badge": "pt"}, {"type": "spd", "label": "避雷器", "label_en": "SPD", "badge": "spd"}, {"type": "ground", "label": "接地", "label_en": "Ground", "badge": "ground"}]}, {"title": "计量与负载", "title_en": "Meter & Load", "color": "#f1c40f", "tab": "device", "devices": [{"type": "meter", "label": "计量表", "label_en": "Meter", "badge": "meter"}, {"type": "meter2", "label": "关口表", "label_en": "Gateway Meter", "badge": "meter2"}, {"type": "load", "label": "用电负载", "label_en": "Load", "badge": "load"}, {"type": "charger", "label": "充电桩", "label_en": "EV Charger", "badge": "charger"}]}, {"title": "辅助系统", "title_en": "Auxiliary", "color": "#9b59b6", "tab": "device", "devices": [{"type": "ems", "label": "EMS系统", "label_en": "EMS", "badge": "ems"}, {"type": "aircon", "label": "空调", "label_en": "HVAC", "badge": "aircon"}, {"type": "fire", "label": "消防", "label_en": "Fire Sys", "badge": "fire"}, {"type": "sensor", "label": "传感器", "label_en": "Sensor", "badge": "sensor"}]}, {"title": "母线/主干线", "title_en": "Busbar & Trunk", "color": "#ff6b6b", "tab": "device", "devices": [{"type": "busbar", "label": "母线", "label_en": "Busbar", "badge": "busbar"}, {"type": "trunk_ac", "label": "交流主干线", "label_en": "AC Trunk", "badge": "busbar"}, {"type": "trunk_dc", "label": "直流主干线", "label_en": "DC Trunk", "badge": "busbar"}, {"type": "tie_line", "label": "联络线", "label_en": "Tie Line", "badge": "busbar"}]}, {"title": "辅助元素", "title_en": "Auxiliary", "color": "#42a5f5", "tab": "annot", "devices": [{"type": "text", "label": "文本框", "label_en": "Text", "badge": "text"}]}], NODE_DEFAULTS={"grid": {"data": ["P(kW)", "Q(kvar)"]}, "solar": {"data": ["P(kW)", "Vpv(V)"]}, "generator": {"data": ["P(kW)", "频率(Hz)"]}, "pcs": {"data": ["P(kW)", "Q(kvar)", "I(A)", "U(V)"]}, "bms": {"data": ["U(V)", "I(A)", "SOC(%)", "温度(℃)"]}, "cabinet": {"data": ["簇电压(V)", "簇电流(A)", "SOC(%)", "温度(℃)", "状态"]}, "transformer": {"data": ["输入电压(V)", "输出电压(V)"]}, "switch": {"data": ["状态"]}, "highvolt": {"data": ["直流电压(V)", "直流电流(A)"]}, "busbar": {"data": ["母线电压(V)"]}, "trunk_ac": {"data": ["电压(V)", "电流(A)"]}, "trunk_dc": {"data": ["电压(V)", "电流(A)"]}, "tie_line": {"data": ["P(kW)"]}, "meter": {"data": ["P(kW)", "Q(kvar)"]}, "meter2": {"data": ["P(kW)", "Q(kvar)", "今日用电(kWh)"]}, "load": {"data": ["负载功率(kW)", "今日用电(kWh)"]}, "charger": {"data": ["功率(kW)", "状态"]}, "ems": {"data": ["运行模式", "状态"]}, "aircon": {"data": ["温度(℃)", "状态"]}, "fire": {"data": ["状态", "告警"]}, "sensor": {"data": ["数值", "单位"]}, "cb_closed": {"data": ["状态", "电流(A)"]}, "switch_open": {"data": ["状态"]}, "disconnector": {"data": ["状态"]}, "contactor": {"data": ["状态"]}, "fuse": {"data": ["额定电流(A)"]}, "resistor": {"data": ["阻值(Ω)"]}, "inductor": {"data": ["电感(mH)"]}, "capacitor": {"data": ["容值(μF)"]}, "ct": {"data": ["变比", "二次电流(A)"]}, "pt": {"data": ["变比", "二次电压(V)"]}, "spd": {"data": ["状态"]}, "ground": {"data": []}, "h2_storage": {"data": ["压力(MPa)", "SOC(%)", "温度(℃)"]}, "iso_g": {"data": ["状态"]}, "lbs_g": {"data": ["状态"]}, "disc_v_g": {"data": ["状态"]}}, PRESET_BG=["#060e1a", "#0a2040", "#102a52", "#0d1b2a", "#1a1a2e", "#0a1a14", "#10240f", "#1a1000", "#2a0a0a", "#160020", "#2b2118", "#1a2630", "#23252b", "#2b1a2a", "#0f2a2a", "#3a2a1a", "#2a1a3a", "#1a3a2a", "#3a1a2a", "#1f1f0a", "#ffffff", "#f0f3f8", "#eaeef4", "#fdf6e3", "#f5eef5", "#e8f4f0", "#fff4e6", "#eef2ff", "#f0fff4", "#fff0f0", "#fef0f5", "#f0f9ff", "#fffbe8", "#f3f0ff", "#eafaf1"], DATA_LABEL_EN={"P(kW)": "P(kW)", "Q(kvar)": "Q(kvar)", "I(A)": "I(A)", "U(V)": "U(V)", "Vpv(V)": "Vpv(V)", "频率(Hz)": "Freq(Hz)", "SOC(%)": "SOC(%)", "温度(℃)": "Temp(℃)", "簇电压(V)": "Cluster V(V)", "簇电流(A)": "Cluster I(A)", "状态": "Status", "输入电压(V)": "Vin(V)", "输出电压(V)": "Vout(V)", "直流电压(V)": "DC V(V)", "直流电流(A)": "DC I(A)", "母线电压(V)": "Bus V(V)", "今日用电(kWh)": "Today(kWh)", "负载功率(kW)": "Load(kW)", "功率(kW)": "Power(kW)", "运行模式": "Mode", "告警": "Alarm", "数值": "Value", "单位": "Unit", "电流(A)": "I(A)", "额定电流(A)": "Rated I(A)", "阻值(Ω)": "R(Ω)", "电感(mH)": "L(mH)", "容值(μF)": "C(μF)", "变比": "Ratio", "二次电流(A)": "Sec I(A)", "二次电压(V)": "Sec V(V)", "电压(V)": "U(V)"}, STATUS_EN={"待机": "Standby", "充电": "Charging", "放电": "Discharging", "发电": "Generating", "在线": "Online", "离线": "Offline", "备用": "Standby", "运行": "Running", "停机": "Stopped", "并网运行": "Grid-tied", "离网运行": "Off-grid", "闭合": "Closed", "断开": "Open", "故障": "Fault", "告警": "Alarm", "正常": "Normal", "充电中": "Charging", "放电中": "Discharging"};
+let DEVICE_GROUPS=[];  // 运行时由 loadIconLibrary() 从 icons/index.json（图标库）填充
+const NODE_DEFAULTS={"grid": {"data": ["P(kW)", "Q(kvar)"]}, "solar": {"data": ["P(kW)", "Vpv(V)"]}, "generator": {"data": ["P(kW)", "频率(Hz)"]}, "pcs": {"data": ["P(kW)", "Q(kvar)", "I(A)", "U(V)"]}, "bms": {"data": ["U(V)", "I(A)", "SOC(%)", "温度(℃)"]}, "cabinet": {"data": ["簇电压(V)", "簇电流(A)", "SOC(%)", "温度(℃)", "状态"]}, "transformer": {"data": ["输入电压(V)", "输出电压(V)"]}, "switch": {"data": ["状态"]}, "highvolt": {"data": ["直流电压(V)", "直流电流(A)"]}, "busbar": {"data": ["母线电压(V)"]}, "trunk_ac": {"data": ["电压(V)", "电流(A)"]}, "trunk_dc": {"data": ["电压(V)", "电流(A)"]}, "tie_line": {"data": ["P(kW)"]}, "meter": {"data": ["P(kW)", "Q(kvar)"]}, "meter2": {"data": ["P(kW)", "Q(kvar)", "今日用电(kWh)"]}, "load": {"data": ["负载功率(kW)", "今日用电(kWh)"]}, "charger": {"data": ["功率(kW)", "状态"]}, "ems": {"data": ["运行模式", "状态"]}, "aircon": {"data": ["温度(℃)", "状态"]}, "fire": {"data": ["状态", "告警"]}, "sensor": {"data": ["数值", "单位"]}, "cb_closed": {"data": ["状态", "电流(A)"]}, "switch_open": {"data": ["状态"]}, "disconnector": {"data": ["状态"]}, "contactor": {"data": ["状态"]}, "fuse": {"data": ["额定电流(A)"]}, "resistor": {"data": ["阻值(Ω)"]}, "inductor": {"data": ["电感(mH)"]}, "capacitor": {"data": ["容值(μF)"]}, "ct": {"data": ["变比", "二次电流(A)"]}, "pt": {"data": ["变比", "二次电压(V)"]}, "spd": {"data": ["状态"]}, "ground": {"data": []}, "h2_storage": {"data": ["压力(MPa)", "SOC(%)", "温度(℃)"]}, "iso_g": {"data": ["状态"]}, "lbs_g": {"data": ["状态"]}, "disc_v_g": {"data": ["状态"]}}, PRESET_BG=["#060e1a", "#0a2040", "#102a52", "#0d1b2a", "#1a1a2e", "#0a1a14", "#10240f", "#1a1000", "#2a0a0a", "#160020", "#2b2118", "#1a2630", "#23252b", "#2b1a2a", "#0f2a2a", "#3a2a1a", "#2a1a3a", "#1a3a2a", "#3a1a2a", "#1f1f0a", "#ffffff", "#f0f3f8", "#eaeef4", "#fdf6e3", "#f5eef5", "#e8f4f0", "#fff4e6", "#eef2ff", "#f0fff4", "#fff0f0", "#fef0f5", "#f0f9ff", "#fffbe8", "#f3f0ff", "#eafaf1"], DATA_LABEL_EN={"P(kW)": "P(kW)", "Q(kvar)": "Q(kvar)", "I(A)": "I(A)", "U(V)": "U(V)", "Vpv(V)": "Vpv(V)", "频率(Hz)": "Freq(Hz)", "SOC(%)": "SOC(%)", "温度(℃)": "Temp(℃)", "簇电压(V)": "Cluster V(V)", "簇电流(A)": "Cluster I(A)", "状态": "Status", "输入电压(V)": "Vin(V)", "输出电压(V)": "Vout(V)", "直流电压(V)": "DC V(V)", "直流电流(A)": "DC I(A)", "母线电压(V)": "Bus V(V)", "今日用电(kWh)": "Today(kWh)", "负载功率(kW)": "Load(kW)", "功率(kW)": "Power(kW)", "运行模式": "Mode", "告警": "Alarm", "数值": "Value", "单位": "Unit", "电流(A)": "I(A)", "额定电流(A)": "Rated I(A)", "阻值(Ω)": "R(Ω)", "电感(mH)": "L(mH)", "容值(μF)": "C(μF)", "变比": "Ratio", "二次电流(A)": "Sec I(A)", "二次电压(V)": "Sec V(V)", "电压(V)": "U(V)"}, STATUS_EN={"待机": "Standby", "充电": "Charging", "放电": "Discharging", "发电": "Generating", "在线": "Online", "离线": "Offline", "备用": "Standby", "运行": "Running", "停机": "Stopped", "并网运行": "Grid-tied", "离网运行": "Off-grid", "闭合": "Closed", "断开": "Open", "故障": "Fault", "告警": "Alarm", "正常": "Normal", "充电中": "Charging", "放电中": "Discharging"};
 let lang='zh';
 const THEMES={
   blue_screen:{name:'蓝色大屏风',desc:'默认 · 指挥中心亮蓝',swatch:'#102a52',vars:{'--ui-bg':'#102a52','--ui-bg2':'#0c2245','--ui-border':'#2a5a9a','--ui-text':'#e8f2ff','--ui-text2':'#a0c0e0','--ui-accent':'#42a5f5','--ui-btn-bg':'#143560','--ui-btn-border':'#2a5a9a','--ui-btn-text':'#bcdcff','--ui-input-bg':'#0a1f40','--ui-hover':'#1a3f70'},bg:'#0a1f40'},
@@ -28,22 +29,61 @@ const ET={
 };
 function etLabel(k){ const e=ET[k]; return lang==='en'?(e.labelEn||e.label):e.label; }
 
-/* ───── 占位锚点(anchor)：最基础的占位元素。默认在画布上不显示名称与数据字段，
-   但属性(标签/字段)依然保留，可在属性面板随时打开显示。归入「辅助元素」分类。 ───── */
-IMG_DATA.anchor='data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="12" fill="none" stroke="#4dd0ff" stroke-width="2" opacity="0.45"/><circle cx="24" cy="24" r="6" fill="#4dd0ff"/></svg>');
-/* ───── 母线/主干线：原来交流主干线/直流主干线/联络线都复用母线图标，无法区分。
-   这里给出语义化的独立图标：交流(~ 正弦)、直流(⎓ 实线+虚线)、联络线(两端环相连)。 ───── */
-IMG_DATA.trunk_ac='data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect x="6" y="29" width="36" height="5" rx="2.5" fill="#ff8a5b"/><path d="M9 18 q3.75 -9 7.5 0 t7.5 0 t7.5 0 t3.5 0" fill="none" stroke="#ff8a5b" stroke-width="3" stroke-linecap="round"/></svg>');
-IMG_DATA.trunk_dc='data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect x="6" y="29" width="36" height="5" rx="2.5" fill="#4dd0ff"/><line x1="12" y1="15" x2="36" y2="15" stroke="#4dd0ff" stroke-width="3" stroke-linecap="round"/><line x1="16" y1="22" x2="32" y2="22" stroke="#4dd0ff" stroke-width="3" stroke-linecap="round" stroke-dasharray="4 4"/></svg>');
-IMG_DATA.tie_line='data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><line x1="13" y1="24" x2="35" y2="24" stroke="#c39bd3" stroke-width="3"/><circle cx="11" cy="24" r="5.5" fill="none" stroke="#c39bd3" stroke-width="3"/><circle cx="37" cy="24" r="5.5" fill="none" stroke="#c39bd3" stroke-width="3"/></svg>');
-// 把占位点放进「辅助元素(annot)」分组
-(function(){const g=DEVICE_GROUPS.find(x=>(x.tab||'')==='annot');
-  if(g)g.devices.unshift({type:'anchor',label:'占位点',label_en:'Anchor Point',badge:'point'});})();
-// 分类顺序：常用优先（电源/储能/母线/电气/计量负载 在前，其余其后）
-(function(){const order=['电源侧','储能设备','母线/主干线','电气设备','计量与负载','开关元件','辅助系统','无源元件','辅助元素'];
-  DEVICE_GROUPS.sort((a,b)=>{const ia=order.indexOf(a.title),ib=order.indexOf(b.title);return (ia<0?999:ia)-(ib<0?999:ib);});})();
-let imgLoaded=0,imgTotal=Object.keys(IMG_DATA).length;
-Object.entries(IMG_DATA).forEach(([k,src])=>{const i=new Image();i.src=src;i.onload=i.onerror=()=>{IMGS[k]=i;if(++imgLoaded>=imgTotal){['trunk_ac','trunk_dc','tie_line'].forEach(t=>{if(IMGS.busbar&&!IMGS[t])IMGS[t]=IMGS.busbar;});init();}};});
+/* ───── 图标库（文件化）：运行时从 icons/index.json 加载「分组结构 + 图片文件」。
+   增删改图标 = 直接增删改 icons/ 下的图片（dev-server / build 会自动扫描登记并同步清单），无需改动代码。
+   清单里的 file-less 元素（如文本框/变量节点等纯绘制元素）不需要图片。 ───── */
+const ICON_BASE='icons/';              // 图标文件目录（相对 topo.html）
+const ICON_FILE={};                    // type → 图片文件名（导出元素库清单 / iconFileName 用）
+const ICON_GROUP_ORDER=['电源侧','储能设备','母线/主干线','电气设备','计量与负载','开关元件','辅助系统','无源元件','辅助元素'];
+let _iconBust=0;                       // 图片缓存版本号：每次「重扫图标」+1，绕过浏览器缓存
+async function loadIconLibrary(){
+  let manifest=null;
+  try{
+    const res=await fetch(ICON_BASE+'index.json',{cache:'no-store'});
+    if(res.ok) manifest=await res.json();
+    else console.error('加载图标库失败：HTTP '+res.status+' '+ICON_BASE+'index.json');
+  }catch(err){ console.error('加载图标库 '+ICON_BASE+'index.json 失败：',err); }
+  const groups=(manifest&&Array.isArray(manifest.groups))?manifest.groups:[];
+  // 由清单构建分组结构（替代旧的硬编码 DEVICE_GROUPS）
+  DEVICE_GROUPS=groups.map(g=>({
+    title:g.title, title_en:g.title_en||g.title, color:g.color||'#42a5f5', tab:g.tab||'device',
+    devices:(g.devices||[]).map(d=>{
+      const dev={type:d.type, label:d.label||d.type, label_en:d.label_en||d.label||d.type, badge:d.badge||d.type};
+      if(d.file){ dev.file=d.file; ICON_FILE[d.type]=d.file; }
+      // 图标库可携带默认数据字段；仅对代码中尚无默认值的类型补充（不覆盖既有 NODE_DEFAULTS）
+      if(Array.isArray(d.data)&&!NODE_DEFAULTS[d.type]) NODE_DEFAULTS[d.type]={data:d.data.slice()};
+      return dev;
+    })
+  }));
+  // 分类顺序：常用优先；自动扫描出的「自定义图标」等未列入顺序的分组排在最后
+  DEVICE_GROUPS.sort((a,b)=>{const ia=ICON_GROUP_ORDER.indexOf(a.title),ib=ICON_GROUP_ORDER.indexOf(b.title);return (ia<0?999:ia)-(ib<0?999:ib);});
+  // 预加载图片到 IMGS（drawImage 用）；同时把 IMG_DATA[type] 记为图片 URL（iconSrcOf / 上传预览用）
+  const tasks=[];
+  const bust=_iconBust?('?v='+_iconBust):'';   // 重新扫描时给图片 URL 加版本号，强制绕过浏览器缓存（替换同名图片即生效）
+  DEVICE_GROUPS.forEach(g=>g.devices.forEach(d=>{
+    if(!d.file)return;                 // 文本框/变量节点等纯绘制元素无图片
+    const url=ICON_BASE+d.file;
+    IMG_DATA[d.type]=url;
+    tasks.push(new Promise(resolve=>{const im=new Image();im.onload=im.onerror=()=>{IMGS[d.type]=im;resolve();};im.src=url+bust;}));
+  }));
+  await Promise.all(tasks);
+}
+// 重新扫描图标库：重新拉取 icons/index.json + 图片并重建左栏（增删改图片后点一下即可，无需刷新整页）
+async function reloadIconLibrary(){
+  _iconBust++;
+  try{
+    await loadIconLibrary();
+    buildSidebar();
+    buildSelects();
+    if(selNode&&nodes.find(x=>x.id===selNode))selectNode(selNode);   // buildSelects 重建了下拉，恢复当前选中项的属性面板
+    else if(selEdge&&edges.includes(selEdge))selectEdge(selEdge);
+    flashHint(lang==='en'?'Icon library reloaded':'图标库已重新扫描');
+  }catch(err){
+    console.error('重新扫描图标失败：',err);
+    flashHint(lang==='en'?'Reload failed':'图标库刷新失败');
+  }
+}
+loadIconLibrary().then(init).catch(err=>{console.error('图标库初始化失败：',err);init();});
 const CUSTOM_ICONS={},CUSTOM_LABELS={};let pendingDataURL=null;
 
 let nodes=[],edges=[],selNode=null,selEdge=null;
@@ -233,6 +273,7 @@ function makeNI(type,zh,en,badge,customUrl){
   const img=document.createElement('img');img.alt=dl;img.className='ni-icon';
   if(customUrl)img.src=customUrl;
   else if(type==='text'){img.src='data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><text x="24" y="34" font-size="34" text-anchor="middle" fill="#42a5f5" font-family="serif" font-weight="bold">T</text></svg>');}
+  else if(type==='variable'){img.src='data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><text x="24" y="20" font-size="17" text-anchor="middle" fill="#9fc0dd" font-family="sans-serif">label</text><text x="24" y="40" font-size="19" text-anchor="middle" fill="#4dd0ff" font-family="sans-serif" font-weight="bold">value</text></svg>');}
   else if(IMGS[type])img.src=IMGS[type].src;
   const txt=document.createElement('div');txt.className='ni-txt';
   txt.innerHTML='<span class="ni-lbl">'+dl+'</span><span class="ni-badge">'+badge+'</span>';
@@ -501,23 +542,23 @@ canvas.addEventListener('mousedown',e=>{
   if(_groupBox&&_groupBox.handle&&Math.hypot(wx-_groupBox.handle[0],wy-_groupBox.handle[1])<9/zoom){
     const cx=(_groupBox.x0+_groupBox.x1)/2, cy=(_groupBox.y0+_groupBox.y1)/2;
     const d0=Math.hypot(_groupBox.handle[0]-cx,_groupBox.handle[1]-cy);
-    const snap={};selSet.forEach(id=>{const nn=nodes.find(z=>z.id===id);if(nn)snap[id]={x:nn.x,y:nn.y,scale:nn.scale||1,fontSize:nn.fontSize};});
+    const snap={};selSet.forEach(id=>{const nn=nodes.find(z=>z.id===id);if(nn)snap[id]={x:nn.x,y:nn.y,scale:nn.scale||1,fontSize:nn.fontSize,valFontSize:nn.valFontSize};});
     dragGroupScale={cx,cy,d0,snap};canvas.style.cursor='nwse-resize';return;
   }
   // 单节点缩放手柄
   if(selNode&&selSet.size<=1){
     const sn=nodes.find(z=>z.id===selNode);
     if(sn&&sn._rotHandle&&Math.hypot(wx-sn._rotHandle[0],wy-sn._rotHandle[1])<9/zoom){
-      const cx=sn.x, cy=(sn.type==='text')?sn.y:(sn.y-nsz(sn)*0.22);
+      const cx=sn.x, cy=(usesTextBox(sn.type))?sn.y:(sn.y-nsz(sn)*0.22);
       dragRotate={n:sn,cx,cy,start:sn.rotation||0,startAng:Math.atan2(wy-cy,wx-cx)};canvas.style.cursor='grabbing';return;
     }
     if(sn&&sn._resizeHandles){
       for(const h of sn._resizeHandles){
         if(Math.hypot(wx-h[0],wy-h[1])<9/zoom){
-          const isText=sn.type==='text';
-          const cx=sn.type==='text'?sn.y:(sn.y-nsz(sn)*0.22);
+          const isText=usesTextBox(sn.type);
+          const cx=usesTextBox(sn.type)?sn.y:(sn.y-nsz(sn)*0.22);
           const baseDist=Math.hypot(h[0]-sn.x, h[1]-sn.y)||1;
-          dragResize={n:sn,baseDist,startScale:sn.scale||1,startFont:sn.fontSize,isText};canvas.style.cursor='nwse-resize';return;
+          dragResize={n:sn,baseDist,startScale:sn.scale||1,startFont:sn.fontSize,startValFont:sn.valFontSize,isText};canvas.style.cursor='nwse-resize';return;
         }
       }
     }
@@ -560,7 +601,7 @@ canvas.addEventListener('mousedown',e=>{
       // 点击空白处：添加一个拐点（自动对齐为水平/垂直 + 吸附网格/节点）
       let px=wx,py=wy;
       const snap=10/zoom;
-      nodes.forEach(o=>{if(Math.abs(o.x-px)<snap)px=o.x;const oy=o.type==='text'?o.y:(o.y-nsz(o)*0.22);if(Math.abs(oy-py)<snap)py=oy;});
+      nodes.forEach(o=>{if(Math.abs(o.x-px)<snap)px=o.x;const oy=usesTextBox(o.type)?o.y:(o.y-nsz(o)*0.22);if(Math.abs(oy-py)<snap)py=oy;});
       const GS=25;{const gx=Math.round(px/GS)*GS;if(Math.abs(gx-px)<snap)px=gx;const gy=Math.round(py/GS)*GS;if(Math.abs(gy-py)<snap)py=gy;}
       const last=edgeWaypoints.length>0?edgeWaypoints[edgeWaypoints.length-1]:(()=>{const f=nodes.find(z=>z.id===edgeFrom);return f?(nodePortPoint(f,edgeFromPort)||[f.x,f.y-nsz(f)*0.22]):[wx,wy];})();
       // L型：与上一点对齐，取偏移大的方向
@@ -643,7 +684,8 @@ canvas.addEventListener('mousemove',e=>{
   if(dragResize){
     const d=Math.hypot(mouseWX-dragResize.n.x, mouseWY-dragResize.n.y);
     const ratio=Math.max(0.05,Math.min(4, d/dragResize.baseDist));
-    if(dragResize.isText){dragResize.n.fontSize=Math.max(8,Math.round(dragResize.startFont*ratio));}
+    if(dragResize.isText){dragResize.n.fontSize=Math.max(8,Math.round(dragResize.startFont*ratio));
+      if(dragResize.n.type==='variable'&&dragResize.startValFont!=null)dragResize.n.valFontSize=Math.max(8,Math.round(dragResize.startValFont*ratio));}
     else{dragResize.n.scale=Math.max(0.05,Math.min(8, dragResize.startScale*ratio));}
     _pathCacheSig='';
     if(selNode===dragResize.n.id){
@@ -659,7 +701,10 @@ canvas.addEventListener('mousemove',e=>{
     const {cx,cy,snap}=dragGroupScale;
     selSet.forEach(id=>{const n=nodes.find(z=>z.id===id);if(!n||!snap[id])return;
       n.x=cx+(snap[id].x-cx)*ratio; n.y=cy+(snap[id].y-cy)*ratio;
-      if(n.type==='text')n.fontSize=Math.max(8,Math.round(snap[id].fontSize*ratio));
+      if(usesTextBox(n.type)){
+        n.fontSize=Math.max(8,Math.round((snap[id].fontSize||14)*ratio));
+        if(n.type==='variable'&&snap[id].valFontSize!=null)n.valFontSize=Math.max(8,Math.round(snap[id].valFontSize*ratio));
+      }
       else n.scale=Math.max(0.05,Math.min(8, snap[id].scale*ratio));
     });
     _pathCacheSig='';
@@ -704,7 +749,7 @@ canvas.addEventListener('mousemove',e=>{
     const tryX=v=>{const d=Math.abs(v-mouseWX);if(d<bestXd){bestXd=d;px=v;gx=v;}};
     const tryY=v=>{const d=Math.abs(v-mouseWY);if(d<bestYd){bestYd=d;py=v;gy=v;}};
     // 1) 对齐其他节点中心线（横/竖）
-    nodes.forEach(o=>{ tryX(o.x); tryY(o.type==='text'?o.y:(o.y-nsz(o)*0.22)); });
+    nodes.forEach(o=>{ tryX(o.x); tryY(usesTextBox(o.type)?o.y:(o.y-nsz(o)*0.22)); });
     // 2) 对齐/汇合其他连线：其拐点(同时命中X与Y即汇合为同一点) + 横平竖直段(对齐到同一通道)
     edges.forEach(oe=>{ if(oe===dragWaypoint.e)return; const pp=_pathCache[oe._cacheKey]||oe._drawPts; if(!pp||pp.length<2)return;
       pp.forEach(pt=>{ tryX(pt[0]); tryY(pt[1]); });
@@ -746,8 +791,8 @@ canvas.addEventListener('mousemove',e=>{
   alignGuides=[];
   const snap=8/zoom;
   // 取一个节点的对齐参考线：x方向[左,中,右]，y方向[上,中,下]
-  function xRefs(o,cx){const s=nsz(o);const hw=(o.type==='text'&&o._textBox)?o._textBox.w/2:s*0.40;return [cx-hw,cx,cx+hw];}
-  function yRefs(o,cy){const s=nsz(o);if(o.type==='text'&&o._textBox){const hh=o._textBox.h/2;return [cy-hh,cy,cy+hh];}const vc=cy-s*0.22,hh=s*0.40;return [vc-hh,vc,vc+hh];}
+  function xRefs(o,cx){const s=nsz(o);const hw=(usesTextBox(o.type)&&o._textBox)?o._textBox.w/2:s*0.40;return [cx-hw,cx,cx+hw];}
+  function yRefs(o,cy){const s=nsz(o);if(usesTextBox(o.type)&&o._textBox){const hh=o._textBox.h/2;return [cy-hh,cy,cy+hh];}const vc=cy-s*0.22,hh=s*0.40;return [vc-hh,vc,vc+hh];}
   const dxr=xRefs(dragNode,nx), dyr=yRefs(dragNode,ny);
   let bestX=null,bestY=null,bestXd=snap,bestYd=snap,guideX=null,guideY=null;
   nodes.forEach(o=>{if(o.id===dragNode.id)return;
@@ -853,7 +898,7 @@ canvas.addEventListener('dblclick',e=>{
   const n=nodeAt(wx,wy);
   if(n){
     if(triggerNodeAction(n,'dblclick'))return;
-    if(n.type==='text'){ openTextEditor(n, e.clientX, e.clientY); return; }
+    if(usesTextBox(n.type)){ openTextEditor(n, e.clientX, e.clientY); return; }
     const isEn=lang==='en';
     const cur=isEn?(n.labelEn||''):(n.labelZh||n.label||'');
     openInlineInput(e.clientX,e.clientY,(isEn?'编辑英文标签':'编辑中文标签'),cur,(v)=>{
@@ -970,6 +1015,15 @@ function addNode(type,x,y){
       data:[{key:'数值',keyEn:'Value',dv:''}]});
     snapshot();selectNode(id);return;
   }
+  if(type==='variable'){
+    // 变量节点：label 段 + value 段，各自字体属性独立；value 默认绑定第一条数据字段（实时值），可静态兜底
+    nodes.push({id,type,labelZh:'变量',labelEn:'Variable',x,y,scale:1,
+      fontSize:16,fontColor:'#e8f4ff',labelBold:true,
+      valFontSize:16,valColor:'#4dd0ff',valBold:true,
+      varLayout:'h',
+      data:[{key:'数值',keyEn:'Value',dv:'--'}]});
+    snapshot();selectNode(id);return;
+  }
   nodes.push({id,type,labelZh,labelEn,x,y,status:'待机',fontSize:14,fontColor:'#e8f4ff',scale:(type==='anchor'?0.1:1),
     hideLabel:(type==='anchor'),hideFields:(type==='anchor'),
     ...(type==='anchor'?{fill:'#4dd0ff',opacity:1}:{}),
@@ -979,7 +1033,10 @@ function addNode(type,x,y){
 // 获取节点当前语言标签
 function nodeLabel(n){ return lang==='en' ? (n.labelEn||n.labelZh||n.id) : (n.labelZh||n.label||n.id); }
 function dataKey(f){ return lang==='en' ? (f.keyEn||f.key) : f.key; }
-function nodeSupportsStateSignals(n){ return !!(n&&n.type!=='text'); }
+// 文本框 + 变量节点：都用 _textBox 包围盒（命中/对齐/缩放等几何逻辑一致），且都不是带状态的设备
+function usesTextBox(t){ return t==='text'||t==='variable'; }
+// 是否带「状态/在线」语义：设备类才有；文本框/变量节点是注记，占位点(anchor)是无源占位，都不暴露 status/online
+function nodeSupportsStateSignals(n){ return !!(n&&!usesTextBox(n.type)&&n.type!=='anchor'); }
 
 function nsz(typeOrNode){
   const type=typeof typeOrNode==='string'?typeOrNode:typeOrNode.type;
@@ -992,7 +1049,7 @@ function nsz(typeOrNode){
     anchor:26}[type]||62;
   return s*(base/600)*scale;
 }
-function nodeAt(wx,wy){for(let i=nodes.length-1;i>=0;i--){const n=nodes[i];if(n.type==='text'){const b=n._textBox;if(b&&wx>=b.x&&wx<=b.x+b.w&&wy>=b.y&&wy<=b.y+b.h)return n;continue;}const s=nsz(n);if(n.type==='anchor'){const vcy=n.y-s*0.22, hit=Math.max(s*0.5, 11/zoom);if(Math.abs(wx-n.x)<hit&&Math.abs(wy-vcy)<hit)return n;continue;}if(Math.abs(wx-n.x)<s*.55&&Math.abs(wy-n.y)<s*.5)return n;}return null;}
+function nodeAt(wx,wy){for(let i=nodes.length-1;i>=0;i--){const n=nodes[i];if(usesTextBox(n.type)){const b=n._textBox;if(b&&wx>=b.x&&wx<=b.x+b.w&&wy>=b.y&&wy<=b.y+b.h)return n;continue;}const s=nsz(n);if(n.type==='anchor'){const vcy=n.y-s*0.22, hit=Math.max(s*0.5, 11/zoom);if(Math.abs(wx-n.x)<hit&&Math.abs(wy-vcy)<hit)return n;continue;}if(Math.abs(wx-n.x)<s*.55&&Math.abs(wy-n.y)<s*.5)return n;}return null;}
 // 返回节点边界上的锚点（从中心朝目标方向，落在图标外缘）
 // 节点的视觉包围盒（图标实际绘制区域，中心略偏上）
 function nodeBox(n){
@@ -1019,7 +1076,7 @@ function linearBusPort(n, wx){
   return {name:'line:'+ratio.toFixed(3),point:[x,sp.y],dist:0};
 }
 function nodeSnapBox(n){
-  if(n.type==='text'&&n._textBox)return n._textBox;
+  if(usesTextBox(n.type)&&n._textBox)return n._textBox;
   const b=nodeBox(n), s=nsz(n), lfs=(n.fontSize||14);
   const labelBottom=(n.y+s*0.28)+lfs*1.45;
   const out={x:b.left,y:b.top,w:b.hw*2,h:Math.max(b.hh*2,labelBottom-b.top)};
@@ -2074,7 +2131,7 @@ function drawAll(){
     let gx0=Infinity,gy0=Infinity,gx1=-Infinity,gy1=-Infinity;
     selSet.forEach(id=>{const n=nodes.find(z=>z.id===id);if(!n)return;
       let bx,by,bw,bh;
-      if(n.type==='text'&&n._textBox){const b=n._textBox;bx=b.x-3/zoom;by=b.y-3/zoom;bw=b.w+6/zoom;bh=b.h+6/zoom;}
+      if(usesTextBox(n.type)&&n._textBox){const b=n._textBox;bx=b.x-3/zoom;by=b.y-3/zoom;bw=b.w+6/zoom;bh=b.h+6/zoom;}
       else{const s=nsz(n);bx=n.x-s/2-4/zoom;by=n.y-s*.72-4/zoom;bw=s+8/zoom;bh=s+8/zoom;}
       ctx.strokeRect(bx,by,bw,bh);
       gx0=Math.min(gx0,bx);gy0=Math.min(gy0,by);gx1=Math.max(gx1,bx+bw);gy1=Math.max(gy1,by+bh);
@@ -2350,6 +2407,7 @@ function drawNode(n){
   ctx.globalAlpha=_drawAlpha;   // 编辑态被规则隐藏的元素「虚化」绘制（仍可点选编辑）
   // 文本框元素：只渲染文字，无图标
   if(n.type==='text'){ drawTextNode(n); return; }
+  if(n.type==='variable'){ drawVariableNode(n); return; }
   const img=CUSTOM_ICONS[n.type]||IMGS[n.type];const s=nsz(n);
   const isSel=selNode===n.id,isESrc=edgeMode&&edgeFrom===n.id;
   ctx.save();
@@ -2442,6 +2500,38 @@ function textNodeDisplay(n){
   }
   return label;
 }
+// ── 文本框 / 变量节点 共用：在给定盒子上绘制背景、边框、选中虚线框 + 缩放/旋转手柄 ──
+function drawBoxBg(n,b,rr){
+  if(!(n.bg&&n.bg!=='none'))return;
+  ctx.fillStyle=n.bg;ctx.beginPath();
+  if(ctx.roundRect)ctx.roundRect(b.x,b.y,b.w,b.h,rr);else ctx.rect(b.x,b.y,b.w,b.h);
+  ctx.fill();
+}
+function drawBoxBorder(n,b,rr){
+  if(!(n.border&&n.border!=='none'))return;
+  ctx.strokeStyle=n.borderColor||'#4dd0ff';ctx.lineWidth=(n.borderWidth||1.5)/zoom;
+  if(n.border==='dashed')ctx.setLineDash([6/zoom,4/zoom]);
+  ctx.beginPath();
+  if(ctx.roundRect)ctx.roundRect(b.x,b.y,b.w,b.h,rr);else ctx.rect(b.x,b.y,b.w,b.h);
+  ctx.stroke();ctx.setLineDash([]);
+}
+function drawBoxSelectionChrome(n,b,rot){
+  ctx.strokeStyle='#4dd0ff';ctx.lineWidth=1.5/zoom;ctx.setLineDash([4/zoom,4/zoom]);
+  ctx.strokeRect(b.x-3/zoom,b.y-3/zoom,b.w+6/zoom,b.h+6/zoom);ctx.setLineDash([]);
+  if(selSet.size>1)return;
+  const hs=5/zoom;
+  const corners=[[b.x-3/zoom,b.y-3/zoom],[b.x+b.w+3/zoom,b.y-3/zoom],[b.x-3/zoom,b.y+b.h+3/zoom],[b.x+b.w+3/zoom,b.y+b.h+3/zoom]];
+  n._resizeHandles=corners.map(c=>rotatePt(c[0],c[1],n.x,n.y,rot));
+  n._resizeHandle=n._resizeHandles[3];
+  ctx.fillStyle='#fff';ctx.strokeStyle='#4dd0ff';ctx.lineWidth=2/zoom;
+  corners.forEach(c=>{ctx.fillRect(c[0]-hs,c[1]-hs,hs*2,hs*2);ctx.strokeRect(c[0]-hs,c[1]-hs,hs*2,hs*2);});
+  const rcx=n.x, rcy=b.y-3/zoom-16/zoom;
+  n._rotHandle=rotatePt(rcx,rcy,n.x,n.y,rot);
+  ctx.strokeStyle='#4dd0ff';ctx.lineWidth=1.5/zoom;
+  ctx.beginPath();ctx.moveTo(n.x,b.y-3/zoom);ctx.lineTo(rcx,rcy);ctx.stroke();
+  ctx.fillStyle='#4dd0ff';ctx.beginPath();ctx.arc(rcx,rcy,5/zoom,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(rcx,rcy,2/zoom,0,Math.PI*2);ctx.fill();
+}
 // 文本框元素渲染
 function drawTextNode(n){
   const isSel=selNode===n.id;
@@ -2457,44 +2547,77 @@ function drawTextNode(n){
   const lh=fs*1.3, totalH=lines.length*lh;
   n._textBox={x:n.x-maxW/2-padX,y:n.y-totalH/2-padY,w:maxW+padX*2,h:totalH+padY*2};
   const b=n._textBox, rr=(n.radius!=null?n.radius:6);
-  // 背景填充
-  if(!n.hideLabel && n.bg && n.bg!=='none'){
-    ctx.fillStyle=n.bg;ctx.beginPath();
-    if(ctx.roundRect)ctx.roundRect(b.x,b.y,b.w,b.h,rr);else ctx.rect(b.x,b.y,b.w,b.h);
-    ctx.fill();
-  }
-  // 边框
-  if(!n.hideLabel && n.border && n.border!=='none'){
-    ctx.strokeStyle=n.borderColor||'#4dd0ff';ctx.lineWidth=(n.borderWidth||1.5)/zoom;
-    if(n.border==='dashed')ctx.setLineDash([6/zoom,4/zoom]);
-    ctx.beginPath();
-    if(ctx.roundRect)ctx.roundRect(b.x,b.y,b.w,b.h,rr);else ctx.rect(b.x,b.y,b.w,b.h);
-    ctx.stroke();ctx.setLineDash([]);
-  }
-  // 选中虚线框
-  if(isSel){
-    ctx.strokeStyle='#4dd0ff';ctx.lineWidth=1.5/zoom;ctx.setLineDash([4/zoom,4/zoom]);
-    ctx.strokeRect(b.x-3/zoom,b.y-3/zoom,b.w+6/zoom,b.h+6/zoom);ctx.setLineDash([]);
-    if(selSet.size<=1){
-      const hs=5/zoom;
-      const corners=[[b.x-3/zoom,b.y-3/zoom],[b.x+b.w+3/zoom,b.y-3/zoom],[b.x-3/zoom,b.y+b.h+3/zoom],[b.x+b.w+3/zoom,b.y+b.h+3/zoom]];
-      n._resizeHandles=corners.map(c=>rotatePt(c[0],c[1],n.x,n.y,rot));
-      n._resizeHandle=n._resizeHandles[3];
-      ctx.fillStyle='#fff';ctx.strokeStyle='#4dd0ff';ctx.lineWidth=2/zoom;
-      corners.forEach(c=>{ctx.fillRect(c[0]-hs,c[1]-hs,hs*2,hs*2);ctx.strokeRect(c[0]-hs,c[1]-hs,hs*2,hs*2);});
-      // 旋转手柄
-      const rcx=n.x, rcy=b.y-3/zoom-16/zoom;
-      n._rotHandle=rotatePt(rcx,rcy,n.x,n.y,rot);
-      ctx.strokeStyle='#4dd0ff';ctx.lineWidth=1.5/zoom;
-      ctx.beginPath();ctx.moveTo(n.x,b.y-3/zoom);ctx.lineTo(rcx,rcy);ctx.stroke();
-      ctx.fillStyle='#4dd0ff';ctx.beginPath();ctx.arc(rcx,rcy,5/zoom,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(rcx,rcy,2/zoom,0,Math.PI*2);ctx.fill();
-    }
-  }
+  if(!n.hideLabel){ drawBoxBg(n,b,rr); drawBoxBorder(n,b,rr); }
+  if(isSel) drawBoxSelectionChrome(n,b,rot);
   if(!n.hideLabel){
     ctx.fillStyle=n.fontColor||'#ffffff';
     if(!n.bg||n.bg==='none'){ctx.shadowColor='rgba(0,0,0,0.6)';ctx.shadowBlur=3/zoom;}
     lines.forEach((l,i)=>{ctx.fillText(l,n.x,n.y-totalH/2+lh*(i+0.5));});
+  }
+  ctx.shadowBlur=0;ctx.restore();
+}
+// 变量节点的「值」：优先取绑定字段的实时信号值，否则取该字段的静态默认值；无字段则空
+function variableValue(n){
+  const f=(n.data||[]).find(x=>!x.hidden&&x.key);
+  if(f){
+    const ctxv=buildCtx(signalValues);
+    const sig=n.id+'.'+f.key;
+    if(Object.prototype.hasOwnProperty.call(ctxv,sig)){
+      const v=ctxv[sig];
+      if(v!==''&&v!=null)return String(v);
+    }
+    if(f.dv!==''&&f.dv!=null)return String(f.dv);
+  }
+  return '';
+}
+// 变量节点渲染：label 段 + value 段，各自字体可独立设置；可横排 / 竖排
+function drawVariableNode(n){
+  const isSel=selNode===n.id;
+  const sc=n.scale||1;
+  const lfs=(n.fontSize||16)*sc;                  // label 字号
+  const vfs=(n.valFontSize||n.fontSize||16)*sc;   // value 字号
+  const labelTxt=nodeLabel(n)||'';
+  const valTxt=variableValue(n);
+  const layout=(n.varLayout==='v')?'v':'h';
+  const lFont=(n.labelBold!==false?'bold ':'')+lfs+"px -apple-system,'Microsoft YaHei',sans-serif";
+  const vFont=(n.valBold?'bold ':'')+vfs+"px -apple-system,'Microsoft YaHei',sans-serif";
+  ctx.save();
+  const rot=(n.rotation||0)*Math.PI/180;
+  if(rot){ctx.translate(n.x,n.y);ctx.rotate(rot);ctx.translate(-n.x,-n.y);}
+  ctx.textBaseline='middle';
+  ctx.font=lFont;const lw=labelTxt?ctx.measureText(labelTxt).width:0;
+  ctx.font=vFont;const vw=valTxt?ctx.measureText(valTxt).width:0;
+  const padX=(n.padX!=null?n.padX:10), padY=(n.padY!=null?n.padY:6);
+  const both=!!(labelTxt&&valTxt);
+  let contentW,contentH;
+  if(layout==='h'){
+    const gap=both?Math.max(lfs,vfs)*0.45:0;
+    contentW=lw+gap+vw; contentH=Math.max(lfs,vfs)*1.2;
+    n._varGap=gap;
+  }else{
+    const vgap=both?Math.max(lfs,vfs)*0.3:0;
+    contentW=Math.max(lw,vw); contentH=(labelTxt?lfs*1.2:0)+(valTxt?vfs*1.2:0)+vgap;
+    n._varGap=vgap;
+  }
+  n._textBox={x:n.x-contentW/2-padX,y:n.y-contentH/2-padY,w:contentW+padX*2,h:contentH+padY*2};
+  const b=n._textBox, rr=(n.radius!=null?n.radius:6);
+  if(!n.hideLabel){ drawBoxBg(n,b,rr); drawBoxBorder(n,b,rr); }
+  if(isSel) drawBoxSelectionChrome(n,b,rot);
+  if(!n.hideLabel){
+    if(!n.bg||n.bg==='none'){ctx.shadowColor='rgba(0,0,0,0.6)';ctx.shadowBlur=3/zoom;}
+    if(layout==='h'){
+      const gap=n._varGap;
+      let x=n.x-contentW/2;
+      ctx.textAlign='left';
+      if(labelTxt){ctx.font=lFont;ctx.fillStyle=n.fontColor||'#e8f4ff';ctx.fillText(labelTxt,x,n.y);x+=lw+gap;}
+      if(valTxt){ctx.font=vFont;ctx.fillStyle=n.valColor||'#4dd0ff';ctx.fillText(valTxt,x,n.y);}
+    }else{
+      const vgap=n._varGap;
+      ctx.textAlign='center';
+      let y=n.y-contentH/2;
+      if(labelTxt){ctx.font=lFont;ctx.fillStyle=n.fontColor||'#e8f4ff';y+=lfs*0.6;ctx.fillText(labelTxt,n.x,y);y+=lfs*0.6+vgap;}
+      if(valTxt){ctx.font=vFont;ctx.fillStyle=n.valColor||'#4dd0ff';y+=vfs*0.6;ctx.fillText(valTxt,n.x,y);}
+    }
   }
   ctx.shadowBlur=0;ctx.restore();
 }
@@ -2674,16 +2797,18 @@ function selectNode(id){
   document.getElementById('p-rot').value=n.rotation||0;document.getElementById('p-rot-v').textContent=n.rotation||0;
   document.getElementById('p-fc').value=n.fontColor||'#e8f4ff';document.getElementById('p-fc-hex').value=n.fontColor||'#e8f4ff';
   document.getElementById('p-x').textContent=n.x.toFixed(0);document.getElementById('p-y').textContent=n.y.toFixed(0);
-  // 文本框元素：隐藏类型/状态/图标大小，数据字段走与其它元素一致的标准配置
+  // 文本框 / 变量节点：隐藏类型/状态/图标大小，数据字段走标准配置
   const isText=n.type==='text';
-  ['prow-type','prow-status','prow-status-en','prow-scale'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isText?'none':'';});
+  const isVariable=n.type==='variable';
+  const isTextBox=isText||isVariable;
+  ['prow-type','prow-status','prow-status-en','prow-scale'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isTextBox?'none':'';});
   ['prow-data','prow-datasep'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});
   // 画布显示开关：反映当前节点的 hideLabel / hideFields
   const slEl=document.getElementById('p-show-label'),sfEl=document.getElementById('p-show-fields');
   if(slEl)slEl.checked=!n.hideLabel; if(sfEl)sfEl.checked=!n.hideFields;
   const slTxt=document.getElementById('p-show-label-text'),sfWrap=document.getElementById('p-show-fields-wrap');
-  if(slTxt){slTxt.textContent=isText?(lang==='en'?'Show Text':'显示文本'):(lang==='en'?'Show Name':'显示名称');slTxt.setAttribute('data-i18n',isText?'显示文本':'显示名称');}
-  if(sfWrap)sfWrap.style.display=isText?'none':'flex';
+  if(slTxt){slTxt.textContent=isTextBox?(lang==='en'?'Show Text':'显示文本'):(lang==='en'?'Show Name':'显示名称');slTxt.setAttribute('data-i18n',isTextBox?'显示文本':'显示名称');}
+  if(sfWrap)sfWrap.style.display=isTextBox?'none':'flex';
   // 占位点外观：仅 anchor 类型显示填充/不透明度
   const isAnchor=n.type==='anchor';
   document.getElementById('anchor-style').style.display=isAnchor?'block':'none';
@@ -2694,12 +2819,13 @@ function selectNode(id){
     const op=Math.round((n.opacity!=null?n.opacity:1)*100);
     document.getElementById('p-anchor-op').value=op;document.getElementById('p-anchor-op-v').textContent=op;
   }
-  document.getElementById('p-fs-label').innerHTML=isText?('文字字号 <span id="p-fs-v">'+(n.fontSize||18)+'</span>px'):('标签字号 <span id="p-fs-v">'+(n.fontSize||14)+'</span>px');
-  document.getElementById('p-fc-label').textContent=isText?'文字颜色':'标签颜色';
-  document.querySelector('#pnode .pr label').textContent=isText?'文本框 ID':'节点 ID';
-  // 文本框样式控件
-  document.getElementById('text-style').style.display=isText?'block':'none';
-  if(isText){
+  const fsLabelTxt=isText?'文字字号':(isVariable?'标签(label)字号':'标签字号');
+  document.getElementById('p-fs-label').innerHTML=fsLabelTxt+' <span id="p-fs-v">'+(n.fontSize||(isText?18:14))+'</span>px';
+  document.getElementById('p-fc-label').textContent=isText?'文字颜色':(isVariable?'标签(label)颜色':'标签颜色');
+  document.querySelector('#pnode .pr label').textContent=isText?'文本框 ID':(isVariable?'变量 ID':'节点 ID');
+  // 盒子样式（背景/边框/圆角）：文本框 + 变量节点共用
+  document.getElementById('text-style').style.display=isTextBox?'block':'none';
+  if(isTextBox){
     document.getElementById('p-bg').value=(n.bg&&n.bg!=='none')?n.bg:'#102a52';
     document.getElementById('p-bg-hex').value=(n.bg&&n.bg!=='none')?n.bg:'';
     document.getElementById('p-border').value=n.border||'none';
@@ -2707,6 +2833,17 @@ function selectNode(id){
     document.getElementById('p-border-color-hex').value=n.borderColor||'#4dd0ff';
     document.getElementById('p-radius').value=n.radius!=null?n.radius:6;
     document.getElementById('p-radius-v').textContent=n.radius!=null?n.radius:6;
+  }
+  // 变量节点专属：排列方式 + label/value 字体属性
+  document.getElementById('variable-style').style.display=isVariable?'block':'none';
+  if(isVariable){
+    document.getElementById('p-var-layout').value=(n.varLayout==='v'?'v':'h');
+    document.getElementById('p-label-bold').checked=(n.labelBold!==false);
+    const vfs=(n.valFontSize!=null?n.valFontSize:(n.fontSize||16));
+    document.getElementById('p-val-fs').value=vfs;document.getElementById('p-val-fs-v').textContent=vfs;
+    document.getElementById('p-val-color').value=n.valColor||'#4dd0ff';
+    document.getElementById('p-val-color-hex').value=n.valColor||'#4dd0ff';
+    document.getElementById('p-val-bold').checked=!!n.valBold;
   }
   renderNodeActionControls(n);
   renderDFs(n);
@@ -2726,6 +2863,20 @@ function applyTextStyle(){
   document.getElementById('p-radius-v').textContent=n.radius;
 }
 function clearTextBg(){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.bg='none';document.getElementById('p-bg-hex').value='';}
+// 变量节点：排列方式 + label/value 字体属性（label 复用 p-fs/p-fc/p-label-bold，value 用 p-val-*）
+function applyVarStyle(){
+  const n=nodes.find(x=>x.id===selNode);if(!n||n.type!=='variable')return;
+  n.varLayout=document.getElementById('p-var-layout').value==='v'?'v':'h';
+  n.labelBold=document.getElementById('p-label-bold').checked;
+  n.valFontSize=parseInt(document.getElementById('p-val-fs').value);
+  document.getElementById('p-val-fs-v').textContent=n.valFontSize;
+  n.valBold=document.getElementById('p-val-bold').checked;
+  const pick=document.getElementById('p-val-color').value;
+  const hex=document.getElementById('p-val-color-hex').value.trim();
+  if(/^#?[0-9a-fA-F]{6}$/.test(hex)){n.valColor=(hex[0]==='#'?hex:'#'+hex);document.getElementById('p-val-color').value=n.valColor;}
+  else if(document.activeElement&&document.activeElement.id==='p-val-color'){n.valColor=pick;document.getElementById('p-val-color-hex').value=pick;}
+}
+function syncVarColor(v){if(/^#[0-9a-fA-F]{6}$/.test(v)){document.getElementById('p-val-color').value=v;applyVarStyle();}}
 function renderNodeActionControls(n){
   const trigger=document.getElementById('p-action-trigger'),url=document.getElementById('p-action-url'),target=document.getElementById('p-action-target');
   if(!trigger||!url||!target)return;
@@ -2804,13 +2955,13 @@ function syncColor(id,v){if(/^#[0-9a-fA-F]{6}$/.test(v)){document.getElementById
 function applyVis(){
   const n=nodes.find(x=>x.id===selNode);if(!n)return;snapshot();
   n.hideLabel=!document.getElementById('p-show-label').checked;
-  if(n.type!=='text')n.hideFields=!document.getElementById('p-show-fields').checked;
+  if(!usesTextBox(n.type))n.hideFields=!document.getElementById('p-show-fields').checked;
   snapshot();
 }
 // 批量：对所有选中节点统一显示/隐藏 名称(label) 或 数据字段(fields)
 function batchVis(which,show){
   const ns=selectedNodes();if(ns.length<1)return;snapshot();
-  ns.forEach(n=>{ if(which==='label')n.hideLabel=!show; else if(n.type!=='text')n.hideFields=!show; });
+  ns.forEach(n=>{ if(which==='label')n.hideLabel=!show; else if(!usesTextBox(n.type))n.hideFields=!show; });
   const cur=nodes.find(x=>x.id===selNode);
   if(cur){const a=document.getElementById('p-show-label'),b=document.getElementById('p-show-fields');if(a)a.checked=!cur.hideLabel;if(b)b.checked=!cur.hideFields;}
   snapshot();
@@ -2835,8 +2986,18 @@ function applyEP(){
   document.getElementById('ep-desc').textContent=base.desc;document.getElementById('ep-desc').style.color=cfg.color;updateEpTypeSwatch();snapshot();
 }
 function clearEdgeColor(){if(!selEdge)return;delete selEdge.lineColor;document.getElementById('ep-color-hex').value='';document.getElementById('ep-color').value=(ET[selEdge.et]||ET.ac_power).color;applyEP();}
-function renderDFs(n){const c=document.getElementById('dfields');c.innerHTML='';(n.data||[]).forEach((f,i)=>{const r=document.createElement('div');r.className='dfrow';const dvVal=(f.dv==null||f.dv==='')?'':String(f.dv).replace(/"/g,'&quot;');r.innerHTML='<input class="df-zh-in" value="'+(f.key||'')+'" placeholder="中文" oninput="updDF('+i+',\'key\',this.value)"><input class="df-en-in" value="'+(f.keyEn||'')+'" placeholder="English" oninput="updDF('+i+',\'keyEn\',this.value)"><input class="df-val-in" value="'+dvVal+'" placeholder="--" oninput="updDFVal('+i+',this.value)"><button onclick="rmDF('+i+')">✕</button>';c.appendChild(r);});}
-function addDF(){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.data=n.data||[];const def=NODE_DEFAULTS[n.type]||{data:[]};const used=n.data.map(f=>f.key);const next=def.data.find(k=>!used.includes(k))||'字段'+(n.data.length+1);n.data.push({key:next,keyEn:(DATA_LABEL_EN[next]||next),dv:''});renderDFs(n);}
+function renderDFs(n){const c=document.getElementById('dfields');c.innerHTML='';(n.data||[]).forEach((f,i)=>{const r=document.createElement('div');r.className='dfrow';const dvVal=(f.dv==null||f.dv==='')?'':String(f.dv).replace(/"/g,'&quot;');r.innerHTML='<input class="df-zh-in" value="'+(f.key||'')+'" placeholder="中文" oninput="updDF('+i+',\'key\',this.value)"><input class="df-en-in" value="'+(f.keyEn||'')+'" placeholder="English" oninput="updDF('+i+',\'keyEn\',this.value)"><input class="df-val-in" value="'+dvVal+'" placeholder="--" oninput="updDFVal('+i+',this.value)"><button onclick="rmDF('+i+')">✕</button>';c.appendChild(r);});
+  // 文本框 / 变量节点：画布上只显示「第一个字段」，因此绑定限制为单个字段，避免绑定多个却只显示一个造成误解
+  const single=usesTextBox(n.type);
+  const lbl=document.getElementById('prow-data-label'),btn=document.getElementById('btn-add-df'),hint=document.getElementById('prow-data-hint');
+  if(lbl)lbl.textContent=single?(n.type==='variable'?'绑定数据（值，仅一个字段）':'绑定数据（仅一个字段）'):'数据字段';
+  if(btn)btn.style.display=(single&&(n.data||[]).length>=1)?'none':'';
+  if(hint){if(single){hint.style.display='';hint.textContent=(n.type==='variable'?'变量只显示一个值：此字段即「value」，可填默认值或由实时数据绑定覆盖。':'文本框只显示一个绑定值，故仅允许绑定一个数据字段。');}else hint.style.display='none';}
+}
+function addDF(){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.data=n.data||[];
+  // 文本框 / 变量节点：只允许绑定一个字段
+  if(usesTextBox(n.type)&&n.data.length>=1){flashHint(n.type==='variable'?'变量只能绑定一个值字段':'文本框只能绑定一个数据字段');return;}
+  const def=NODE_DEFAULTS[n.type]||{data:[]};const used=n.data.map(f=>f.key);const next=def.data.find(k=>!used.includes(k))||'字段'+(n.data.length+1);n.data.push({key:next,keyEn:(DATA_LABEL_EN[next]||next),dv:''});renderDFs(n);}
 function resetRotation(){const n=nodes.find(x=>x.id===selNode);if(!n)return;snapshot();n.rotation=0;document.getElementById('p-rot').value=0;document.getElementById('p-rot-v').textContent=0;snapshot();}
 function resetFieldPos(){const n=nodes.find(x=>x.id===selNode);if(!n||!n.data)return;snapshot();n.data.forEach(f=>{f.ox=0;f.oy=0;});snapshot();}
 // 智能环绕布局：把字段卡片分配到设备四周空闲方向，避开连线占用的边
@@ -2950,8 +3111,8 @@ function alignSel(mode){
   const ns=selectedNodes();if(ns.length<2)return;
   snapshot();
   // 元素半宽/半高（考虑实际尺寸），对齐按边缘计算
-  const hw=n=>(n.type==='text'&&n._textBox)?n._textBox.w/2:nsz(n)*0.40;
-  const hh=n=>(n.type==='text'&&n._textBox)?n._textBox.h/2:nsz(n)*0.40;
+  const hw=n=>(usesTextBox(n.type)&&n._textBox)?n._textBox.w/2:nsz(n)*0.40;
+  const hh=n=>(usesTextBox(n.type)&&n._textBox)?n._textBox.h/2:nsz(n)*0.40;
   const left=n=>n.x-hw(n), right=n=>n.x+hw(n), top=n=>n.y-hh(n), bot=n=>n.y+hh(n);
   const xs=ns.map(n=>n.x), ys=ns.map(n=>n.y);
   const minL=Math.min(...ns.map(left)), maxR=Math.max(...ns.map(right));
@@ -2979,14 +3140,14 @@ function alignSel(mode){
     // 边到边间距：gap 为相邻元素之间的空白
     const gap=parseInt(document.getElementById('align-gap').value)||120;
     const sorted=[...ns].sort((a,b)=>a.x-b.x);
-    const halfW=n=>(n.type==='text'&&n._textBox)?n._textBox.w/2:nsz(n)*0.40;
+    const halfW=n=>(usesTextBox(n.type)&&n._textBox)?n._textBox.w/2:nsz(n)*0.40;
     let cursor=sorted[0].x;
     sorted.forEach((n,i)=>{if(i===0){cursor=n.x;return;}cursor=cursor+halfW(sorted[i-1])+gap+halfW(n);n.x=cursor;});
   }
   else if(mode==='vgap'){
     const gap=parseInt(document.getElementById('align-gap').value)||120;
     const sorted=[...ns].sort((a,b)=>a.y-b.y);
-    const halfH=n=>(n.type==='text'&&n._textBox)?n._textBox.h/2:nsz(n)*0.40;
+    const halfH=n=>(usesTextBox(n.type)&&n._textBox)?n._textBox.h/2:nsz(n)*0.40;
     let cursor=sorted[0].y;
     sorted.forEach((n,i)=>{if(i===0){cursor=n.y;return;}cursor=cursor+halfH(sorted[i-1])+gap+halfH(n);n.y=cursor;});
   }
@@ -3371,14 +3532,21 @@ function iconSrcOf(t){
   if(IMGS[t]&&IMGS[t].src) return IMGS[t].src;
   return null;
 }
-// 根据 dataURL 判断扩展名
+// 根据 dataURL 或文件 URL 判断扩展名
 function iconExt(src){
   if(!src) return 'png';
-  if(src.indexOf('image/svg')>=0) return 'svg';
-  if(src.indexOf('image/jpeg')>=0||src.indexOf('image/jpg')>=0) return 'jpg';
-  return 'png';
+  if(src.indexOf('data:')===0){
+    if(src.indexOf('image/svg')>=0) return 'svg';
+    if(src.indexOf('image/jpeg')>=0||src.indexOf('image/jpg')>=0) return 'jpg';
+    return 'png';
+  }
+  const m=src.split(/[?#]/)[0].match(/\.([a-z0-9]+)$/i);
+  return m?m[1].toLowerCase():'png';
 }
-function iconFileName(t){const src=iconSrcOf(t);return src?(t+'.'+iconExt(src)):null;}
+function iconFileName(t){
+  if(ICON_FILE[t]) return ICON_FILE[t];                 // 图标库内置图标：用清单登记的真实文件名
+  const src=iconSrcOf(t);return src?(t+'.'+iconExt(src)):null;
+}
 function usedTypeList(){return [...new Set(nodes.map(n=>n.type))];}
 
 // 元素库版本号（后台维护，前后端共享同一套库时用它对齐）
@@ -3440,10 +3608,18 @@ function buildJSON(){
     if(nodeSupportsStateSignals(n)) o.status=statusBilingual(n);
     // 自定义图标的 type 不在后台库中，附带文件名以便前端解析
     if(String(n.type).startsWith('custom_')) o.icon=iconFileName(n.type);
-    if(n.type==='text'){
+    if(usesTextBox(n.type)){
       o.textStyle={bg:n.bg||'none',border:n.border||'none',borderColor:n.borderColor||'#4dd0ff',
         borderWidth:(n.borderWidth!=null?n.borderWidth:1.5), radius:(n.radius!=null?n.radius:6),
         padX:(n.padX!=null?n.padX:10), padY:(n.padY!=null?n.padY:6)};
+    }
+    if(n.type==='variable'){
+      // 变量节点：label / value 两段的字体属性 + 排列方式（value 文本走 data[0] 的实时绑定/默认值）
+      o.variableStyle={
+        layout:(n.varLayout==='v'?'vertical':'horizontal'),
+        label:{fontSize:(n.fontSize||16),color:(n.fontColor||'#e8f4ff'),bold:(n.labelBold!==false)},
+        value:{fontSize:(n.valFontSize||n.fontSize||16),color:(n.valColor||'#4dd0ff'),bold:!!n.valBold}
+      };
     }
     if(n.type==='anchor') o.anchorStyle={fill:n.fill||'none', opacity:(n.opacity!=null?n.opacity:1)};
     if(n.action&&n.action.url)o.action={trigger:n.action.trigger||'click',url:n.action.url,target:n.action.target||'same'};
@@ -3555,13 +3731,18 @@ function parseImportedNode(o){
     return {key:(key.zh||''), keyEn:(key.en||key.zh||''), dv:dv, hidden:!!f.hidden,
             ox:(+off.x||+f.ox||0), oy:(+off.y||+f.oy||0)};
   });
-  // 文本框样式
-  if(o.type==='text'){const t=o.textStyle||{};n.bg=t.bg||o.bg||'none';n.border=t.border||o.border||'none';
+  // 文本框 / 变量节点 共用的盒子样式（背景/边框/圆角/内边距）
+  if(usesTextBox(o.type)){const t=o.textStyle||{};n.bg=t.bg||o.bg||'none';n.border=t.border||o.border||'none';
     n.borderColor=t.borderColor||o.borderColor||'#4dd0ff';n.borderWidth=(t.borderWidth!=null?t.borderWidth:(o.borderWidth!=null?o.borderWidth:1.5));
     n.radius=(t.radius!=null?t.radius:(o.radius!=null?o.radius:6));n.padX=(t.padX!=null?t.padX:(o.padX!=null?o.padX:10));n.padY=(t.padY!=null?t.padY:(o.padY!=null?o.padY:6));
     const oldBind=t.bind||o.textBind;
     if(oldBind&&!n.data.length)n.data=[{key:String(oldBind).split('.').pop()||'数值',keyEn:'Value',dv:''}];
     if(!n.data.length)n.data=[{key:'数值',keyEn:'Value',dv:''}];}
+  // 变量节点：label / value 两段字体属性 + 排列方式
+  if(o.type==='variable'){const vs=o.variableStyle||{};const lb=vs.label||{},vl=vs.value||{};
+    n.varLayout=(vs.layout==='vertical'||vs.layout==='v')?'v':'h';
+    n.fontSize=(lb.fontSize!=null?lb.fontSize:(o.fontSize||16));n.fontColor=lb.color||o.fontColor||'#e8f4ff';n.labelBold=(lb.bold!==false);
+    n.valFontSize=(vl.fontSize!=null?vl.fontSize:n.fontSize);n.valColor=vl.color||'#4dd0ff';n.valBold=!!vl.bold;}
   // 占位点样式
   if(o.type==='anchor'){const a=o.anchorStyle||{};n.fill=a.fill||o.fill||'none';n.opacity=(a.opacity!=null?a.opacity:(o.opacity!=null?o.opacity:1));}
   if(o.action&&o.action.url)n.action={trigger:o.action.trigger||'click',url:String(o.action.url),target:(o.action.target==='blank'?'blank':'same')};
@@ -4591,7 +4772,7 @@ export function evalCond(cond, ctx){
   var rv=(cond.ref!=null)?ctx[cond.ref]:cond.val;
   return cmpOp(lv,cond.op||'truthy',rv);
 }
-function nodeSupportsStateSignals(n){return !!(n&&n.type!=='text');}
+function nodeSupportsStateSignals(n){return !!(n&&n.type!=='text'&&n.type!=='variable'&&n.type!=='anchor');}
 export function buildContext(topology, signals){
   var ctx={};
   (topology.nodes||[]).forEach(function(n){

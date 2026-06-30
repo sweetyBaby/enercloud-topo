@@ -121,6 +121,7 @@
     <div id="side-acc-tools">
       <button class="side-tool side-tool-expand" onclick="setSidebarGroups(true)" title="展开全部分组" aria-label="展开全部分组" data-i18n="▾ 全部展开">▾ 全部展开</button>
       <button class="side-tool side-tool-collapse" onclick="setSidebarGroups(false)" title="折叠全部分组" aria-label="折叠全部分组" data-i18n="▸ 全部折叠">▸ 全部折叠</button>
+      <button class="side-tool side-tool-rescan" onclick="reloadIconLibrary()" title="重扫图标库：新增/替换/删除 icons/ 图片后点此刷新左栏（无需刷新页面）" aria-label="重新扫描图标">🔄</button>
     </div>
     <div id="sidebar"></div>
   </div>
@@ -250,6 +251,23 @@
           <div class="pr"><label>圆角 <span id="p-radius-v">6</span>px</label>
             <div class="pr-inline"><input type="range" id="p-radius" min="0" max="24" value="6" oninput="applyTextStyle()"></div></div>
         </div>
+        <div id="variable-style" style="display:none">
+          <div class="psep"></div>
+          <div class="pr"><label data-i18n="排列方式">排列方式</label>
+            <select id="p-var-layout" onchange="applyVarStyle()">
+              <option value="h" data-i18n="横排（标签 值）">横排（标签 值）</option>
+              <option value="v" data-i18n="竖排（标签上·值下）">竖排（标签上·值下）</option>
+            </select></div>
+          <div class="pr"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--ui-text)"><input type="checkbox" id="p-label-bold" onchange="applyVarStyle()" style="width:auto"> <span data-i18n="标签(label)加粗">标签(label)加粗</span></label></div>
+          <div class="psep"></div>
+          <div class="phint" data-i18n="值(value)字体：">值(value)字体：</div>
+          <div class="pr"><label>值字号 <span id="p-val-fs-v">16</span>px</label>
+            <div class="pr-inline"><input type="range" id="p-val-fs" min="10" max="48" value="16" oninput="applyVarStyle()"></div></div>
+          <div class="pr"><label data-i18n="值颜色">值颜色</label>
+            <div class="pr-inline"><input type="color" id="p-val-color" value="#4dd0ff" oninput="applyVarStyle()">
+            <input type="text" id="p-val-color-hex" style="flex:1" oninput="syncVarColor(this.value)"></div></div>
+          <div class="pr"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--ui-text)"><input type="checkbox" id="p-val-bold" onchange="applyVarStyle()" style="width:auto"> <span data-i18n="值(value)加粗">值(value)加粗</span></label></div>
+        </div>
         <div id="anchor-style" style="display:none">
           <div class="psep"></div>
           <div class="pr"><label data-i18n="占位点填充色">占位点填充色</label>
@@ -263,7 +281,7 @@
           <div class="phint">💡 把填充设为画布同色、或不透明度调到 0，用户即看不到此点；研发可在「视图 ▾ → 📍 占位点标记」总开关查看/隐藏全部占位点位置。</div>
         </div>
         <div class="psep" id="prow-datasep"></div>
-        <div class="pr" id="prow-data"><label data-i18n="数据字段">数据字段</label>
+        <div class="pr" id="prow-data"><label id="prow-data-label" data-i18n="数据字段">数据字段</label>
           <div class="df-head">
             <span class="df-col df-col-zh" data-i18n="中文字段名">中文字段名</span>
             <span class="df-col df-col-en" data-i18n="英文字段名">英文字段名</span>
@@ -271,7 +289,8 @@
             <span style="width:24px"></span>
           </div>
           <div id="dfields"></div>
-          <button class="tb" style="width:100%;margin-top:4px;font-size:12px" onclick="addDF()" data-i18n="+ 添加字段">+ 添加字段</button></div>
+          <button class="tb" id="btn-add-df" style="width:100%;margin-top:4px;font-size:12px" onclick="addDF()" data-i18n="+ 添加字段">+ 添加字段</button>
+          <div class="phint" id="prow-data-hint" style="display:none;margin-top:4px"></div></div>
         <div class="psep"></div>
         <div class="phint">坐标: <span id="p-x">—</span>, <span id="p-y">—</span></div>
       </div>
