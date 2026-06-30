@@ -147,6 +147,10 @@ function createServer() {
     if (pathname === '/icons/index.json') {
       return send(res, 200, JSON.stringify(buildIconManifest(), null, 2), types['.json']);
     }
+    // 模板清单由目录扫描动态生成（增删改 templates/*.json 即自动反映，不依赖 index.json）
+    if (pathname === '/templates/index.json') {
+      return send(res, 200, JSON.stringify(templateApi.buildIndex(), null, 2), types['.json']);
+    }
     if (templateApi.matches(pathname)) {
       return templateApi.handle(req, res, pathname);
     }

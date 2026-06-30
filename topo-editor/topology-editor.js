@@ -4881,8 +4881,10 @@ function dlAllIconsZip(){
 
 // ══════════════════════════════════════════════
 // 模板系统：每个模板是 templates/ 目录下的单独 JSON 文件，按需加载（不一次性载入全部）。
-//   读列表/读模板 = 静态 fetch；保存/编辑/重命名/删除 = 调 /api/templates 自动落盘并更新 index.json。
+//   清单(index.json)由服务端「扫描 templates/ 目录」动态生成——增删改模板 .json 文件即自动反映，无需维护 index.json。
+//   读列表(GET templates/index.json，已被 dev/生产 server 拦截为扫描结果) / 读模板 = fetch；保存/编辑/重命名/删除 = 调 /api/templates 落盘对应 .json。
 //   模板文件两种形态：内置 seed（节点/连线种子，加载时自动布局）；用户保存 canvas（完整画布 JSON，保留原布局）。
+//   每个模板文件自带元数据 doc.template{id,name,nameEn,desc,builtin[,default]}；默认模板=某文件 default:true，否则排序首个。
 // ══════════════════════════════════════════════
 // 读列表/读模板的静态目录；写操作(保存/编辑/重命名/删除)的接口。
 // 默认同源相对路径（dev-server / 生产 server 均提供）；如需对接父平台后端，
@@ -5079,7 +5081,7 @@ async function saveCanvasAsTemplate(){
     const doc={schemaVersion:'tpl-1',template:{name:res.name,nameEn:res.nameEn,desc:res.desc,builtin:false},canvas,preview};
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(doc,null,2)],{type:'application/json'}));
     a.download=(res.name||'template')+'.json';a.click();
-    flashHint(lang==='en'?'Save API unavailable — JSON downloaded; put it into templates/ and add to index.json':'保存接口不可用：已下载 JSON，请放入 templates/ 目录并登记到 index.json');
+    flashHint(lang==='en'?'Save API unavailable — JSON downloaded; drop it into templates/ (auto-listed by folder scan)':'保存接口不可用：已下载 JSON，放入 templates/ 目录即可（清单由目录扫描自动生成）');
     return;
   }
   if(document.getElementById('tpl-overlay').classList.contains('show')){try{renderTemplateCards(await loadTplManifest(true));}catch(e){}}

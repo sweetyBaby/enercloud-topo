@@ -130,11 +130,85 @@ if ICONS.is_dir():
     dev_count = sum(len(g.get("devices", [])) for g in manifest.get("groups", []))
     print(f"Copied icons/ ({n} images, {dev_count} devices in manifest)")
 
-# 模板库：原样拷贝 templates/ 到 dist（每个模板单独 JSON + index.json，前端按需加载）
+# 模板库：拷贝模板 JSON 到 dist，并「扫描生成」index.json（与 dev/生产 server 同逻辑；
+#  纯静态托管 dist 时前端仍能读到清单。增删改 templates/*.json 重新 build 即自动反映）。
+def template_preview(doc: dict):
+    try:
+        if isinstance(doc.get("preview"), dict) and isinstance(doc["preview"].get("pts"), list):
+            return doc["preview"]
+        src = doc.get("seed") or doc.get("canvas") or doc
+        nodes = (src or {}).get("nodes") or []
+        if not nodes:
+            return None
+        idx_map, pts = {}, []
+        for i, nd in enumerate(nodes):
+            idx_map[nd.get("id")] = i
+            p = nd.get("position") or nd
+            # 与 JS Math.round 一致（四舍五入·半值向上），避免 Python round 的银行家舍入造成预览坐标分歧
+            jsround = lambda v: int((float(v) + 0.5) // 1)
+            pts.append([jsround(p.get("x") or 0), jsround(p.get("y") or 0)])
+        edges = []
+        for e in ((src or {}).get("edges") or []):
+            a, b = idx_map.get(e.get("from")), idx_map.get(e.get("to"))
+            if a is None or b is None:
+                continue
+            color = e.get("color") or (e.get("style") or {}).get("color") or "#4dd0ff"
+            edges.append([a, b, color])
+        return {"pts": pts, "edges": edges}
+    except Exception:
+        return None
+
+
+def build_template_index(tpl_dir: Path) -> dict:
+    entries = []
+    for fp in sorted(tpl_dir.glob("*.json")):
+        if fp.name == "index.json":
+            continue
+        try:
+            doc = json.loads(fp.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(doc, dict):
+            continue  # 顶层为数组/标量的 JSON 不是模板，跳过（与 JS 扫描器一致，不报错）
+        looks_like_canvas = bool(doc.get("canvas") or doc.get("seed") or isinstance(doc.get("nodes"), list))
+        if not doc.get("template") and not looks_like_canvas:
+            continue
+        t = doc.get("template") or {}
+        tid = re.sub(r"[^a-zA-Z0-9_-]", "", str(t.get("id") or fp.stem))[:64]
+        if not tid:
+            continue
+        entries.append({
+            "id": tid,
+            "name": t.get("name") or tid,
+            "nameEn": t.get("nameEn") or t.get("name") or tid,
+            "desc": t.get("desc") or "",
+            "file": fp.name,
+            "builtin": bool(t.get("builtin")),
+            "_def": bool(t.get("default")),
+            "preview": template_preview(doc),
+        })
+    entries.sort(key=lambda e: (not e["builtin"], e["file"]))  # 内置在前·按文件名
+    default = next((e["id"] for e in entries if e["_def"]), entries[0]["id"] if entries else None)
+    for e in entries:
+        e.pop("_def", None)
+    return {"schemaVersion": "tpl-index-1", "default": default, "templates": entries}
+
+
 tpl_src = ROOT / "templates"
 if tpl_src.is_dir():
-    shutil.copytree(tpl_src, DIST / "templates")
-    print(f"Copied templates/ ({len(list(tpl_src.glob('*.json')))} files)")
+    dist_tpl = DIST / "templates"
+    dist_tpl.mkdir(parents=True, exist_ok=True)
+    n = 0
+    for fp in tpl_src.glob("*.json"):
+        if fp.name == "index.json":
+            continue  # 由扫描重新生成，不拷贝源 index.json
+        shutil.copy2(fp, dist_tpl / fp.name)
+        n += 1
+    manifest = build_template_index(tpl_src)
+    (dist_tpl / "index.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"Copied templates/ ({n} files) + generated index.json ({len(manifest['templates'])} templates, default={manifest['default']})")
 
 print("Build complete: dist/")
 for rel in outputs:

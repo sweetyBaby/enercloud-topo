@@ -1,6 +1,7 @@
 // ───── 模板读写存储 + HTTP API（dev-server 与生产 server 共用） ─────
-// 保存/编辑/重命名/删除自动落盘到模板目录并维护 index.json。
-// 通过 createTemplateApi({dir, indexFile, log, warn}) 绑定到具体目录，返回可挂载的请求处理器。
+// 保存/编辑/重命名/删除直接落盘到模板目录里的单个 <id>.json；模板「清单」由 buildIndexFromDir(dir)
+// 实时扫描目录动态生成，不再维护 index.json 文件。
+// 通过 createTemplateApi({dir, log, warn}) 绑定到具体目录，返回 {matches, handle, dir, buildIndex}。
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
@@ -57,23 +58,53 @@ function previewFromDoc(doc) {
   } catch (err) { return undefined; }
 }
 
+// ───── 模板清单：由目录扫描动态生成（不再依赖 index.json 落盘） ─────
+// 每个模板 .json 自带元数据(doc.template) + 可由画布(seed/canvas/nodes)生成预览，
+// 因此增删改模板文件后清单自动更新；无需维护 index.json。
+// 默认模板：某文件 template.default===true 则为默认，否则取排序后第一个（内置在前·按文件名）。
+function buildIndexFromDir(dir) {
+  const out = { schemaVersion: 'tpl-index-1', default: null, templates: [] };
+  let files = [];
+  try { files = fs.readdirSync(dir); } catch (err) { return out; }
+  const entries = [];
+  for (const file of files) {
+    if (!file.endsWith('.json') || file === 'index.json') continue;
+    let doc;
+    try { doc = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')); } catch (err) { continue; }
+    // 必须看起来像「模板/画布」：有 template 块，或有 canvas/seed/nodes
+    const looksLikeCanvas = !!(doc && (doc.canvas || doc.seed || Array.isArray(doc.nodes)));
+    if (!doc || (!doc.template && !looksLikeCanvas)) continue;
+    const t = doc.template || {};
+    const id = safeId(t.id) || safeId(file.replace(/\.json$/, ''));
+    if (!id) continue;
+    entries.push({
+      id,
+      name: t.name || id,
+      nameEn: t.nameEn || t.name || id,
+      desc: t.desc || '',
+      file,
+      builtin: !!t.builtin,
+      _def: !!t.default,
+      preview: previewFromDoc(doc),
+    });
+  }
+  entries.sort((a, b) => {
+    if (a.builtin !== b.builtin) return a.builtin ? -1 : 1; // 内置在前
+    return a.file < b.file ? -1 : (a.file > b.file ? 1 : 0); // 同类按文件名
+  });
+  const def = entries.find((e) => e._def);
+  out.default = def ? def.id : (entries[0] ? entries[0].id : null);
+  out.templates = entries.map(({ _def, ...rest }) => rest);
+  return out;
+}
+
 // 创建绑定到指定模板目录的 API 处理器
 function createTemplateApi(opts) {
   const dir = opts.dir;
-  const indexFile = opts.indexFile || path.join(dir, 'index.json');
   const log = opts.log || (() => {});
   const warn = opts.warn || (() => {});
 
-  function readIndex() {
-    try {
-      if (fs.existsSync(indexFile)) return JSON.parse(fs.readFileSync(indexFile, 'utf8'));
-    } catch (err) { warn(`Read ${indexFile} failed: ${err.message}`); }
-    return { schemaVersion: 'tpl-index-1', default: null, templates: [] };
-  }
-  function writeIndex(idx) {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(indexFile, JSON.stringify(idx, null, 2), 'utf8');
-  }
+  function readIndex() { return buildIndexFromDir(dir); }   // 实时扫描目录，不读 index.json
 
   // 是否归该 API 处理（GET 列表 + 写操作）
   function matches(pathname) {
@@ -88,7 +119,7 @@ function createTemplateApi(opts) {
       // GET /api/templates → 返回清单（前端读列表也可直接 GET 静态 templates/index.json）
       if (method === 'GET' && !rest) return sendJSON(res, 200, readIndex());
 
-      // POST /api/templates → 新建模板：写 <id>.json + 更新 index.json
+      // POST /api/templates → 新建模板：写 <id>.json（清单由目录扫描得出，无需落盘 index.json）
       if (method === 'POST' && !rest) {
         const body = await readBody(req);
         const meta = body.template || {};
@@ -102,15 +133,11 @@ function createTemplateApi(opts) {
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(path.join(dir, file), JSON.stringify(doc, null, 2), 'utf8');
         const entry = { id: newId, name: meta.name, nameEn: meta.nameEn || meta.name, desc: meta.desc || '', file, builtin: false, preview: previewFromDoc(body) };
-        idx.templates = idx.templates || [];
-        idx.templates.push(entry);
-        if (!idx.default) idx.default = newId;
-        writeIndex(idx);
         log(`Template created: ${newId}`);
-        return sendJSON(res, 200, { ok: true, entry, default: idx.default });
+        return sendJSON(res, 200, { ok: true, entry, default: readIndex().default });
       }
 
-      // PUT /api/templates/:id → 编辑(改内容)或重命名(改 meta)
+      // PUT /api/templates/:id → 编辑(改内容)或重命名(改 meta)：只改 <id>.json 自身
       if (method === 'PUT' && id) {
         const body = await readBody(req);
         const idx = readIndex();
@@ -131,24 +158,19 @@ function createTemplateApi(opts) {
         if (body.canvas) { doc.canvas = body.canvas; delete doc.seed; entry.preview = previewFromDoc(body); }
         else if (body.seed) { doc.seed = body.seed; delete doc.canvas; entry.preview = previewFromDoc(body); }
         fs.writeFileSync(fp, JSON.stringify(doc, null, 2), 'utf8');
-        writeIndex(idx);
         log(`Template updated: ${id}`);
         return sendJSON(res, 200, { ok: true, entry });
       }
 
-      // DELETE /api/templates/:id → 删除文件 + 从 index.json 移除
+      // DELETE /api/templates/:id → 删除 <id>.json（清单随之自动少一项）
       if (method === 'DELETE' && id) {
         const idx = readIndex();
-        const pos = (idx.templates || []).findIndex((t) => t.id === id);
-        if (pos < 0) return sendJSON(res, 404, { ok: false, error: 'not found' });
-        const entry = idx.templates[pos];
+        const entry = (idx.templates || []).find((t) => t.id === id);
+        if (!entry) return sendJSON(res, 404, { ok: false, error: 'not found' });
         const fp = path.join(dir, entry.file || `${id}.json`);
         try { if (fs.existsSync(fp)) fs.unlinkSync(fp); } catch (err) { warn(`Delete ${fp} failed: ${err.message}`); }
-        idx.templates.splice(pos, 1);
-        if (idx.default === id) idx.default = idx.templates.length ? idx.templates[0].id : null;
-        writeIndex(idx);
         log(`Template deleted: ${id}`);
-        return sendJSON(res, 200, { ok: true, default: idx.default });
+        return sendJSON(res, 200, { ok: true, default: readIndex().default });
       }
 
       return sendJSON(res, 405, { ok: false, error: 'method not allowed' });
@@ -158,7 +180,8 @@ function createTemplateApi(opts) {
     }
   }
 
-  return { matches, handle, dir, indexFile };
+  // buildIndex(): 扫描目录得到清单（供两端拦截 /templates/index.json 复用）
+  return { matches, handle, dir, buildIndex: () => buildIndexFromDir(dir) };
 }
 
-module.exports = { createTemplateApi, send };
+module.exports = { createTemplateApi, send, buildIndexFromDir };

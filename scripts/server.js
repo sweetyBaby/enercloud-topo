@@ -66,7 +66,12 @@ const server = http.createServer((req, res) => {
   // 1) 模板写/列表 API
   if (templateApi.matches(pathname)) return templateApi.handle(req, res, pathname);
 
-  // 2) /templates/* 静态读取：指向可写的 tplDir，确保读到的就是最新落盘内容
+  // 2) 模板清单：扫描 tplDir 动态生成（增删改 templates/*.json 即自动反映，不依赖 index.json）
+  if (pathname === '/templates/index.json') {
+    return send(res, 200, JSON.stringify(templateApi.buildIndex(), null, 2), 'application/json; charset=utf-8');
+  }
+
+  // 3) /templates/* 静态读取：指向可写的 tplDir，确保读到的就是最新落盘内容
   if (pathname === '/templates' || pathname.startsWith('/templates/')) {
     return serveStatic(res, tplDir, pathname.replace(/^\/templates\/?/, '') || 'index.json');
   }
