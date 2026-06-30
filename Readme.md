@@ -90,7 +90,7 @@ window.addEventListener('message', (ev) => {
     frame.contentWindow.postMessage({ type: 'topo:topology', data: 画布JSON对象 }, '*');
     // 2) 下发实时数据（整批覆盖）
     frame.contentWindow.postMessage({ type: 'topo:signals',
-      data: { 'grid_1.P(kW)': 383, 'pcs_1.P(kW)': -9, 'bms_1.SOC(%)': 55, 'grid_1.online': true } }, '*');
+      data: { 'grid_1.P(kW)': 383, 'pcs_1.P(kW)': -9, 'bms_1.SOC(%)': 55 } }, '*');
   }
 });
 // 之后每次实时数据更新（增量合并，只传变化的信号）
@@ -134,20 +134,18 @@ const state = resolveDynamic(topology, liveSignals);
 
 | 信号类型 | 命名 | 示例 |
 |---|---|---|
-| 节点数据字段 | `节点id.字段名` | `pcs_1.P(kW)`、`bms_1.SOC(%)` |
-| 节点状态 | `节点id.status` | `pcs_1.status` = `"运行"` |
-| 节点在线 | `节点id.online` | `grid_1.online` = `true` |
+| 节点数据字段 | `节点id.字段名` | `pcs_1.P(kW)`、`bms_1.SOC(%)`、`pcs_1.状态` |
 | 全局信号 | `信号名` | `mode` = `"island"` |
 
 > 字段名用的是运营端配置的**中文字段名**（如 `P(kW)`、`今日用电(kWh)`）。前后端务必一致。
+> 节点信号**只有「已绑定的数据字段」**——旧的 `节点id.status` / `节点id.online` 自动隐藏字段已移除；如需状态/在线，请在画布上给节点**显式加数据字段**（如 `状态`、`在线`），照常用 `节点id.字段名` 下发。
 
 实时数据示例：
 ```json
 {
   "grid_1.P(kW)": 383,
-  "grid_1.online": true,
   "pcs_1.P(kW)": -9,
-  "pcs_1.status": "放电",
+  "pcs_1.状态": "放电",
   "bms_1.SOC(%)": 55,
   "mode": "island"
 }
@@ -163,7 +161,7 @@ const state = resolveDynamic(topology, liveSignals);
 
 ### 4.4 显隐与流向如何被驱动
 - 每帧用当前信号实时求值：节点 `visibleWhen` 不满足→隐藏；连线 `showWhen` 不满足或两端节点被隐藏→不画；连线 `dirRules` 顺序匹配出流向（箭头/流动动画方向随之变化）。
-- 没传的信号回退到画布里的静态默认值（节点字段值 / 状态 / 在线=true / 全局信号样例）。
+- 没传的信号回退到画布里的静态默认值（节点字段值 / 全局信号样例）。
 
 ---
 
@@ -228,7 +226,7 @@ const state = resolveDynamic(topology, liveSignals);
       "showWhen": {...}, "dirRules": [...] }              // 可选：显示/流向规则
   ],
   "signals": [ { "name":"mode", "label":"运行模式", "sample":"island", "type":"enum", "options":["grid","island"] } ],
-  "sampleSignals": { "grid_1.online": true }              // 导出时的样例值(可作默认)
+  "sampleSignals": { "bms_1.SOC(%)": 55 }                 // 导出时的样例值(可作默认)
 }
 ```
 

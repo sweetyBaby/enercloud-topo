@@ -41,11 +41,11 @@ const TOPOLOGY = {
   schemaVersion:"2.0",
   meta:{ canvas:{ bgColor:"#0a1f40" } },
   nodes:[
-    {id:"grid_1", type:"grid",  label:{zh:"市电",      en:"Grid"}, position:{x:140,y:240}, data:[{key:{zh:"P(kW)",en:"P(kW)"},value:5}]},
+    {id:"grid_1", type:"grid",  label:{zh:"市电",      en:"Grid"}, position:{x:140,y:240}, data:[{key:{zh:"P(kW)",en:"P(kW)"},value:5},{key:{zh:"在线",en:"Online"},value:true}]},
     {id:"pv_1",   type:"solar", label:{zh:"光伏",      en:"PV"},   position:{x:340,y:90},  data:[{key:{zh:"P(kW)",en:"P(kW)"},value:8}]},
     {id:"pcs_1",  type:"pcs",   label:{zh:"PCS变流器", en:"PCS"},  position:{x:540,y:240}, data:[{key:{zh:"P(kW)",en:"P(kW)"},value:0}],
       // 规则：市电离线时隐藏 PCS（演示「数据驱动显隐」）
-      visibleWhen:{var:"grid_1.online", op:"truthy"}},
+      visibleWhen:{var:"grid_1.在线", op:"truthy"}},
     {id:"bms_1",  type:"bms",   label:{zh:"电池BMS",   en:"BMS"},  position:{x:760,y:240}, data:[{key:{zh:"SOC(%)",en:"SOC(%)"},value:60}]}
   ],
   edges:[
@@ -72,14 +72,14 @@ window.addEventListener('message', (ev)=>{
   }
 });
 
-// ── 3) 实时数据：键名 = 规则里的信号名（节点id.字段 / .status / .online / 全局信号）──
+// ── 3) 实时数据：键名 = 规则里的信号名（节点id.字段名 / 全局信号）──
 let auto=null;
 const sim = {
   push(sig){ post({type:'topo:merge', data:sig}); },       // 增量合并；整批覆盖用 type:'topo:signals'
   charging(){ this.push({'pcs_1.P(kW)':  12}); setStatus('PCS=+12kW 充电 → 流向 PCS→BMS 正向'); },
   discharging(){ this.push({'pcs_1.P(kW)': -9}); setStatus('PCS=-9kW 放电 → 流向 反向'); },
-  gridOff(){ this.push({'grid_1.online': false}); setStatus('市电离线 → PCS 及相关连线按规则隐藏'); },
-  gridOn(){  this.push({'grid_1.online': true });  setStatus('市电在线 → 恢复显示'); },
+  gridOff(){ this.push({'grid_1.在线': false}); setStatus('市电离线 → PCS 及相关连线按规则隐藏'); },
+  gridOn(){  this.push({'grid_1.在线': true });  setStatus('市电在线 → 恢复显示'); },
   start(){ if(auto) return; auto=setInterval(()=>{
       // 模拟一组随机实时值
       this.push({

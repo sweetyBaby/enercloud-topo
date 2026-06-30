@@ -85,8 +85,7 @@
             "簇电压(V)",
             "簇电流(A)",
             "SOC(%)",
-            "温度(℃)",
-            "状态"
+            "温度(℃)"
           ]
         },
         {
@@ -176,9 +175,7 @@
           "label_en": "Breaker",
           "badge": "switch",
           "file": "switch.svg",
-          "data": [
-            "状态"
-          ]
+          "data": []
         },
         {
           "type": "highvolt",
@@ -240,8 +237,7 @@
           "badge": "charger",
           "file": "charger.svg",
           "data": [
-            "功率(kW)",
-            "状态"
+            "功率(kW)"
           ]
         }
       ]
@@ -259,7 +255,6 @@
           "badge": "cb_closed",
           "file": "cb_closed.svg",
           "data": [
-            "状态",
             "电流(A)"
           ]
         },
@@ -269,9 +264,7 @@
           "label_en": "Switch (open)",
           "badge": "switch_open",
           "file": "switch_open.svg",
-          "data": [
-            "状态"
-          ]
+          "data": []
         },
         {
           "type": "disconnector",
@@ -279,9 +272,7 @@
           "label_en": "Disconnector",
           "badge": "disconnector",
           "file": "disconnector.svg",
-          "data": [
-            "状态"
-          ]
+          "data": []
         },
         {
           "type": "contactor",
@@ -289,9 +280,7 @@
           "label_en": "Contactor",
           "badge": "contactor",
           "file": "contactor.svg",
-          "data": [
-            "状态"
-          ]
+          "data": []
         },
         {
           "type": "fuse",
@@ -309,9 +298,7 @@
           "label_en": "Isolator",
           "badge": "iso_g",
           "file": "iso_g.svg",
-          "data": [
-            "状态"
-          ]
+          "data": []
         },
         {
           "type": "lbs_g",
@@ -319,9 +306,7 @@
           "label_en": "Load Switch",
           "badge": "lbs_g",
           "file": "lbs_g.svg",
-          "data": [
-            "状态"
-          ]
+          "data": []
         },
         {
           "type": "disc_v_g",
@@ -329,9 +314,7 @@
           "label_en": "Vert. Disconnector",
           "badge": "disc_v_g",
           "file": "disc_v_g.svg",
-          "data": [
-            "状态"
-          ]
+          "data": []
         }
       ]
     },
@@ -348,8 +331,7 @@
           "badge": "ems",
           "file": "ems.svg",
           "data": [
-            "运行模式",
-            "状态"
+            "运行模式"
           ]
         },
         {
@@ -359,8 +341,7 @@
           "badge": "aircon",
           "file": "aircon.svg",
           "data": [
-            "温度(℃)",
-            "状态"
+            "温度(℃)"
           ]
         },
         {
@@ -370,7 +351,6 @@
           "badge": "fire",
           "file": "fire.svg",
           "data": [
-            "状态",
             "告警"
           ]
         },
@@ -451,9 +431,7 @@
           "label_en": "SPD",
           "badge": "spd",
           "file": "spd.svg",
-          "data": [
-            "状态"
-          ]
+          "data": []
         },
         {
           "type": "ground",

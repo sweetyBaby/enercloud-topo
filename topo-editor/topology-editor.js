@@ -1,6 +1,6 @@
 // Topology editor runtime and UI logic.
 let DEVICE_GROUPS=[];  // 运行时由 loadIconLibrary() 从 icons/index.json（图标库）填充
-const NODE_DEFAULTS={"grid": {"data": ["P(kW)", "Q(kvar)"]}, "solar": {"data": ["P(kW)", "Vpv(V)"]}, "generator": {"data": ["P(kW)", "频率(Hz)"]}, "pcs": {"data": ["P(kW)", "Q(kvar)", "I(A)", "U(V)"]}, "bms": {"data": ["U(V)", "I(A)", "SOC(%)", "温度(℃)"]}, "cabinet": {"data": ["簇电压(V)", "簇电流(A)", "SOC(%)", "温度(℃)", "状态"]}, "transformer": {"data": ["输入电压(V)", "输出电压(V)"]}, "switch": {"data": ["状态"]}, "highvolt": {"data": ["直流电压(V)", "直流电流(A)"]}, "busbar": {"data": ["母线电压(V)"]}, "trunk_ac": {"data": ["电压(V)", "电流(A)"]}, "trunk_dc": {"data": ["电压(V)", "电流(A)"]}, "tie_line": {"data": ["P(kW)"]}, "meter": {"data": ["P(kW)", "Q(kvar)"]}, "meter2": {"data": ["P(kW)", "Q(kvar)", "今日用电(kWh)"]}, "load": {"data": ["负载功率(kW)", "今日用电(kWh)"]}, "charger": {"data": ["功率(kW)", "状态"]}, "ems": {"data": ["运行模式", "状态"]}, "aircon": {"data": ["温度(℃)", "状态"]}, "fire": {"data": ["状态", "告警"]}, "sensor": {"data": ["数值", "单位"]}, "cb_closed": {"data": ["状态", "电流(A)"]}, "switch_open": {"data": ["状态"]}, "disconnector": {"data": ["状态"]}, "contactor": {"data": ["状态"]}, "fuse": {"data": ["额定电流(A)"]}, "resistor": {"data": ["阻值(Ω)"]}, "inductor": {"data": ["电感(mH)"]}, "capacitor": {"data": ["容值(μF)"]}, "ct": {"data": ["变比", "二次电流(A)"]}, "pt": {"data": ["变比", "二次电压(V)"]}, "spd": {"data": ["状态"]}, "ground": {"data": []}, "h2_storage": {"data": ["压力(MPa)", "SOC(%)", "温度(℃)"]}, "iso_g": {"data": ["状态"]}, "lbs_g": {"data": ["状态"]}, "disc_v_g": {"data": ["状态"]}}, PRESET_BG=["#060e1a", "#0a2040", "#102a52", "#0d1b2a", "#1a1a2e", "#0a1a14", "#10240f", "#1a1000", "#2a0a0a", "#160020", "#2b2118", "#1a2630", "#23252b", "#2b1a2a", "#0f2a2a", "#3a2a1a", "#2a1a3a", "#1a3a2a", "#3a1a2a", "#1f1f0a", "#ffffff", "#f0f3f8", "#eaeef4", "#fdf6e3", "#f5eef5", "#e8f4f0", "#fff4e6", "#eef2ff", "#f0fff4", "#fff0f0", "#fef0f5", "#f0f9ff", "#fffbe8", "#f3f0ff", "#eafaf1"], DATA_LABEL_EN={"P(kW)": "P(kW)", "Q(kvar)": "Q(kvar)", "I(A)": "I(A)", "U(V)": "U(V)", "Vpv(V)": "Vpv(V)", "频率(Hz)": "Freq(Hz)", "SOC(%)": "SOC(%)", "温度(℃)": "Temp(℃)", "簇电压(V)": "Cluster V(V)", "簇电流(A)": "Cluster I(A)", "状态": "Status", "输入电压(V)": "Vin(V)", "输出电压(V)": "Vout(V)", "直流电压(V)": "DC V(V)", "直流电流(A)": "DC I(A)", "母线电压(V)": "Bus V(V)", "今日用电(kWh)": "Today(kWh)", "负载功率(kW)": "Load(kW)", "功率(kW)": "Power(kW)", "运行模式": "Mode", "告警": "Alarm", "数值": "Value", "单位": "Unit", "电流(A)": "I(A)", "额定电流(A)": "Rated I(A)", "阻值(Ω)": "R(Ω)", "电感(mH)": "L(mH)", "容值(μF)": "C(μF)", "变比": "Ratio", "二次电流(A)": "Sec I(A)", "二次电压(V)": "Sec V(V)", "电压(V)": "U(V)"}, STATUS_EN={"待机": "Standby", "充电": "Charging", "放电": "Discharging", "发电": "Generating", "在线": "Online", "离线": "Offline", "备用": "Standby", "运行": "Running", "停机": "Stopped", "并网运行": "Grid-tied", "离网运行": "Off-grid", "闭合": "Closed", "断开": "Open", "故障": "Fault", "告警": "Alarm", "正常": "Normal", "充电中": "Charging", "放电中": "Discharging"};
+const NODE_DEFAULTS={"grid": {"data": ["P(kW)", "Q(kvar)"]}, "solar": {"data": ["P(kW)", "Vpv(V)"]}, "generator": {"data": ["P(kW)", "频率(Hz)"]}, "pcs": {"data": ["P(kW)", "Q(kvar)", "I(A)", "U(V)"]}, "bms": {"data": ["U(V)", "I(A)", "SOC(%)", "温度(℃)"]}, "cabinet": {"data": ["簇电压(V)", "簇电流(A)", "SOC(%)", "温度(℃)"]}, "transformer": {"data": ["输入电压(V)", "输出电压(V)"]}, "switch": {"data": []}, "highvolt": {"data": ["直流电压(V)", "直流电流(A)"]}, "busbar": {"data": ["母线电压(V)"]}, "trunk_ac": {"data": ["电压(V)", "电流(A)"]}, "trunk_dc": {"data": ["电压(V)", "电流(A)"]}, "tie_line": {"data": ["P(kW)"]}, "meter": {"data": ["P(kW)", "Q(kvar)"]}, "meter2": {"data": ["P(kW)", "Q(kvar)", "今日用电(kWh)"]}, "load": {"data": ["负载功率(kW)", "今日用电(kWh)"]}, "charger": {"data": ["功率(kW)"]}, "ems": {"data": ["运行模式"]}, "aircon": {"data": ["温度(℃)"]}, "fire": {"data": ["告警"]}, "sensor": {"data": ["数值", "单位"]}, "cb_closed": {"data": ["电流(A)"]}, "switch_open": {"data": []}, "disconnector": {"data": []}, "contactor": {"data": []}, "fuse": {"data": ["额定电流(A)"]}, "resistor": {"data": ["阻值(Ω)"]}, "inductor": {"data": ["电感(mH)"]}, "capacitor": {"data": ["容值(μF)"]}, "ct": {"data": ["变比", "二次电流(A)"]}, "pt": {"data": ["变比", "二次电压(V)"]}, "spd": {"data": []}, "ground": {"data": []}, "h2_storage": {"data": ["压力(MPa)", "SOC(%)", "温度(℃)"]}, "iso_g": {"data": []}, "lbs_g": {"data": []}, "disc_v_g": {"data": []}}, PRESET_BG=["#060e1a", "#0a2040", "#102a52", "#0d1b2a", "#1a1a2e", "#0a1a14", "#10240f", "#1a1000", "#2a0a0a", "#160020", "#2b2118", "#1a2630", "#23252b", "#2b1a2a", "#0f2a2a", "#3a2a1a", "#2a1a3a", "#1a3a2a", "#3a1a2a", "#1f1f0a", "#ffffff", "#f0f3f8", "#eaeef4", "#fdf6e3", "#f5eef5", "#e8f4f0", "#fff4e6", "#eef2ff", "#f0fff4", "#fff0f0", "#fef0f5", "#f0f9ff", "#fffbe8", "#f3f0ff", "#eafaf1"], DATA_LABEL_EN={"P(kW)": "P(kW)", "Q(kvar)": "Q(kvar)", "I(A)": "I(A)", "U(V)": "U(V)", "Vpv(V)": "Vpv(V)", "频率(Hz)": "Freq(Hz)", "SOC(%)": "SOC(%)", "温度(℃)": "Temp(℃)", "簇电压(V)": "Cluster V(V)", "簇电流(A)": "Cluster I(A)", "状态": "Status", "输入电压(V)": "Vin(V)", "输出电压(V)": "Vout(V)", "直流电压(V)": "DC V(V)", "直流电流(A)": "DC I(A)", "母线电压(V)": "Bus V(V)", "今日用电(kWh)": "Today(kWh)", "负载功率(kW)": "Load(kW)", "功率(kW)": "Power(kW)", "运行模式": "Mode", "告警": "Alarm", "数值": "Value", "单位": "Unit", "电流(A)": "I(A)", "额定电流(A)": "Rated I(A)", "阻值(Ω)": "R(Ω)", "电感(mH)": "L(mH)", "容值(μF)": "C(μF)", "变比": "Ratio", "二次电流(A)": "Sec I(A)", "二次电压(V)": "Sec V(V)", "电压(V)": "U(V)"}, STATUS_EN={"待机": "Standby", "充电": "Charging", "放电": "Discharging", "发电": "Generating", "在线": "Online", "离线": "Offline", "备用": "Standby", "运行": "Running", "停机": "Stopped", "并网运行": "Grid-tied", "离网运行": "Off-grid", "闭合": "Closed", "断开": "Open", "故障": "Fault", "告警": "Alarm", "正常": "Normal", "充电中": "Charging", "放电中": "Discharging"};
 let lang='zh';
 const THEMES={
   blue_screen:{name:'蓝色大屏风',desc:'默认 · 指挥中心亮蓝',swatch:'#102a52',vars:{'--ui-bg':'#102a52','--ui-bg2':'#0c2245','--ui-border':'#2a5a9a','--ui-text':'#e8f2ff','--ui-text2':'#a0c0e0','--ui-accent':'#42a5f5','--ui-btn-bg':'#143560','--ui-btn-border':'#2a5a9a','--ui-btn-text':'#bcdcff','--ui-input-bg':'#0a1f40','--ui-hover':'#1a3f70'},bg:'#0a1f40'},
@@ -1024,7 +1024,7 @@ function addNode(type,x,y){
       data:[{key:'数值',keyEn:'Value',dv:'--'}]});
     snapshot();selectNode(id);return;
   }
-  nodes.push({id,type,labelZh,labelEn,x,y,status:'待机',fontSize:14,fontColor:'#e8f4ff',scale:(type==='anchor'?0.1:1),
+  nodes.push({id,type,labelZh,labelEn,x,y,fontSize:14,fontColor:'#e8f4ff',scale:(type==='anchor'?0.1:1),
     hideLabel:(type==='anchor'),hideFields:(type==='anchor'),
     ...(type==='anchor'?{fill:'#4dd0ff',opacity:1}:{}),
     data:(def.data||[]).map(k=>({key:k,keyEn:(DATA_LABEL_EN[k]||k),dv:''}))});
@@ -1033,10 +1033,9 @@ function addNode(type,x,y){
 // 获取节点当前语言标签
 function nodeLabel(n){ return lang==='en' ? (n.labelEn||n.labelZh||n.id) : (n.labelZh||n.label||n.id); }
 function dataKey(f){ return lang==='en' ? (f.keyEn||f.key) : f.key; }
-// 文本框 + 变量节点：都用 _textBox 包围盒（命中/对齐/缩放等几何逻辑一致），且都不是带状态的设备
+// 文本框 + 变量节点：都用 _textBox 包围盒（命中/对齐/缩放等几何逻辑一致）
 function usesTextBox(t){ return t==='text'||t==='variable'; }
-// 是否带「状态/在线」语义：设备类才有；文本框/变量节点是注记，占位点(anchor)是无源占位，都不暴露 status/online
-function nodeSupportsStateSignals(n){ return !!(n&&!usesTextBox(n.type)&&n.type!=='anchor'); }
+// 注：status / online 已彻底移除，节点的可用信号 = 仅其「已绑定数据字段」
 
 function nsz(typeOrNode){
   const type=typeof typeOrNode==='string'?typeOrNode:typeOrNode.type;
@@ -2788,20 +2787,17 @@ function selectNode(id){
   document.getElementById('p-id').value=n.id;
   document.getElementById('p-label-zh').value=n.labelZh||n.label||'';
   document.getElementById('p-label-en').value=n.labelEn||'';
-  document.getElementById('p-type').value=n.type;document.getElementById('p-status').value=n.status||'';
-  const seEl=document.getElementById('p-status-en');
-  seEl.value=n.statusEn||'';
-  seEl.placeholder=(STATUS_EN[n.status]||'')||'自动映射，可手动覆盖';
+  document.getElementById('p-type').value=n.type;
   document.getElementById('p-fs').value=n.fontSize||14;document.getElementById('p-fs-v').textContent=n.fontSize||14;
   const sc=Math.round((n.scale||1)*100);document.getElementById('p-scale').value=sc;document.getElementById('p-scale-v').textContent=sc;
   document.getElementById('p-rot').value=n.rotation||0;document.getElementById('p-rot-v').textContent=n.rotation||0;
   document.getElementById('p-fc').value=n.fontColor||'#e8f4ff';document.getElementById('p-fc-hex').value=n.fontColor||'#e8f4ff';
   document.getElementById('p-x').textContent=n.x.toFixed(0);document.getElementById('p-y').textContent=n.y.toFixed(0);
-  // 文本框 / 变量节点：隐藏类型/状态/图标大小，数据字段走标准配置
+  // 文本框 / 变量节点：隐藏类型/图标大小，数据字段走标准配置
   const isText=n.type==='text';
   const isVariable=n.type==='variable';
   const isTextBox=isText||isVariable;
-  ['prow-type','prow-status','prow-status-en','prow-scale'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isTextBox?'none':'';});
+  ['prow-type','prow-scale'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isTextBox?'none':'';});
   ['prow-data','prow-datasep'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});
   // 画布显示开关：反映当前节点的 hideLabel / hideFields
   const slEl=document.getElementById('p-show-label'),sfEl=document.getElementById('p-show-fields');
@@ -2935,15 +2931,7 @@ function applyNP(){
   n.labelZh=document.getElementById('p-label-zh').value;
   n.labelEn=document.getElementById('p-label-en').value;
   n.label=n.labelZh; // 兼容旧字段
-  n.type=document.getElementById('p-type').value;n.status=document.getElementById('p-status').value;
-  n.statusEn=document.getElementById('p-status-en').value.trim();
-  // 必填校验：中英文初始状态都需填写，英文缺失时高亮提示
-  const seEl=document.getElementById('p-status-en'), sEl=document.getElementById('p-status');
-  if(!n.statusEn){ seEl.style.borderColor='#ff6b6b'; seEl.title='请填写英文初始状态（必填）'; }
-  else { seEl.style.borderColor=''; seEl.title=''; }
-  if(!n.status){ sEl.style.borderColor='#ff6b6b'; sEl.title='请填写中文初始状态（必填）'; }
-  else { sEl.style.borderColor=''; sEl.title=''; }
-  document.getElementById('p-status-en').placeholder=(STATUS_EN[n.status]||'')||'如 Standby / Charging';
+  n.type=document.getElementById('p-type').value;
   n.fontSize=parseInt(document.getElementById('p-fs').value);document.getElementById('p-fs-v').textContent=n.fontSize;
   n.scale=parseInt(document.getElementById('p-scale').value)/100;document.getElementById('p-scale-v').textContent=Math.round(n.scale*100);
   n.rotation=parseInt(document.getElementById('p-rot').value);document.getElementById('p-rot-v').textContent=n.rotation;
@@ -3520,11 +3508,6 @@ function confirmUp(){
 }
 function closeUp(){document.getElementById('uo').classList.remove('show');document.getElementById('upv').style.display='none';document.getElementById('upv').src='';document.getElementById('un').value='';document.getElementById('un-en').value='';document.getElementById('un').classList.remove('invalid');document.getElementById('un-en').classList.remove('invalid');document.getElementById('fi').value='';pendingDataURL=null;}
 
-function statusBilingual(n){
-  const zh=n.status||'待机';
-  const en=(n.statusEn&&n.statusEn.trim())||STATUS_EN[zh]||zh;
-  return {zh,en};
-}
 // 取某类型的图标 dataURL
 function iconSrcOf(t){
   if(CUSTOM_ICONS[t]&&CUSTOM_ICONS[t].src) return CUSTOM_ICONS[t].src;
@@ -3605,7 +3588,7 @@ function buildJSON(){
         offset:{x:parseFloat((f.ox||0).toFixed(1)), y:parseFloat((f.oy||0).toFixed(1))}
       }))
     };
-    if(nodeSupportsStateSignals(n)) o.status=statusBilingual(n);
+    // status / online 已移除：节点不再导出运行状态属性
     // 自定义图标的 type 不在后台库中，附带文件名以便前端解析
     if(String(n.type).startsWith('custom_')) o.icon=iconFileName(n.type);
     if(usesTextBox(n.type)){
@@ -3714,10 +3697,7 @@ function parseImportedNode(o){
     fontSize:o.fontSize||14,
     fontColor:o.fontColor||'#e8f4ff'
   };
-  // 状态（中/英）
-  if(o.status&&typeof o.status==='object'){ n.status=o.status.zh||'待机'; if(o.status.en)n.statusEn=o.status.en; }
-  else n.status=o.status||'待机';
-  if(o.statusEn)n.statusEn=o.statusEn;
+  // status / online 已移除：忽略旧文件里的 status 字段（向后兼容，不再读入节点）
   // 显示开关（导出用 display.showLabel/showFields；内部用 hideLabel/hideFields）
   const disp=o.display||{};
   n.hideLabel=(disp.showLabel===false)||(o.hideLabel===true);
@@ -3926,29 +3906,23 @@ function evalCond(cond, ctx){
   const rv=(cond.ref!=null)?ctx[cond.ref]:cond.val;
   return cmpOp(lv,cond.op||'truthy',rv);
 }
-// 汇总当前画布全部可用信号：节点字段(id.字段) + 有状态节点的 id.status/id.online + 自定义全局信号
+// 汇总当前画布全部可用信号：节点字段(id.字段) + 自定义全局信号（status/online 已移除）
 function collectSignals(){
   const out=[],seen=new Set();
   const add=(name,label)=>{if(name&&!seen.has(name)){seen.add(name);out.push({name,label:label||name});}};
   nodes.forEach(n=>{
+    // 节点的可用信号 = 仅它「已绑定的数据字段」；不再凭空附带 status / online
     (n.data||[]).forEach(f=>{if(f.key)add(n.id+'.'+f.key,nodeLabel(n)+' · '+f.key);});
-    if(nodeSupportsStateSignals(n)){
-      add(n.id+'.status',nodeLabel(n)+' · 状态');
-      add(n.id+'.online',nodeLabel(n)+' · 在线');
-    }
   });
   (customSignals||[]).forEach(s=>add(s.name,s.label||s.name));
   return out;
 }
-// 构造求值上下文：静态默认值(节点字段dv/有状态节点状态/在线=true/自定义样例) 叠加注入的样例值
+// 构造求值上下文：静态默认值(节点字段dv/自定义样例) 叠加注入的样例值
 function buildCtx(values){
   const ctx={};
   nodes.forEach(n=>{
+    // 仅以节点「已绑定数据字段」的默认值入栈；status / online 已移除，不再凭空注入
     (n.data||[]).forEach(f=>{if(f.key)ctx[n.id+'.'+f.key]=f.dv;});
-    if(nodeSupportsStateSignals(n)){
-      ctx[n.id+'.status']=n.status||'';
-      ctx[n.id+'.online']=true;
-    }
   });
   (customSignals||[]).forEach(s=>{if(s.name!=null&&s.sample!==undefined)ctx[s.name]=s.sample;});
   if(values)Object.keys(values).forEach(k=>{ctx[k]=values[k];});
@@ -4061,13 +4035,6 @@ function makeSignalPicker(value, onChange){
 function signalValueMeta(name){
   if(!name)return {kind:'text'};
   const p=parseSignal(name);
-  const n=p.node==='@global'?null:nodes.find(x=>x.id===p.node);
-  if(p.field==='online'&&nodeSupportsStateSignals(n))return {kind:'bool'};
-  if(p.field==='status'&&nodeSupportsStateSignals(n)){
-    const base=['在线','离线','待机','运行','充电','放电','故障','告警','备用','发电'];
-    if(n&&n.status&&!base.includes(n.status))base.unshift(n.status);
-    return {kind:'enum',options:base};
-  }
   if(p.node==='@global'){
     const s=(customSignals||[]).find(c=>c.name===p.field);
     if(!s)return {kind:'text'};
@@ -4077,6 +4044,7 @@ function signalValueMeta(name){
     if(t==='number')return {kind:'num'};
     return {kind:'text'};
   }
+  const n=nodes.find(x=>x.id===p.node);
   const f=n&&(n.data||[]).find(d=>d.key===p.field);
   if(f){
     if(typeof f.dv==='boolean')return {kind:'bool'};
@@ -4401,15 +4369,13 @@ function pruneInvalidInjections(){
 function fieldOptionsFor(node){
   if(node==='@global')return (customSignals||[]).map(s=>({v:s.name,t:s.label||s.name}));
   const n=nodes.find(x=>x.id===node);if(!n)return [];
+  // 仅暴露节点「已绑定数据字段」；status / online 已移除，不再作为可选规则信号
   const opts=(n.data||[]).filter(f=>f.key).map(f=>({v:f.key,t:f.key}));
-  if(nodeSupportsStateSignals(n)){ opts.push({v:'status',t:'状态'});opts.push({v:'online',t:'在线'}); }
   return opts;
 }
 // 某行「值」的下拉建议（在线→true/false；状态→常见状态；数值→当前静态值）
 function valSuggestFor(r){
   const n=(r&&r.node&&r.node!=='@global')?nodes.find(x=>x.id===r.node):null;
-  if(r.field==='online'&&nodeSupportsStateSignals(n))return ['true','false'];
-  if(r.field==='status'&&nodeSupportsStateSignals(n)){const base=['在线','离线','待机','运行','充电','放电','故障','告警','备用','发电'];if(n&&n.status&&base.indexOf(n.status)<0)base.unshift(n.status);return base;}
   if(r.node==='@global'){const s=(customSignals||[]).find(c=>c.name===r.field);if(!s)return [];const t=sigTypeOf(s);if(t==='bool')return ['true','false'];if(t==='enum')return (s.options||[]).map(String);return (s.sample!==''&&s.sample!=null)?[String(s.sample)]:[];}
   const f=n&&(n.data||[]).find(d=>d.key===r.field);return (f&&f.dv!=='')?[String(f.dv)]:[];
 }
@@ -4710,7 +4676,7 @@ function dlIconsZip(){
 '       const fname = node.icon;            // 如 "pcs.png"\n'+
 '       const url   = "/assets/topo-icons/" + fname;\n'+
 '       // 在 (node.x, node.y) 处按 meta.iconSizeByType[node.type] 绘制\n'+
-'  3) 文字：中文 node.label.zh / 英文 node.label.en；状态 node.status.zh / .en\n'+
+'  3) 文字：中文 node.label.zh / 英文 node.label.en\n'+
 '  4) 连线样式见 topology.json 的 edgeStyles\n';
   files.push({name:'README.txt', data:strToBytes(readme)});
   const zip=makeZip(files);
@@ -4740,8 +4706,8 @@ const RUNTIME_JS=`// 储能拓扑 · 数据驱动运行端（与编辑器「数�
 //   const state = resolveDynamic(topology, signals);
 //   state.nodes: [{...node, visible}]        // visible=false → 不渲染该元素
 //   state.edges: [{...edge, visible, dir}]    // visible=false → 不渲染（含"条件不满足时无连线"）；dir=动态流向
-// signals：扁平对象，如 { "bms_1.SOC(%)": 20, "grid_1.online": true, "mode": "island" }
-//   未提供的信号回退到画布静态值（节点字段 value / 支持状态节点的状态与在线=true / topology.signals 样例）。
+// signals：扁平对象，如 { "bms_1.SOC(%)": 20, "grid_1.P(kW)": 383, "mode": "island" }（键=节点id.字段名 或 全局信号名）
+//   未提供的信号回退到画布静态值（节点字段 value / topology.signals 样例）。
 function _num(x){if(typeof x==='number')return x;if(typeof x==='boolean')return x?1:0;var f=parseFloat(x);return isNaN(f)?NaN:f;}
 function _looseEq(a,b){if(a===b)return true;var na=_num(a),nb=_num(b);if(!isNaN(na)&&!isNaN(nb))return na===nb;return String(a)===String(b);}
 function _toList(rv){if(Array.isArray(rv))return rv;return String(rv==null?'':rv).split(',').map(function(s){return s.trim();}).filter(function(s){return s!=='';});}
@@ -4772,7 +4738,6 @@ export function evalCond(cond, ctx){
   var rv=(cond.ref!=null)?ctx[cond.ref]:cond.val;
   return cmpOp(lv,cond.op||'truthy',rv);
 }
-function nodeSupportsStateSignals(n){return !!(n&&n.type!=='text'&&n.type!=='variable'&&n.type!=='anchor');}
 export function buildContext(topology, signals){
   var ctx={};
   (topology.nodes||[]).forEach(function(n){
@@ -4780,10 +4745,7 @@ export function buildContext(topology, signals){
       var key=(f.key&&typeof f.key==='object')?f.key.zh:f.key;
       if(key!=null)ctx[n.id+'.'+key]=(f.value==='--'?'':f.value);
     });
-    if(nodeSupportsStateSignals(n)){
-      ctx[n.id+'.status']=(n.status&&typeof n.status==='object')?n.status.zh:(n.status||'');
-      ctx[n.id+'.online']=true;
-    }
+    // 节点上下文仅含其数据字段；status / online 已移除（如需可经 signals / sampleSignals 自行提供任意键）
   });
   (topology.signals||[]).forEach(function(s){if(s&&s.name!=null&&s.sample!==undefined)ctx[s.name]=s.sample;});
   if(topology.sampleSignals)Object.keys(topology.sampleSignals).forEach(function(k){ctx[k]=topology.sampleSignals[k];});
@@ -4889,10 +4851,10 @@ function dlAllIconsZip(){
 '数据驱动（动态显隐 / 流向 / 条件连线）：\n'+
 '  画布 JSON 中：node.visibleWhen（显示条件）、edge.showWhen（显示/存在条件）、edge.dirRules（流向规则，顺序匹配 e.dir 兜底）、顶层 signals（自定义全局信号）。\n'+
 '  条件结构：叶子 {var,op,val|ref}；组合 {all:[...]}/{any:[...]}/{not:{...}}；op ∈ == != > >= < <= in between truthy falsy exists。\n'+
-'  信号寻址：节点字段=“节点id.字段名(中文)”，支持状态的节点另有“节点id.status”“节点id.online”，以及 signals 里的全局信号。\n'+
+'  信号寻址：节点字段=“节点id.字段名(中文)”，以及 signals 里的全局信号。\n'+
 '  运行端用法：\n'+
 '    import { resolveDynamic } from "./runtime.js";\n'+
-'    const state = resolveDynamic(topology, liveSignals);   // liveSignals 形如 {"bms_1.SOC(%)":18,"grid_1.online":false}\n'+
+'    const state = resolveDynamic(topology, liveSignals);   // liveSignals 形如 {"bms_1.SOC(%)":18,"grid_1.P(kW)":383}\n'+
 '    state.nodes/state.edges 上的 visible 决定是否渲染，edge.dir 为动态流向。\n\n'+
 '前端接入（两种方式，按需选）：\n'+
 '  方式A（推荐·零重写·像素级一致）：直接把本编辑器 HTML 以「只读运行模式」托管/内嵌，复用同一份渲染器+规则，\n'+
@@ -4901,11 +4863,11 @@ function dlAllIconsZip(){
 '        其它参数：fit=0 关闭自动适配；interactive=1 允许平移缩放（默认只读不可交互）。\n'+
 '    • iframe 内嵌：父页面 postMessage 推送：\n'+
 '        iframe.contentWindow.postMessage({type:"topo:topology",data:画布JSON对象},"*");\n'+
-'        iframe.contentWindow.postMessage({type:"topo:signals",data:{"grid_1.P(kW)":-2,"grid_1.online":true}},"*");  // 整批覆盖\n'+
+'        iframe.contentWindow.postMessage({type:"topo:signals",data:{"grid_1.P(kW)":-2,"bms_1.SOC(%)":55}},"*");  // 整批覆盖\n'+
 '        iframe.contentWindow.postMessage({type:"topo:merge",data:{"bms_1.SOC(%)":55}},"*");                         // 增量合并\n'+
 '        iframe 就绪后会向父页面 postMessage({type:"topo:ready"})，收到后再推数据更稳妥。\n'+
 '    • JS API（同源/直接托管时）：window.TopoRuntime.loadTopology(对象或URL) / setSignals(obj) / mergeSignals(obj) / fit()\n'+
-'    实时数据键名 = 规则里的信号名：节点字段「节点id.字段名」、支持状态节点的「节点id.status / 节点id.online」、全局信号名；\n'+
+'    实时数据键名 = 规则里的信号名：节点字段「节点id.字段名」、全局信号名；\n'+
 '    同一份实时数据既驱动规则(显隐/流向)，也用于字段卡片数值显示（注意编辑器约定：字段值为 0 显示为 --）。\n'+
 '  方式B（自研渲染器）：用 runtime.js 的 resolveDynamic 仅取 visible/dir，再按上面「前端渲染流程」自行绘制\n'+
 '    （注意 route="smart" 的智能走线路径未存入 JSON，自研渲染需自行实现走线，否则线形可能与运营端不一致）。\n';
@@ -5181,7 +5143,7 @@ function setRouteStyle(s){ routeStyle=parseInt(s); applyTidyRouting(); _pathCach
 //     2) iframe 内嵌：父页面 postMessage({type:'topo:topology',data:画布JSON对象})、
 //        {type:'topo:signals',data:{信号:值}}（整批覆盖）、{type:'topo:merge',data:{...}}（增量合并）
 //     3) JS API：window.TopoRuntime.loadTopology(对象或URL) / setSignals(obj) / mergeSignals(obj) / fit()
-//   实时数据键名 = 规则里用的信号名：节点字段「节点id.字段名」、支持状态节点的「节点id.status / 节点id.online」、全局信号名。
+//   实时数据键名 = 规则里用的信号名：节点字段「节点id.字段名」、全局信号名。
 // ══════════════════════════════════════════════════════════════
 let _rtCfg=null,_rtTimer=null;
 function topoRuntimeConfig(){
@@ -5209,9 +5171,8 @@ function applyLiveSignals(payload){
     const ps=parseSignal(k);                             // 映射到节点字段→更新显示
     if(ps&&ps.node&&ps.node!=='@global'){
       const n=nodes.find(x=>x.id===ps.node); if(!n)return;
-      if(ps.field==='status'&&nodeSupportsStateSignals(n)) n.status=v;
-      else if(ps.field==='online'){ /* 仅参与规则，无字段显示 */ }
-      else { const f=(n.data||[]).find(d=>d.key===ps.field); if(f)f.dv=v; }
+      // 仅把实时值映射到节点「数据字段」用于显示；status / online 已移除（任意键仍存入 signalValues 供规则求值）
+      const f=(n.data||[]).find(d=>d.key===ps.field); if(f)f.dv=v;
     }
   });
   // 流向/显隐由渲染循环每帧按 signalValues 实时求值，无需手动重绘
