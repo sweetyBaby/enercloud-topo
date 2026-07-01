@@ -172,19 +172,41 @@ function tplPreviewOfCanvas(){
   const eg=edges.map(e=>{const a=idx[e.from],b=idx[e.to];if(a==null||b==null)return null;return [a,b,(ET[e.et]||ET.ac_power).color];}).filter(Boolean);
   return {pts,edges:eg};
 }
+// 模板重名校验：中/英名忽略大小写与首尾空格；exceptId=允许与之同名的模板（即当前覆盖目标）。
+function tplNameClash(templates,name,nameEn,exceptId){
+  const norm=s=>String(s==null?'':s).trim().toLowerCase();
+  const nm=norm(name),nmEn=norm(nameEn);
+  return (templates||[]).find(t=>t.id!==exceptId&&(norm(t.name)===nm||(nmEn&&norm(t.nameEn)===nmEn)))||null;
+}
 async function saveCanvasAsTemplate(){
   if(!nodes.length){flashHint(lang==='en'?'Canvas is empty':'画布为空，无法保存');return;}
-  let curName='';
-  if(currentTemplateId){try{const mf=await loadTplManifest();const e=(mf.templates||[]).find(t=>t.id===currentTemplateId);if(e)curName=(lang==='en'?(e.nameEn||e.name):e.name)||currentTemplateId;}catch(err){}}
+  // 重名校验依赖完整清单：拉取失败(服务不可用)时 fail-closed，不在状态未知时保存，以免产生重复模板。
+  //  生产静态部署下清单是静态 index.json，正常可读；此处仅在清单真正不可达时阻断。
+  let templates;
+  try{const mf=await loadTplManifest();templates=(mf&&Array.isArray(mf.templates))?mf.templates:null;}catch(err){templates=null;}
+  if(!templates){flashHint(lang==='en'?'Template service unavailable — cannot save now':'模板服务不可用，暂时无法保存（无法校验重名）');return;}
+  const curEntry=currentTemplateId?templates.find(t=>t.id===currentTemplateId):null;
+  // 当前模板名（语言相关、去首尾空格、无 id 兜底）：真正有名称才允许「覆盖」。
+  const curName=((curEntry?(lang==='en'?(curEntry.nameEn||curEntry.name):(curEntry.name||curEntry.nameEn)):'')||'').trim();
+  // 仅「已加载的自定义模板」可覆盖：内置模板不允许被覆盖、未加载任何模板则一律另存为新。
+  const canOverwrite=!!(curEntry&&!curEntry.builtin&&curName);
   const res=await tplDialog({title:lang==='en'?'💾 Save as template':'💾 保存为模板',
-    name:(_tplEditMode?curName:''),showOverwrite:!!(currentTemplateId&&curName),overwriteDefault:_tplEditMode,curName});
+    name:(canOverwrite?curName:''),showOverwrite:canOverwrite,overwriteDefault:canOverwrite,curName});
   if(!res)return;
+  const overwriteId=(res.overwrite&&canOverwrite)?currentTemplateId:null;
+  // 重名校验：与其它模板（非当前覆盖目标）同名则拒绝，避免出现重复命名的模板。
+  const clash=tplNameClash(templates,res.name,res.nameEn,overwriteId);
+  if(clash){
+    const cn=(lang==='en'?(clash.nameEn||clash.name):clash.name)||clash.id;
+    flashHint(lang==='en'?('A template named “'+cn+'” already exists — use another name, or click “Edit” on it in the library to overwrite'):('已存在同名模板「'+cn+'」，请改用其它名称，或在模板库对该模板点「编辑」后覆盖'));
+    return;
+  }
   const canvas=JSON.parse(buildJSON());
   const preview=tplPreviewOfCanvas();
   const meta={name:res.name,nameEn:res.nameEn,desc:res.desc};
   try{
-    if(res.overwrite&&currentTemplateId){
-      const r=await fetch(TPL_API+'/'+encodeURIComponent(currentTemplateId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({template:meta,canvas,preview})});
+    if(overwriteId){
+      const r=await fetch(TPL_API+'/'+encodeURIComponent(overwriteId),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({template:meta,canvas,preview})});
       if(!r.ok)throw new Error('HTTP '+r.status);
       _tplManifest=null;flashHint(lang==='en'?'Template updated':'模板已更新');
     }else{
@@ -209,6 +231,12 @@ async function renameTemplate(id){
   const mf=await loadTplManifest();const e=(mf.templates||[]).find(t=>t.id===id);if(!e)return;
   const res=await tplDialog({title:lang==='en'?'✎ Rename template':'✎ 重命名模板',name:e.name,nameEn:e.nameEn,desc:e.desc,okText:lang==='en'?'Rename':'重命名'});
   if(!res)return;
+  const clash=tplNameClash(mf.templates,res.name,res.nameEn,id);   // 重名校验（排除自身）
+  if(clash){
+    const cn=(lang==='en'?(clash.nameEn||clash.name):clash.name)||clash.id;
+    flashHint(lang==='en'?('A template named “'+cn+'” already exists — use another name'):('已存在同名模板「'+cn+'」，请改用其它名称'));
+    return;
+  }
   try{
     const r=await fetch(TPL_API+'/'+encodeURIComponent(id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({template:{name:res.name,nameEn:res.nameEn,desc:res.desc}})});
     if(!r.ok)throw new Error('HTTP '+r.status);

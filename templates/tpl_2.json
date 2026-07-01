@@ -2,8 +2,8 @@
   "schemaVersion": "tpl-1",
   "template": {
     "id": "tpl_2",
-    "name": "jintan",
-    "nameEn": "jintan",
+    "name": "jintan-old",
+    "nameEn": "jintan-old",
     "desc": "",
     "builtin": false
   },
