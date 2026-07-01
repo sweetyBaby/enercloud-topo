@@ -279,14 +279,19 @@
             <div class="pr-inline"><input type="range" id="p-anchor-op" min="0" max="100" value="100" oninput="applyAnchorStyle()"></div></div>
           <div class="phint">💡 把填充设为画布同色、或不透明度调到 0，用户即看不到此点；研发可在「视图 ▾ → 📍 占位点标记」总开关查看/隐藏全部占位点位置。</div>
         </div>
+        <div class="psep" id="prow-devbind-sep"></div>
+        <div class="pr" id="prow-devbind">
+          <label data-i18n="后台设备绑定">后台设备绑定
+            <button class="tb" id="p-dev-reload" onclick="reloadBackendBindingData()" title="重新拉取后台设备/字典（增删改后刷新）" style="float:right;padding:1px 7px;font-size:11px">🔄</button>
+          </label>
+          <div class="pr-inline" style="gap:6px">
+            <select id="p-dev-type" onchange="applyDeviceBind(true)" style="flex:0 0 38%" title="后台设备类型"></select>
+            <select id="p-dev-id" onchange="applyDeviceBind(false)" style="flex:1" title="后台设备实例（该节点对应的物理设备）"></select>
+          </div>
+          <div class="phint" id="p-dev-hint" data-i18n="该节点默认对应的后台设备；下方字段未单独指定来源时即取此设备。">该节点默认对应的后台设备；下方字段未单独指定来源时即取此设备。</div>
+        </div>
         <div class="psep" id="prow-datasep"></div>
         <div class="pr" id="prow-data"><label id="prow-data-label" data-i18n="数据字段">数据字段</label>
-          <div class="df-head">
-            <span class="df-col df-col-zh" data-i18n="中文字段名">中文字段名</span>
-            <span class="df-col df-col-en" data-i18n="英文字段名">英文字段名</span>
-            <span class="df-col df-col-val" data-i18n="数值">数值</span>
-            <span style="width:24px"></span>
-          </div>
           <div id="dfields"></div>
           <button class="tb" id="btn-add-df" style="width:100%;margin-top:4px;font-size:12px" onclick="addDF()" data-i18n="+ 添加字段">+ 添加字段</button>
           <div class="phint" id="prow-data-hint" style="display:none;margin-top:4px"></div></div>

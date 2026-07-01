@@ -210,6 +210,40 @@ if tpl_src.is_dir():
     )
     print(f"Copied templates/ ({n} files) + generated index.json ({len(manifest['templates'])} templates, default={manifest['default']})")
 
+# 后台字段字典 dic/：拷贝 *.json + 扫描合并生成 dic/index.json（按 deviceType 归并；增删改字典文件重新 build 即反映）
+dic_src = ROOT / "dic"
+if dic_src.is_dir():
+    dist_dic = DIST / "dic"
+    dist_dic.mkdir(parents=True, exist_ok=True)
+    merged: dict = {}
+    n = 0
+    for fp in dic_src.glob("*.json"):
+        if fp.name == "index.json":
+            continue
+        shutil.copy2(fp, dist_dic / fp.name)
+        n += 1
+        try:
+            arr = json.loads(fp.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(arr, list):
+            continue
+        for g in arr:
+            if not isinstance(g, dict):
+                continue
+            dt, fields = g.get("deviceType"), g.get("fields")
+            if not dt or not isinstance(fields, list):
+                continue
+            merged.setdefault(dt, []).append({"location": g.get("location") or "", "fields": fields})
+    (dist_dic / "index.json").write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Copied dic/ ({n} files) + generated index.json (deviceTypes: {', '.join(merged.keys()) or 'none'})")
+
+# 设备档案 device/：原样拷贝（device-type.json / device-info.json 等，内容变更由前端 no-store 重新拉取）
+dev_src = ROOT / "device"
+if dev_src.is_dir():
+    shutil.copytree(dev_src, DIST / "device", dirs_exist_ok=True)
+    print(f"Copied device/ ({len(list(dev_src.glob('*.json')))} files)")
+
 print("Build complete: dist/")
 for rel in outputs:
     size = (DIST / rel).stat().st_size / 1024

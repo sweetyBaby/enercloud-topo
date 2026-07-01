@@ -38,6 +38,26 @@ function listIconFiles() {
     return [];
   }
 }
+// ───── 后台字段字典：扫描 dic/ 目录，按 deviceType 合并所有 *.json ─────
+//  每个字典文件形如 [{deviceType, location, fields:[...]}, ...]；增删改 dic/*.json 即自动反映。
+const dicDir = path.join(root, 'dic');
+function buildDicManifest() {
+  const out = {};
+  let files = [];
+  try { files = fs.readdirSync(dicDir).filter((f) => f.endsWith('.json') && f !== 'index.json'); } catch (err) { return out; }
+  for (const file of files) {
+    let arr;
+    try { arr = JSON.parse(fs.readFileSync(path.join(dicDir, file), 'utf8')); } catch (err) { continue; }
+    if (!Array.isArray(arr)) continue;
+    for (const g of arr) {
+      const dt = g && g.deviceType;
+      if (!dt || !Array.isArray(g.fields)) continue;
+      (out[dt] = out[dt] || []).push({ location: g.location || '', fields: g.fields });
+    }
+  }
+  return out;
+}
+
 function buildIconManifest() {
   let curated = { groups: [] };
   try {
@@ -146,6 +166,10 @@ function createServer() {
     const pathname = url.parse(req.url).pathname || '/';
     if (pathname === '/icons/index.json') {
       return send(res, 200, JSON.stringify(buildIconManifest(), null, 2), types['.json']);
+    }
+    // 后台字段字典：扫描 dic/ 合并（增删改 dic/*.json 即自动反映）。device/* 走静态，内容变更经 no-store 重新拉取即可。
+    if (pathname === '/dic/index.json') {
+      return send(res, 200, JSON.stringify(buildDicManifest(), null, 2), types['.json']);
     }
     // 模板清单由目录扫描动态生成（增删改 templates/*.json 即自动反映，不依赖 index.json）
     if (pathname === '/templates/index.json') {

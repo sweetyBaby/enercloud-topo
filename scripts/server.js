@@ -41,6 +41,25 @@ const types = {
 function log(message) { console.log(`[${new Date().toLocaleTimeString()}] ${message}`); }
 function warn(message) { console.warn(`[${new Date().toLocaleTimeString()}] ${message}`); }
 
+// 后台字段字典：扫描 dic/ 目录，按 deviceType 合并所有 *.json（增删改 dic/*.json 即自动反映）
+const dicDir = path.join(staticRoot, 'dic');
+function buildDicManifest() {
+  const out = {};
+  let files = [];
+  try { files = fs.readdirSync(dicDir).filter((f) => f.endsWith('.json') && f !== 'index.json'); } catch (err) { return out; }
+  for (const file of files) {
+    let arr;
+    try { arr = JSON.parse(fs.readFileSync(path.join(dicDir, file), 'utf8')); } catch (err) { continue; }
+    if (!Array.isArray(arr)) continue;
+    for (const g of arr) {
+      const dt = g && g.deviceType;
+      if (!dt || !Array.isArray(g.fields)) continue;
+      (out[dt] = out[dt] || []).push({ location: g.location || '', fields: g.fields });
+    }
+  }
+  return out;
+}
+
 const templateApi = createTemplateApi({ dir: tplDir, log, warn });
 
 function inside(baseDir, file) {
@@ -69,6 +88,11 @@ const server = http.createServer((req, res) => {
   // 2) 模板清单：扫描 tplDir 动态生成（增删改 templates/*.json 即自动反映，不依赖 index.json）
   if (pathname === '/templates/index.json') {
     return send(res, 200, JSON.stringify(templateApi.buildIndex(), null, 2), 'application/json; charset=utf-8');
+  }
+
+  // 2b) 后台字段字典：扫描 dic/ 合并（device/* 与其它资源走静态托管）
+  if (pathname === '/dic/index.json') {
+    return send(res, 200, JSON.stringify(buildDicManifest(), null, 2), 'application/json; charset=utf-8');
   }
 
   // 3) /templates/* 静态读取：指向可写的 tplDir，确保读到的就是最新落盘内容

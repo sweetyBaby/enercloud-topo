@@ -83,7 +83,38 @@ async function reloadIconLibrary(){
     flashHint(lang==='en'?'Reload failed':'图标库刷新失败');
   }
 }
-loadIconLibrary().then(init).catch(err=>{console.error('图标库初始化失败：',err);init();});
+/* ───── 后台数据绑定：设备类型(device-type.json)、设备实例(device-info.json)、字段字典(dic/ 扫描合并)。
+   三者都「动态加载」：dic 走扫描路由、device 走 no-store 拉取，增删改后台 JSON 重新加载即生效。 ───── */
+let DEVICE_TYPES=[];   // [{value,label}] 来自 device-type.json 的 dictValue/dictLabel
+let DEVICE_LIST=[];    // [{deviceId,deviceName,deviceType,projectName}] 来自 device-info.json
+let DEVICE_DICTS={};   // { deviceType: [{location,fields:[...]}] } 来自 dic/index.json（扫描合并）
+// 画布元素类型 → 后台 deviceType 的默认映射（仅作选中节点时的默认值，用户仍可在面板改选任意类型）
+const CANVAS_TYPE_TO_DEVICE={bms:'BCU',cabinet:'BCU',pcs:'PCS',ems:'EMS'};
+async function loadBackendBindingData(){
+  const getJSON=async(u)=>{try{const r=await fetch(u,{cache:'no-store'});return r.ok?await r.json():null;}catch(e){return null;}};
+  const [types,list,dicts]=await Promise.all([
+    getJSON('device/device-type.json'), getJSON('device/device-info.json'), getJSON('dic/index.json')
+  ]);
+  if(Array.isArray(types))DEVICE_TYPES=types.filter(t=>t&&t.dictValue&&(t.status==null||String(t.status)==='0'))
+    .map(t=>({value:t.dictValue,label:t.dictLabel||t.dictValue}));
+  if(Array.isArray(list))DEVICE_LIST=list.filter(d=>d&&d.deviceId&&d.delFlag!=='2')
+    .map(d=>({deviceId:d.deviceId,deviceName:d.deviceName||d.deviceId,deviceType:d.deviceType||d.archiveDeviceType||'',projectName:d.projectName||''}));
+  if(dicts&&typeof dicts==='object'&&!Array.isArray(dicts))DEVICE_DICTS=dicts;
+}
+// 字典查询助手
+function nodeDeviceType(n){ return (n&&n.deviceType)||CANVAS_TYPE_TO_DEVICE[n&&n.type]||''; }
+function dictLocations(dt){ return (DEVICE_DICTS[dt]||[]).map(g=>g.location); }
+function dictFields(dt,loc){ const g=(DEVICE_DICTS[dt]||[]).find(x=>x.location===loc); return g?g.fields:[]; }
+function devicesOfType(dt){ return DEVICE_LIST.filter(d=>!dt||d.deviceType===dt); }
+function deviceNameOf(id){ const d=DEVICE_LIST.find(x=>x.deviceId===id); return d?(d.deviceName+(d.projectName?(' · '+d.projectName):'')):(id||''); }
+function deviceTypeLabel(v){ const t=DEVICE_TYPES.find(x=>x.value===v); return t?t.label:(v||''); }
+// 后台绑定数据动态刷新：重新拉取设备/字典并刷新当前节点面板
+async function reloadBackendBindingData(){
+  try{ await loadBackendBindingData(); const n=nodes.find(x=>x.id===selNode); if(n)selectNode(n.id);
+    flashHint(lang==='en'?'Backend dict/devices reloaded':'后台字典/设备已刷新'); }
+  catch(err){ console.error('刷新后台绑定数据失败：',err); }
+}
+Promise.all([loadIconLibrary(),loadBackendBindingData()]).then(init).catch(err=>{console.error('初始化失败：',err);init();});
 const CUSTOM_ICONS={},CUSTOM_LABELS={};let pendingDataURL=null;
 
 let nodes=[],edges=[],selNode=null,selEdge=null;
@@ -2974,7 +3005,29 @@ function applyEP(){
   document.getElementById('ep-desc').textContent=base.desc;document.getElementById('ep-desc').style.color=cfg.color;updateEpTypeSwatch();snapshot();
 }
 function clearEdgeColor(){if(!selEdge)return;delete selEdge.lineColor;document.getElementById('ep-color-hex').value='';document.getElementById('ep-color').value=(ET[selEdge.et]||ET.ac_power).color;applyEP();}
-function renderDFs(n){const c=document.getElementById('dfields');c.innerHTML='';(n.data||[]).forEach((f,i)=>{const r=document.createElement('div');r.className='dfrow';const dvVal=(f.dv==null||f.dv==='')?'':String(f.dv).replace(/"/g,'&quot;');r.innerHTML='<input class="df-zh-in" value="'+(f.key||'')+'" placeholder="中文" oninput="updDF('+i+',\'key\',this.value)"><input class="df-en-in" value="'+(f.keyEn||'')+'" placeholder="English" oninput="updDF('+i+',\'keyEn\',this.value)"><input class="df-val-in" value="'+dvVal+'" placeholder="--" oninput="updDFVal('+i+',this.value)"><button onclick="rmDF('+i+')">✕</button>';c.appendChild(r);});
+function renderDFs(n){const c=document.getElementById('dfields');c.className='dfgrid';
+  // 列头 + 所有字段单元格放在「同一个 CSS grid」里，列宽由浏览器统一计算 → 列名与数据行精确对齐、绝不错位
+  let html='<span class="dh dh-zh" data-i18n="中文名">中文名</span><span class="dh dh-en" data-i18n="英文名">英文名</span><span class="dh dh-val" data-i18n="默认值">默认值</span><span class="dh dh-act" data-i18n="绑定">绑定</span>';
+  (n.data||[]).forEach((f,i)=>{
+    const dvVal=(f.dv==null||f.dv==='')?'':String(f.dv);   // 原始值；下方统一用 tplEsc 转义
+    const bound=!!(f.bind&&f.bind.field);
+    html+='<input class="df-zh-in" value="'+tplEsc(f.key||'')+'" placeholder="中文字段名" title="中文字段名" oninput="updDF('+i+',\'key\',this.value)">'+
+      '<input class="df-en-in" value="'+tplEsc(f.keyEn||'')+'" placeholder="英文名" title="英文名" oninput="updDF('+i+',\'keyEn\',this.value)">'+
+      '<input class="df-val-in" value="'+tplEsc(dvVal)+'" placeholder="--" title="默认值（可留空）" oninput="updDFVal('+i+',this.value)">'+
+      '<span class="df-acts">'+
+        '<button class="df-bind'+(bound?' bound':'')+'" onclick="openFieldBind('+i+')" title="'+(bound?'已绑定后台字段，点击修改':'绑定后台字段')+'">🔗</button>'+
+        '<button class="df-del" onclick="rmDF('+i+')" title="删除字段">✕</button>'+
+      '</span>';
+    // 已绑定 → 整行(跨全部列)紧贴显示来源（前缀字段名，杜绝歧义）+ ✕ 快速清除
+    if(bound){
+      const noInst=!(f.bind.deviceId||n.deviceId);
+      html+='<div class="df-bindline'+(noInst?' warn':'')+'">'+
+        '<span class="df-bindsum" onclick="openFieldBind('+i+')" title="点击编辑绑定">↳ '+tplEsc((f.key||('字段'+(i+1)))+'  ←  '+fieldBindSummary(n,f))+'</span>'+
+        '<button class="df-bindclr" onclick="clearFieldBind('+i+')" title="清除此字段的绑定">✕</button></div>';
+    }
+  });
+  c.innerHTML=html;
+  refreshDeviceBindUI(n);
   // 文本框 / 变量节点：画布上只显示「第一个字段」，因此绑定限制为单个字段，避免绑定多个却只显示一个造成误解
   const single=usesTextBox(n.type);
   const lbl=document.getElementById('prow-data-label'),btn=document.getElementById('btn-add-df'),hint=document.getElementById('prow-data-hint');
@@ -2986,6 +3039,109 @@ function addDF(){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.data=n.dat
   // 文本框 / 变量节点：只允许绑定一个字段
   if(usesTextBox(n.type)&&n.data.length>=1){flashHint(n.type==='variable'?'变量只能绑定一个值字段':'文本框只能绑定一个数据字段');return;}
   const def=NODE_DEFAULTS[n.type]||{data:[]};const used=n.data.map(f=>f.key);const next=def.data.find(k=>!used.includes(k))||'字段'+(n.data.length+1);n.data.push({key:next,keyEn:(DATA_LABEL_EN[next]||next),dv:''});renderDFs(n);}
+
+// ───── 后台数据绑定 UI ─────
+// 节点级「设备类型 + 设备实例」下拉（该节点字段的默认来源）
+function refreshDeviceBindUI(n){
+  const sec=document.getElementById('prow-devbind'),sep=document.getElementById('prow-devbind-sep');
+  if(!sec)return;
+  const show=n&&n.type!=='anchor';   // 占位点无数据，不显示绑定
+  sec.style.display=show?'':'none'; if(sep)sep.style.display=show?'':'none';
+  if(!show)return;
+  const tSel=document.getElementById('p-dev-type'),iSel=document.getElementById('p-dev-id');
+  const dt=nodeDeviceType(n);
+  tSel.innerHTML='<option value="">（未指定）</option>'+DEVICE_TYPES.map(t=>'<option value="'+tplEsc(t.value)+'"'+(t.value===dt?' selected':'')+'>'+tplEsc(t.label)+'</option>').join('');
+  const list=devicesOfType(dt);
+  iSel.innerHTML='<option value="">（未指定实例）</option>'+list.map(d=>'<option value="'+tplEsc(d.deviceId)+'"'+(d.deviceId===n.deviceId?' selected':'')+'>'+tplEsc(d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</option>').join('');
+  const hint=document.getElementById('p-dev-hint');
+  if(hint){
+    if(!DEVICE_TYPES.length){hint.textContent='未加载到后台设备类型，请确认 device/ 与 dic/ 已就绪并重启服务后点 🔄 刷新。';hint.style.color='#e0a020';}
+    else if(dt&&!n.deviceId){hint.textContent='⚠ 已选设备类型但未指定「设备实例」——跟随本节点的字段将无法关联到具体后台设备，请选择实例。';hint.style.color='#e0a020';}
+    else {hint.textContent='该节点默认对应的后台设备；下方字段未单独指定来源时即取此设备。';hint.style.color='';}
+  }
+}
+function applyDeviceBind(typeChanged){
+  const n=nodes.find(x=>x.id===selNode);if(!n)return;snapshot();
+  const dt=document.getElementById('p-dev-type').value;
+  n.deviceType=dt||''; if(!n.deviceType)delete n.deviceType;
+  if(typeChanged){ delete n.deviceId; }   // 改类型 → 实例需重选
+  else { const did=document.getElementById('p-dev-id').value; n.deviceId=did||''; if(!n.deviceId)delete n.deviceId; }
+  refreshDeviceBindUI(n); renderDFs(n); snapshot();
+}
+// 某字段绑定的可读摘要：跨设备时加 ⮕ 标记
+function fieldBindSummary(n,f){
+  if(!f.bind||!f.bind.field)return '';
+  const dt=f.bind.deviceType||nodeDeviceType(n);
+  const did=f.bind.deviceId||n.deviceId||'';
+  const cross=(f.bind.deviceType&&f.bind.deviceType!==nodeDeviceType(n))||(f.bind.deviceId&&f.bind.deviceId!==(n.deviceId||''));
+  if(!did)  // 没解析到设备实例 → 绑定不完整，明确提示
+    return '⚠ 未指定设备实例 · '+(dt?deviceTypeLabel(dt)+'·':'')+f.bind.field;
+  return (cross?'⮕ ':'')+(dt?deviceTypeLabel(dt)+'·':'')+deviceNameOf(did)+' / '+f.bind.field;
+}
+// 字段来源选择弹窗：设备(默认本节点/可跨设备) + 分类(location) + 字段(field)
+function openFieldBind(i){
+  const n=nodes.find(x=>x.id===selNode);if(!n)return;
+  const f=(n.data||[])[i];if(!f)return;
+  closeFieldBind();
+  const b=f.bind||{};
+  const ov=document.createElement('div');ov.id='fb-overlay';ov.onclick=e=>{if(e.target===ov)closeFieldBind();};
+  // 设备选项：空=跟随本节点；否则具体设备(携带其 deviceType)
+  const followLbl=n.deviceId?deviceNameOf(n.deviceId):(nodeDeviceType(n)?('⚠ 未指定实例·'+deviceTypeLabel(nodeDeviceType(n))):'⚠ 未指定设备');
+  const devOpts=['<option value="">（跟随本节点：'+tplEsc(followLbl)+'）</option>']
+    .concat(DEVICE_LIST.map(d=>{const sel=(b.deviceId===d.deviceId)?' selected':'';return '<option value="'+tplEsc(d.deviceId)+'" data-dt="'+tplEsc(d.deviceType)+'"'+sel+'>'+tplEsc(deviceTypeLabel(d.deviceType)+' · '+d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</option>';}));
+  ov.innerHTML='<div id="fb-box"><div id="fb-title">绑定后台字段：'+tplEsc(f.key||('字段'+(i+1)))+'</div>'+
+    '<label class="fb-l">来源设备</label><select id="fb-dev">'+devOpts.join('')+'</select>'+
+    '<label class="fb-l">分类(location)</label><select id="fb-loc"></select>'+
+    '<label class="fb-l">字段(field)</label><select id="fb-field"></select>'+
+    '<div id="fb-acts"><button class="tb" onclick="clearFieldBind('+i+')">清除绑定</button><span style="flex:1"></span>'+
+    '<button class="tb" onclick="closeFieldBind()">取消</button><button class="tb grn" id="fb-confirm" onclick="confirmFieldBind('+i+')">确定</button></div>'+
+    '<div class="phint" id="fb-hint" style="margin-top:6px"></div></div>';
+  document.body.appendChild(ov);
+  const effType=()=>{const o=document.getElementById('fb-dev').selectedOptions[0];const dt=o&&o.getAttribute('data-dt');return dt||nodeDeviceType(n);};
+  // 是否已能确定来源设备实例：选了具体设备，或「跟随本节点」且本节点已设实例
+  const resolvable=()=>!!(document.getElementById('fb-dev').value||n.deviceId);
+  const fillField=(curField)=>{
+    const dt=effType();const loc=document.getElementById('fb-loc').value;const fields=dictFields(dt,loc);
+    document.getElementById('fb-field').innerHTML=fields.length?fields.map(x=>'<option'+(x===curField?' selected':'')+'>'+tplEsc(x)+'</option>').join(''):'<option value="">（无字段）</option>';
+  };
+  const fillLoc=(curLoc,curField)=>{
+    const dt=effType();const locs=dictLocations(dt);
+    const loc=document.getElementById('fb-loc');
+    loc.innerHTML=locs.length?locs.map(l=>'<option'+(l===curLoc?' selected':'')+'>'+tplEsc(l)+'</option>').join(''):'<option value="">（该类型无字典，重启服务后点🔄刷新）</option>';
+    fillField(curField);
+    updateGate();
+  };
+  // 无法解析设备实例 → 禁用分类/字段/确定，避免存下无法关联后台的"残缺绑定"
+  const updateGate=()=>{
+    const ok=resolvable();
+    ['fb-loc','fb-field'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=!ok;});
+    const cb=document.getElementById('fb-confirm');if(cb){cb.disabled=!ok;cb.style.opacity=ok?'':'.45';cb.style.cursor=ok?'':'not-allowed';}
+    const h=document.getElementById('fb-hint');
+    if(!ok){h.textContent='⚠ 未确定设备实例：请在上方为本节点选「设备实例」，或在此「来源设备」直接选择具体设备，否则无法绑定。';h.style.color='#e0a020';}
+    else{const dt=effType();h.textContent='字典：'+(dt?deviceTypeLabel(dt):'—')+'（'+dictLocations(dt).length+' 个分类）';h.style.color='';}
+  };
+  // 解析当前 bind 的初值
+  let curLoc='',curField='';
+  if(b.field){const p=String(b.field).split('.');curField=p.pop();curLoc=p.join('.');}
+  document.getElementById('fb-dev').onchange=()=>fillLoc('','');
+  document.getElementById('fb-loc').onchange=()=>{fillField('');};
+  fillLoc(curLoc,curField);
+}
+function closeFieldBind(){const ov=document.getElementById('fb-overlay');if(ov)ov.remove();}
+function clearFieldBind(i){const n=nodes.find(x=>x.id===selNode);if(!n)return;const f=(n.data||[])[i];if(f){snapshot();delete f.bind;snapshot();}closeFieldBind();renderDFs(n);}
+function confirmFieldBind(i){
+  const n=nodes.find(x=>x.id===selNode);if(!n)return;const f=(n.data||[])[i];if(!f)return;
+  const devSel=document.getElementById('fb-dev'),loc=document.getElementById('fb-loc').value,field=document.getElementById('fb-field').value;
+  if(!devSel.value&&!n.deviceId){flashHint('请先确定设备实例：为本节点选「设备实例」或在弹窗里选具体来源设备');return;}  // 无实例不允许保存
+  if(!loc||!field){flashHint('请选择分类与字段');return;}
+  snapshot();
+  const o=devSel.selectedOptions[0],did=devSel.value,dt=o&&o.getAttribute('data-dt');
+  const bind={field:loc+'.'+field};
+  if(did){ bind.deviceId=did; if(dt)bind.deviceType=dt; }   // 指定了具体设备 → 跨设备/显式来源
+  f.bind=bind;
+  if(!f.key){ f.key=field; f.keyEn=f.keyEn||field; }        // 字段名未填则用后台字段名兜底
+  snapshot();closeFieldBind();renderDFs(n);
+}
 function resetRotation(){const n=nodes.find(x=>x.id===selNode);if(!n)return;snapshot();n.rotation=0;document.getElementById('p-rot').value=0;document.getElementById('p-rot-v').textContent=0;snapshot();}
 function resetFieldPos(){const n=nodes.find(x=>x.id===selNode);if(!n||!n.data)return;snapshot();n.data.forEach(f=>{f.ox=0;f.oy=0;});snapshot();}
 // 智能环绕布局：把字段卡片分配到设备四周空闲方向，避开连线占用的边
@@ -3581,13 +3737,29 @@ function buildJSON(){
       scale:n.scale||1, rotation:n.rotation||0,
       fontSize:n.fontSize||14, fontColor:n.fontColor||'#e8f4ff',
       display:{ showLabel:!n.hideLabel, showFields:!n.hideFields },
-      data:(n.data||[]).map(f=>({
-        key:{zh:f.key, en:f.keyEn||f.key},
-        value:(f.dv==null||f.dv==='')?'':f.dv,
-        hidden:!!f.hidden,
-        offset:{x:parseFloat((f.ox||0).toFixed(1)), y:parseFloat((f.oy||0).toFixed(1))}
-      }))
+      data:(n.data||[]).map(f=>{
+        const fo={
+          key:{zh:f.key, en:f.keyEn||f.key},
+          value:(f.dv==null||f.dv==='')?'':f.dv,
+          hidden:!!f.hidden,
+          offset:{x:parseFloat((f.ox||0).toFixed(1)), y:parseFloat((f.oy||0).toFixed(1))}
+        };
+        if(f.bind&&f.bind.field){
+          // 后台字段绑定：导出时把来源「显式化」——总是写全 deviceType/deviceId，并用 followNode 标明是否跟随本节点设备
+          const follow=!(f.bind.deviceType||f.bind.deviceId);
+          fo.bind={
+            field:f.bind.field,
+            deviceType:f.bind.deviceType||nodeDeviceType(n)||'',
+            deviceId:f.bind.deviceId||n.deviceId||'',
+            followNode:follow                                    // true=随节点设备（节点改设备它跟着变）；false=显式指定来源
+          };
+        }
+        return fo;
+      })
     };
+    // 后台设备绑定：节点默认对应的后台设备（字段未单独指定来源时取此）
+    if(n.deviceType)o.deviceType=n.deviceType;
+    if(n.deviceId)o.deviceId=n.deviceId;
     // status / online 已移除：节点不再导出运行状态属性
     // 自定义图标的 type 不在后台库中，附带文件名以便前端解析
     if(String(n.type).startsWith('custom_')) o.icon=iconFileName(n.type);
@@ -3654,6 +3826,21 @@ function buildJSON(){
     Object.keys(signalValues).forEach(k=>{if(valid.has(k))samples[k]=signalValues[k];});
     if(Object.keys(samples).length)obj.sampleSignals=samples;
   }
+  // ★ 后台数据绑定清单：每条字段绑定 → {signal, node, source:{deviceType,deviceId,field}}（来源自包含，含跨设备）
+  // 后台据此知道：取哪台设备的哪个字段、对应输出哪个实时信号键（signal=节点id.字段名，前端 applyLiveSignals 直接消费）
+  const dataBindings=[];
+  nodes.forEach(n=>{
+    (n.data||[]).forEach(f=>{
+      if(!f.bind||!f.bind.field||!f.key)return;
+      const deviceType=f.bind.deviceType||nodeDeviceType(n)||'';
+      const deviceId=f.bind.deviceId||n.deviceId||'';
+      const dev=deviceId?DEVICE_LIST.find(d=>d.deviceId===deviceId):null;
+      const source={deviceType, deviceId, field:f.bind.field};
+      if(dev&&dev.deviceName)source.deviceName=dev.deviceName;   // 便于后台/排错人读，可选
+      dataBindings.push({ signal:n.id+'.'+f.key, node:n.id, label:f.key, source });
+    });
+  });
+  if(dataBindings.length)obj.dataBindings=dataBindings;
   return JSON.stringify(obj,null,2);
 }
 function refreshJSON(){document.getElementById('jout').textContent=buildJSON();}
@@ -3698,6 +3885,9 @@ function parseImportedNode(o){
     fontColor:o.fontColor||'#e8f4ff'
   };
   // status / online 已移除：忽略旧文件里的 status 字段（向后兼容，不再读入节点）
+  // 后台设备绑定（节点默认设备）
+  if(o.deviceType)n.deviceType=o.deviceType;
+  if(o.deviceId)n.deviceId=o.deviceId;
   // 显示开关（导出用 display.showLabel/showFields；内部用 hideLabel/hideFields）
   const disp=o.display||{};
   n.hideLabel=(disp.showLabel===false)||(o.hideLabel===true);
@@ -3708,8 +3898,14 @@ function parseImportedNode(o){
     const off=f.offset||{};
     let dv=(f.value!==undefined?f.value:f.dv);
     if(dv==='--'||dv==null)dv='';   // 兼容旧导出的占位符 '--'：视为无值（空）
-    return {key:(key.zh||''), keyEn:(key.en||key.zh||''), dv:dv, hidden:!!f.hidden,
+    const fld={key:(key.zh||''), keyEn:(key.en||key.zh||''), dv:dv, hidden:!!f.hidden,
             ox:(+off.x||+f.ox||0), oy:(+off.y||+f.oy||0)};
+    if(f.bind&&f.bind.field){
+      // followNode=true（或旧格式缺省 device）→ 内部只存 field 保持「跟随节点」；否则固化显式来源
+      if(f.bind.followNode||!(f.bind.deviceType||f.bind.deviceId)) fld.bind={field:f.bind.field};
+      else fld.bind={field:f.bind.field, ...(f.bind.deviceType?{deviceType:f.bind.deviceType}:{}), ...(f.bind.deviceId?{deviceId:f.bind.deviceId}:{})};
+    }
+    return fld;
   });
   // 文本框 / 变量节点 共用的盒子样式（背景/边框/圆角/内边距）
   if(usesTextBox(o.type)){const t=o.textStyle||{};n.bg=t.bg||o.bg||'none';n.border=t.border||o.border||'none';

@@ -146,7 +146,7 @@ canvas{display:block;cursor:default}
 #zoom-ctrl button:hover{background:var(--ui-hover)}
 #zoom-info{font-size:12px;color:var(--ui-accent);font-weight:600;min-width:46px;text-align:center;cursor:pointer;user-select:none}
 #zoom-info:hover{text-decoration:underline}
-#props{width:320px;background:var(--ui-bg2);border-left:1px solid var(--ui-border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;transition:width .18s ease}
+#props{width:344px;background:var(--ui-bg2);border-left:1px solid var(--ui-border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;transition:width .18s ease}
 #props.collapsed{width:0;border-left:none}
 #props h3{font-size:13px;color:var(--ui-accent);letter-spacing:1px;padding:10px 11px 7px;border-bottom:1px solid var(--ui-border);font-weight:bold}
 #pbody{padding:11px;flex:1;overflow-y:auto}
@@ -159,19 +159,37 @@ canvas{display:block;cursor:default}
 .psep{height:1px;background:var(--ui-border);margin:10px 0}
 .phint{font-size:12px;color:var(--ui-text2);line-height:1.7;opacity:.85}
 #pnone{color:var(--ui-text2);font-size:13px;text-align:center;margin-top:20px;line-height:2;opacity:.8}
-.dfrow{display:flex;gap:5px;margin-bottom:5px;align-items:center}.dfrow input{min-width:0}.dfrow .df-zh-in,.dfrow .df-en-in{flex:1.3}.dfrow .df-val-in{flex:0.9}
+/* 数据字段：列头 + 所有字段单元格同处一个 grid → 列宽统一、列名与数据行精确对齐 */
+.dfgrid{display:grid;grid-template-columns:2fr 1.2fr .85fr auto;column-gap:4px;row-gap:5px;align-items:center}
+.dfgrid input{min-width:0}
+.dfgrid .dh{font-size:11px;font-weight:600;white-space:nowrap;padding-left:4px}
+.dfgrid .dh-zh{color:#4dd0ff}.dfgrid .dh-en{color:#2ecc71}.dfgrid .dh-val{color:#f1c40f}.dfgrid .dh-act{color:#b38bff}
 .df-zh-in{border-left:3px solid #4dd0ff!important}
 .df-en-in{border-left:3px solid #2ecc71!important}
-.df-head{display:flex;gap:5px;margin-bottom:6px;align-items:center}
-.df-col{flex:1;font-size:12px;font-weight:bold;text-align:center;padding:4px 0;border-radius:4px}
-.df-col-zh{background:rgba(77,208,255,.18);color:#4dd0ff;border:1px solid rgba(77,208,255,.4)}
-.df-col-en{background:rgba(46,204,113,.18);color:#2ecc71;border:1px solid rgba(46,204,113,.4)}
-.df-col-val{background:rgba(241,196,15,.18);color:#f1c40f;border:1px solid rgba(241,196,15,.4)}
-.df-tag{font-size:10px;flex-shrink:0;width:20px;text-align:center;border-radius:3px;padding:2px 0;font-weight:bold}
-.df-zh{background:rgba(77,208,255,.18);color:#4dd0ff}
-.df-en{background:rgba(46,204,113,.18);color:#2ecc71}
-.dfrow button{background:var(--ui-btn-bg);border:1px solid var(--ui-border);color:var(--ui-text2);font-size:12px;padding:3px 7px;border-radius:3px;cursor:pointer;flex-shrink:0}
-.dfrow button:hover{border-color:#e06060;color:#e06060}
+.df-val-in{border-left:3px solid #f1c40f!important}
+.df-acts{display:flex;gap:4px}
+.dfgrid button{width:30px;background:var(--ui-btn-bg);border:1px solid var(--ui-border);color:var(--ui-text2);font-size:12px;padding:4px 0;border-radius:3px;cursor:pointer}
+.dfgrid .df-del:hover{border-color:#e06060;color:#e06060}
+/* 🔗 绑定按钮：灰=未绑定，绿=已绑定 */
+.dfgrid .df-bind{filter:grayscale(1);opacity:.6}
+.dfgrid .df-bind:hover{filter:none;opacity:1;border-color:var(--ui-accent);color:var(--ui-accent)}
+.dfgrid .df-bind.bound{filter:none;opacity:1;border-color:#2ecc71;background:color-mix(in srgb,#2ecc71 16%,var(--ui-btn-bg))}
+/* 已绑定的来源摘要：卡片内紧贴字段下方、前缀字段名，明确归属；含行内✕快速清除 */
+.df-bindline{grid-column:1 / -1;display:flex;align-items:flex-start;gap:6px;margin:-2px 0 2px 2px;padding-left:6px;border-left:2px solid rgba(46,204,113,.5)}
+.df-bindline.warn{border-left-color:#e0a020}
+.df-bindsum{flex:1;min-width:0;font-size:11px;color:#2ecc71;cursor:pointer;word-break:break-all;line-height:1.35}
+.df-bindline.warn .df-bindsum{color:#e0a020}
+.df-bindsum:hover{text-decoration:underline}
+.df-bindclr{flex-shrink:0;background:var(--ui-btn-bg);border:1px solid var(--ui-border);color:var(--ui-text2);font-size:10px;line-height:1;padding:2px 6px;border-radius:3px;cursor:pointer}
+.df-bindclr:hover{border-color:#e06060;color:#e06060}
+/* 字段来源选择弹窗 */
+#fb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:210;display:flex;align-items:center;justify-content:center}
+#fb-box{background:var(--ui-bg);border:1px solid var(--ui-border);border-radius:10px;padding:16px;width:380px;max-width:92vw;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+#fb-title{font-size:13px;font-weight:700;color:var(--ui-accent);margin-bottom:10px}
+#fb-box .fb-l{display:block;font-size:12px;color:var(--ui-text2);margin:8px 0 3px}
+#fb-box select{width:100%;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-size:12px;padding:6px;border-radius:5px}
+#fb-acts{display:flex;gap:8px;align-items:center;margin-top:14px}
+#fb-acts .tb{padding:5px 12px}#fb-acts .grn{border-color:#2ecc71;color:#2ecc71}
 #bgpanel-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:40}
 #bgpanel-overlay.show{display:block}
 #bgpanel{position:fixed;top:0;right:0;height:100vh;width:340px;max-width:88vw;background:var(--ui-bg);border-left:1px solid var(--ui-border);padding:0;z-index:41;box-shadow:-8px 0 32px rgba(0,0,0,.45);transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
