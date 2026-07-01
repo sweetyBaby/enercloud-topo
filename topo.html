@@ -349,10 +349,9 @@
 </div>
 <div id="jpanel"><div id="jpi"><h3 data-i18n="📋 画布 JSON">📋 画布 JSON</h3>
   <div style="font-size:12px;color:var(--ui-text2);margin-bottom:8px;line-height:1.6">
-    画布 JSON 轻量，仅含节点/连线实例信息，通过 <b>meta.libraryRef</b> 引用元素库版本，并自带本图用到的连线类型样式(edgeStyles)。完整元素库+字典+图标请点「🗂 元素库包」导出。
-    数据驱动规则随图导出：节点 <b>visibleWhen</b>、连线 <b>showWhen</b>/<b>dirRules</b>、顶层 <b>signals</b>/<b>sampleSignals</b>；运行端用元素库包内的 <b>runtime.js</b> 的 <b>resolveDynamic(topology, signals)</b> 还原显隐与流向（与编辑器内规则实时生效的效果一致）。
-    全局视图设置（线标签/数据字段/线宽/走线风格/汇流合并）记录在 <b>meta.view</b>，导入时一并还原，复原整张拓扑图外观。
+    含节点/连线、数据驱动规则(<b>visibleWhen</b>/<b>showWhen</b>/<b>dirRules</b>)、后台绑定清单(<b>dataBindings</b>)与视图设置(<b>meta.view</b>)；完整元素库+字典+图标请用「🗂 元素库包」。
   </div>
+  <div id="jbind-risk" style="display:none"></div>
   <div id="jout"></div>
   <div id="jpa"><button class="tb" onclick="copyJSON()" data-i18n="📋 复制JSON">📋 复制JSON</button>
     <button class="tb grn" onclick="dlJSON()" data-i18n="⬇ 下载画布JSON">⬇ 下载画布JSON</button>

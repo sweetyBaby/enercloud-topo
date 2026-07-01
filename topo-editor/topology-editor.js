@@ -2957,8 +2957,19 @@ function selectEdge(e){
 function showPanel(m){document.getElementById('pnone').style.display=m==='none'?'block':'none';document.getElementById('pnode').style.display=m==='node'?'block':'none';document.getElementById('pedge').style.display=m==='edge'?'block':'none';}
 function applyNP(){
   const n=nodes.find(x=>x.id===selNode);if(!n)return;
-  const nid=document.getElementById('p-id').value.trim();
-  if(nid&&nid!==n.id){edges.forEach(e=>{if(e.from===n.id)e.from=nid;if(e.to===n.id)e.to=nid;});n.id=nid;selNode=nid;}
+  const idEl=document.getElementById('p-id');
+  const nid=idEl.value.trim();
+  // 节点 ID 必须唯一且非空：非法则标红提示、不应用该 ID（其余属性照常保存），改成合法后自动生效
+  if(nid!==n.id){
+    let err='';
+    if(!nid)err='节点 ID 不能为空';
+    else if(nodes.some(x=>x!==n&&x.id===nid))err='节点 ID 已存在，请使用唯一 ID';
+    if(err){ idEl.style.borderColor='#ff6b6b';idEl.title=err; }
+    else{
+      idEl.style.borderColor='';idEl.title='';
+      edges.forEach(e=>{if(e.from===n.id)e.from=nid;if(e.to===n.id)e.to=nid;});n.id=nid;selNode=nid;
+    }
+  }else{ idEl.style.borderColor='';idEl.title=''; }
   n.labelZh=document.getElementById('p-label-zh').value;
   n.labelEn=document.getElementById('p-label-en').value;
   n.label=n.labelZh; // 兼容旧字段
@@ -3843,11 +3854,84 @@ function buildJSON(){
   if(dataBindings.length)obj.dataBindings=dataBindings;
   return JSON.stringify(obj,null,2);
 }
-function refreshJSON(){document.getElementById('jout').textContent=buildJSON();}
-function showJSON(){document.getElementById('jout').textContent=buildJSON();document.getElementById('jpanel').classList.add('show');}
+// 导出前校验：列出「有字段名但未绑定/绑定无法解析」的数据字段（风险项，不阻断导出）
+// 已加载后台设备/字典时，进一步校验「设备实例真实存在」「location.field 在字典中存在」，以捕获导入/陈旧的失效绑定；
+// 未加载参考数据时（DEVICE_LIST/DICTS 为空）则退化为存在性检查，避免误报。
+function unboundBindingReport(){
+  const miss=[];
+  const haveDevices=DEVICE_LIST.length>0;
+  const add=(n,f,reason)=>miss.push({node:n.id,label:nodeLabel(n),key:f.key,reason});
+  nodes.forEach(n=>{
+    if(n.type==='anchor')return;                       // 占位点无数据
+    (n.data||[]).forEach(f=>{
+      if(!f.key)return;
+      if(!(f.bind&&f.bind.field)){add(n,f,'未绑定字段');return;}
+      const dt=f.bind.deviceType||nodeDeviceType(n)||'';
+      const did=f.bind.deviceId||n.deviceId||'';
+      if(!did){add(n,f,'缺设备实例');return;}
+      if(haveDevices&&!DEVICE_LIST.some(d=>d.deviceId===did)){add(n,f,'设备实例不存在');return;}
+      const dict=DEVICE_DICTS[dt];
+      if(dict&&dict.length){                            // 该类型字典已加载 → 校验字段确实存在
+        const p=String(f.bind.field).split('.'),fld=p.pop(),loc=p.join('.');
+        const g=dict.find(x=>x.location===loc);
+        if(!g||!(g.fields||[]).includes(fld)){add(n,f,'字段不在字典');return;}
+      }
+    });
+  });
+  return miss;
+}
+// 导出前校验：节点 ID 是否重复/为空（ID 是 signal 键与 dataBindings 的主键，重复会冲突，属严重问题）
+// 用 Object.create(null) 避免 __proto__/constructor/toString 等 ID 与对象原型属性碰撞导致误计数。
+function duplicateIdReport(){
+  const cnt=Object.create(null);nodes.forEach(n=>{const id=n.id||'';cnt[id]=(cnt[id]||0)+1;});
+  const dups=Object.keys(cnt).filter(id=>id&&cnt[id]>1).map(id=>({id,count:cnt[id]}));
+  const emptyCount=(cnt['']||0);
+  return {dups,emptyCount};
+}
+// 在 JSON 面板顶部渲染导出校验横幅：ID 重复/为空（红·硬性·阻断导出）+ 字段未绑定（黄·风险·仍可导出）
+function renderBindRisk(){
+  const el=document.getElementById('jbind-risk');if(!el)return;
+  const {dups,emptyCount}=duplicateIdReport();
+  const miss=unboundBindingReport();
+  if(!dups.length&&!emptyCount&&!miss.length){el.style.display='none';el.innerHTML='';return;}
+  // 有 ID 冲突 → 整条横幅切成红色（严重·阻断导出）；否则保持黄色（风险·仍可导出）
+  const severe=!!(dups.length||emptyCount);
+  el.style.borderColor=severe?'#ff6b6b':'';
+  el.style.background=severe?'rgba(255,107,107,.12)':'';
+  let html='';
+  if(dups.length||emptyCount){
+    const parts=dups.map(d=>'· ID「'+tplEsc(d.id)+'」重复 '+d.count+' 次');
+    if(emptyCount)parts.push('· 有 '+emptyCount+' 个节点 ID 为空');
+    html+='<div style="color:#ff6b6b"><b>✕ 节点 ID 冲突：会造成信号键/dataBindings 冲突，已阻止导出，请先修正：</b>'+
+      '<div style="margin-top:5px;max-height:120px;overflow:auto;font-size:12px;line-height:1.5">'+parts.join('<br>')+'</div></div>';
+  }
+  if(miss.length){
+    const items=miss.map(m=>'· '+tplEsc(m.label+' ('+m.node+') → '+m.key+'：'+m.reason)).join('<br>');
+    html+=(html?'<div style="height:8px"></div>':'')+
+      '<b>⚠ '+miss.length+' 个字段未绑定后台字段，导出后无实时数据（仍可导出）</b>'+
+      '<div style="margin-top:5px;max-height:160px;overflow:auto;font-size:12px;line-height:1.5">'+items+'</div>';
+  }
+  el.style.display='';el.innerHTML=html;
+}
+function refreshJSON(){document.getElementById('jout').textContent=buildJSON();renderBindRisk();}
+function showJSON(){document.getElementById('jout').textContent=buildJSON();renderBindRisk();document.getElementById('jpanel').classList.add('show');
+  const {dups,emptyCount}=duplicateIdReport();const miss=unboundBindingReport();
+  if(dups.length||emptyCount)flashHint(lang==='en'?'⚠ Duplicate/empty node IDs — fix before use':'✕ 存在重复/为空的节点 ID，会造成信号键冲突，请先修正');
+  else if(miss.length)flashHint(lang==='en'?('Warning: '+miss.length+' field(s) not bound — export allowed'):('⚠ 有 '+miss.length+' 个数据字段未绑定后台字段（仍可导出）'));
+}
 function hideJSON(){document.getElementById('jpanel').classList.remove('show');}
-function copyJSON(){navigator.clipboard.writeText(buildJSON()).then(()=>{const b=document.querySelector('#jpa .tb');const o=b.textContent;b.textContent='✓ 已复制';setTimeout(()=>b.textContent=o,1500);});}
-function dlJSON(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buildJSON()],{type:'application/json'}));a.download='topology.json';a.click();}
+// 节点 ID 唯一/非空是硬性要求：重复或为空时拦截导出（复制/下载），必须先修正
+function blockExportForIds(){
+  const {dups,emptyCount}=duplicateIdReport();
+  if(dups.length||emptyCount){
+    renderBindRisk();
+    flashHint(lang==='en'?'Export blocked: duplicate/empty node IDs — fix first':'✕ 存在重复或为空的节点 ID，已阻止导出，请先修正');
+    return true;
+  }
+  return false;
+}
+function copyJSON(){if(blockExportForIds())return;navigator.clipboard.writeText(buildJSON()).then(()=>{const b=document.querySelector('#jpa .tb');const o=b.textContent;b.textContent='✓ 已复制';setTimeout(()=>b.textContent=o,1500);});}
+function dlJSON(){if(blockExportForIds())return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buildJSON()],{type:'application/json'}));a.download='topology.json';a.click();}
 
 // ───── 导入画布 JSON：按导出的配置还原节点/连线/画布设置，便于快速修改 ─────
 function onImportJSON(ev){
