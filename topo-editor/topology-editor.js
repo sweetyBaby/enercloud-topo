@@ -3100,7 +3100,7 @@ function openFieldBind(i){
   const followLbl=n.deviceId?deviceNameOf(n.deviceId):(nodeDeviceType(n)?('⚠ 未指定实例·'+deviceTypeLabel(nodeDeviceType(n))):'⚠ 未指定设备');
   const devOpts=['<option value="">（跟随本节点：'+tplEsc(followLbl)+'）</option>']
     .concat(DEVICE_LIST.map(d=>{const sel=(b.deviceId===d.deviceId)?' selected':'';return '<option value="'+tplEsc(d.deviceId)+'" data-dt="'+tplEsc(d.deviceType)+'"'+sel+'>'+tplEsc(deviceTypeLabel(d.deviceType)+' · '+d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</option>';}));
-  ov.innerHTML='<div id="fb-box"><div id="fb-title">绑定后台字段：'+tplEsc(f.key||('字段'+(i+1)))+'</div>'+
+  ov.innerHTML='<div id="fb-box"><button class="dlg-close" onclick="closeFieldBind()" title="关闭" aria-label="关闭">✕</button><div id="fb-title">绑定后台字段：'+tplEsc(f.key||('字段'+(i+1)))+'</div>'+
     '<label class="fb-l">来源设备</label><select id="fb-dev">'+devOpts.join('')+'</select>'+
     '<label class="fb-l">分类(location)</label><select id="fb-loc"></select>'+
     '<label class="fb-l">字段(field)</label><select id="fb-field"></select>'+
