@@ -194,8 +194,8 @@ async function saveCanvasAsTemplate(){
   const curName=((curEntry?(lang==='en'?(curEntry.nameEn||curEntry.name):(curEntry.name||curEntry.nameEn)):'')||'').trim();
   // 只要「已加载模板且能在清单中找到」就展示「覆盖」选项（保证一致性：使用任意模板后都在）。
   const canOverwrite=!!(curEntry&&curName);
-  // 默认是否勾选覆盖：仅自定义模板默认勾选；内置模板默认不勾（防误覆盖内置，但仍可手动勾选覆盖）。
-  const overwriteDefault=!!(canOverwrite&&!curEntry.builtin);
+  // 覆盖默认不勾：默认「另存为新」，要更新原模板需手动勾选。重名会被 validate 拦截并提示勾选覆盖，故默认不勾也不会误建重复。
+  const overwriteDefault=false;
   // 重名校验放在对话框「保存」点击处：中/英名与其它模板（非当前覆盖目标）重复则阻止保存并保持对话框打开。
   //  overwriteId 依赖复选框实时状态，故在 validate 内按 r.overwrite 重算。
   const res=await tplDialog({title:lang==='en'?'💾 Save as template':'💾 保存为模板',
