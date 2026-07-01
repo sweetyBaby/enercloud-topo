@@ -3328,28 +3328,32 @@ function selectedNodes(){return [...selSet].map(id=>nodes.find(n=>n.id===id)).fi
 function selectedChipRefs(){
   return [...selChips].map(k=>{const a=k.split('#');const n=nodes.find(z=>z.id===a[0]);if(!n||!n.data[a[1]])return null;
     const pos=fieldChipPos(n,parseInt(a[1]));const b=n.data[a[1]]._chipBox;
-    return {n,f:n.data[a[1]],fi:parseInt(a[1]),x:pos.x,y:pos.y,w:b?b.w:60,h:b?b.h:16};
+    // x/y 取 chip 盒左上角(与 w/h 同口径)：优先用已绘制的 _chipBox，未绘制时用 fieldChipPos 兜底
+    // 兜底 y 用「盒顶」= 基线(pos.y) - cfs，与 _chipBox.y(=pos.y-cfs) 同口径，避免竖向对齐偏移
+    return {n,f:n.data[a[1]],fi:parseInt(a[1]),x:(b?b.x:pos.x),y:(b?b.y:(pos.y-(pos.cfs||0))),w:b?b.w:60,h:b?b.h:16};
   }).filter(Boolean);
 }
 function alignChips(mode){
   const cs=selectedChipRefs();if(cs.length<2)return;
   snapshot();
-  // 用 chip 左上角坐标对齐
-  const xs=cs.map(c=>c.x), ys=cs.map(c=>c.y);
-  const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
-  const cX=(minX+maxX)/2,cY=(minY+maxY)/2;
-  const setX=(c,nx)=>{c.f.ox=(c.f.ox||0)+(nx-c.x);};
-  const setY=(c,ny)=>{c.f.oy=(c.f.oy||0)+(ny-c.y);};
-  if(mode==='left')cs.forEach(c=>setX(c,minX));
-  else if(mode==='right')cs.forEach(c=>setX(c,maxX));
-  else if(mode==='hcenter')cs.forEach(c=>setX(c,cX));
-  else if(mode==='top')cs.forEach(c=>setY(c,minY));
-  else if(mode==='bottom')cs.forEach(c=>setY(c,maxY));
-  else if(mode==='vcenter')cs.forEach(c=>setY(c,cY));
-  else if(mode==='hdist'){const s=[...cs].sort((a,b)=>a.x-b.x);const span=maxX-minX>1?(maxX-minX):(s.length-1)*(parseInt(document.getElementById('align-gap').value)||80);const step=span/(s.length-1);s.forEach((c,i)=>setX(c,minX+step*i));}
-  else if(mode==='vdist'){const s=[...cs].sort((a,b)=>a.y-b.y);const span=maxY-minY>1?(maxY-minY):(s.length-1)*(parseInt(document.getElementById('align-gap').value)||30);const step=span/(s.length-1);s.forEach((c,i)=>setY(c,minY+step*i));}
-  else if(mode==='hgap'){const gap=parseInt(document.getElementById('align-gap').value)||80;const s=[...cs].sort((a,b)=>a.x-b.x);s.forEach((c,i)=>setX(c,minX+gap*i));}
-  else if(mode==='vgap'){const gap=parseInt(document.getElementById('align-gap').value)||30;const s=[...cs].sort((a,b)=>a.y-b.y);s.forEach((c,i)=>setY(c,minY+gap*i));}
+  // c.x/c.y = chip 左/上边缘(世界坐标)，c.w/c.h = chip 宽高 → 按「边缘」对齐(与元素对齐口径一致)，宽度不同也能真正左/右/居中对齐
+  const minL=Math.min(...cs.map(c=>c.x)), maxR=Math.max(...cs.map(c=>c.x+c.w));
+  const minT=Math.min(...cs.map(c=>c.y)), maxB=Math.max(...cs.map(c=>c.y+c.h));
+  const cX=(minL+maxR)/2, cY=(minT+maxB)/2;
+  // ox/oy 以「屏幕像素」存储（fieldChipPos 用 ox/zoom 换算到世界坐标）；这里的 nx/c.x 是世界坐标，
+  // 故位移增量需 *zoom 转成屏幕像素，否则非 100% 缩放下对齐会错位（与拖拽存储口径一致）。
+  const setX=(c,nx)=>{c.f.ox=(c.f.ox||0)+(nx-c.x)*zoom;};
+  const setY=(c,ny)=>{c.f.oy=(c.f.oy||0)+(ny-c.y)*zoom;};
+  if(mode==='left')cs.forEach(c=>setX(c,minL));            // 左边缘对齐
+  else if(mode==='right')cs.forEach(c=>setX(c,maxR-c.w));   // 右边缘对齐
+  else if(mode==='hcenter')cs.forEach(c=>setX(c,cX-c.w/2)); // 水平居中
+  else if(mode==='top')cs.forEach(c=>setY(c,minT));         // 顶边缘对齐
+  else if(mode==='bottom')cs.forEach(c=>setY(c,maxB-c.h));  // 底边缘对齐
+  else if(mode==='vcenter')cs.forEach(c=>setY(c,cY-c.h/2)); // 垂直居中
+  else if(mode==='hdist'){const s=[...cs].sort((a,b)=>a.x-b.x);const a0=s[0].x,a1=s[s.length-1].x;const span=(a1-a0)>1?(a1-a0):(s.length-1)*(parseInt(document.getElementById('align-gap').value)||80);const step=span/(s.length-1);s.forEach((c,i)=>setX(c,a0+step*i));}
+  else if(mode==='vdist'){const s=[...cs].sort((a,b)=>a.y-b.y);const a0=s[0].y,a1=s[s.length-1].y;const span=(a1-a0)>1?(a1-a0):(s.length-1)*(parseInt(document.getElementById('align-gap').value)||30);const step=span/(s.length-1);s.forEach((c,i)=>setY(c,a0+step*i));}
+  else if(mode==='hgap'){const gap=parseInt(document.getElementById('align-gap').value)||80;const s=[...cs].sort((a,b)=>a.x-b.x);let cur=s[0].x;s.forEach(c=>{setX(c,cur);cur+=c.w+gap;});}   // 边到边固定间距(累积宽度)
+  else if(mode==='vgap'){const gap=parseInt(document.getElementById('align-gap').value)||30;const s=[...cs].sort((a,b)=>a.y-b.y);let cur=s[0].y;s.forEach(c=>{setY(c,cur);cur+=c.h+gap;});}   // 边到边固定间距(累积高度)
   snapshot();
 }
 function alignSel(mode){
