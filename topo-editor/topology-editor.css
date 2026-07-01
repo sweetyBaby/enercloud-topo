@@ -167,6 +167,8 @@ canvas{display:block;cursor:default}
 .df-zh-in{border-left:3px solid #4dd0ff!important}
 .df-en-in{border-left:3px solid #2ecc71!important}
 .df-val-in{border-left:3px solid #f1c40f!important}
+/* 中英文名必填：缺失时整框标红提示 */
+.df-invalid{border-color:#ff6b6b!important;background:rgba(255,107,107,.08)!important}
 .df-acts{display:flex;gap:4px}
 .dfgrid button{width:30px;background:var(--ui-btn-bg);border:1px solid var(--ui-border);color:var(--ui-text2);font-size:12px;padding:4px 0;border-radius:3px;cursor:pointer}
 .dfgrid .df-del:hover{border-color:#e06060;color:#e06060}
@@ -326,6 +328,8 @@ canvas{display:block;cursor:default}
 .rm-mini{width:24px;height:24px;border:1px solid var(--ui-border);background:var(--ui-btn-bg);color:var(--ui-text2);border-radius:5px;cursor:pointer}
 .rm-mini:hover{border-color:var(--ui-accent);color:var(--ui-accent)}
 .rm-dirdefault{display:flex;align-items:center;gap:8px;color:var(--ui-text2);font-size:13px;margin-top:4px}
+.rm-iconsel{max-width:200px;font-size:12px}
+.rm-iconprev{width:26px;height:26px;object-fit:contain;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);border-radius:5px;padding:2px;flex-shrink:0}
 .rule-line{display:flex;align-items:center;gap:8px}
 .rule-sum{flex:1;min-width:0;font-size:12px;color:var(--ui-text2);background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);border-radius:6px;padding:6px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rule-sum.has{color:#ffcc44;border-color:#7a6320}

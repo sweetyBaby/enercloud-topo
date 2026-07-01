@@ -43,10 +43,13 @@
 | 规则 | 作用对象 | 说明 |
 |---|---|---|
 | **显示条件** `visibleWhen` | 元素 | 条件不满足 → 该元素（及其连线）隐藏 |
+| **图标规则** `iconRules` | 元素 | 按信号顺序匹配，第一个命中的规则决定显示哪个图标；都不命中用元素自身图标（如电池 BMS 充电/放电/待机切换不同图标） |
 | **显示条件** `showWhen` | 连线 | 条件不满足 → 该连线不画（适合"动态建立的连线"） |
 | **流向（按规则确定）** `dirRules` | 连线 | 按顺序匹配，第一个命中的规则决定流向；都不命中用连线自身的「固定流向」兜底 |
 
 流向取值：`正向 →` / `反向 ←` / `双向 ↔` / `无流向`。
+
+**图标规则怎么配**：选中元素 → 属性面板「图标规则（数据驱动）」→「编辑」。每条规则 = 一个条件 + 一个目标图标（从元素库里选，如 `bms_charge` / `bms_discharge` / `bms_standby`）；从上到下匹配，命中即用该图标，都不命中回落到元素自身图标。图标切换**只换显示图标**，不改元素类型/尺寸/数据字段。前端拿到的目标图标是元素库里的 `type`，用 `type→图标文件` 同一张映射解析（见 §5、§6）。
 
 ### 2.4 全局信号 & 注入测试
 - 「⚙ 规则与信号」面板可新增**全局信号**（如 `mode`、`islanding`），任意规则都能引用，随图导出。
@@ -118,10 +121,18 @@ TopoRuntime.fit();                     // 重新适配容器尺寸
 ```js
 import { resolveDynamic } from './runtime.js';
 const state = resolveDynamic(topology, liveSignals);
-// state.nodes: [{...node, visible}]            visible=false 不渲染
-// state.edges: [{...edge, visible, dir}]        visible 决定是否画，dir=动态流向
+// state.nodes: [{...node, visible, iconType}]   visible=false 不渲染；iconType=当前应绘制的图标(默认=node.type)
+// state.edges: [{...edge, visible, dir}]         visible 决定是否画，dir=动态流向
+
+// 画节点图标时，用 iconType 取图标文件（与 node.type 同一张映射表）：
+state.nodes.forEach(n => {
+  if (!n.visible) return;                          // 被显示条件隐藏 → 跳过
+  const iconUrl = ICON_BASE + ICON_PATHS[n.iconType];   // ← 图标规则命中时 iconType≠type，自动换图
+  drawImage(iconUrl, n.position, n.sizeWorld);
+});
 ```
 > ⚠️ 注意：连线 `route:"smart"`（智能走线）的实际避障路径**不在 JSON 里**，自研渲染需自己实现走线算法，否则线形可能与运营端不一致。**优先用方案 A 可避免该问题。**
+> 方案 A（同一渲染器）会**自动按 `iconRules` 换图标**，前端无需任何处理。
 
 ---
 
@@ -134,18 +145,18 @@ const state = resolveDynamic(topology, liveSignals);
 
 | 信号类型 | 命名 | 示例 |
 |---|---|---|
-| 节点数据字段 | `节点id.字段名` | `pcs_1.P(kW)`、`bms_1.SOC(%)`、`pcs_1.状态` |
+| 节点数据字段 | `节点id.英文字段名` | `pcs_1.P(kW)`、`bms_1.SOC(%)`、`pcs_1.Status` |
 | 全局信号 | `信号名` | `mode` = `"island"` |
 
-> 字段名用的是运营端配置的**中文字段名**（如 `P(kW)`、`今日用电(kWh)`）。前后端务必一致。
-> 节点信号**只有「已绑定的数据字段」**——旧的 `节点id.status` / `节点id.online` 自动隐藏字段已移除；如需状态/在线，请在画布上给节点**显式加数据字段**（如 `状态`、`在线`），照常用 `节点id.字段名` 下发。
+> **字段名用的是运营端配置的「英文名」**（`data[].key.en`），如 `P(kW)`、`Today(kWh)`、`Status`。运营端每个数据字段**中文名、英文名都是必填**（缺任一无法绑定、且会阻断导出）；英文名作为端到端信号键，前后端务必逐字一致。字段卡片在图上仍显示中文名，仅信号键用英文。
+> 节点信号**只有「已绑定的数据字段」**——旧的 `节点id.status` / `节点id.online` 自动隐藏字段已移除；如需状态/在线，请在画布上给节点**显式加数据字段**（中文名 `状态`/`在线`，英文名 `Status`/`Online`），用 `节点id.英文名`（如 `pcs_1.Status`）下发。
 
 实时数据示例：
 ```json
 {
   "grid_1.P(kW)": 383,
   "pcs_1.P(kW)": -9,
-  "pcs_1.状态": "放电",
+  "pcs_1.Status": "放电",
   "bms_1.SOC(%)": 55,
   "mode": "island"
 }
@@ -159,8 +170,8 @@ const state = resolveDynamic(topology, liveSignals);
 - **无值显示空**：字段值为 `null`、未提供、或空串 `""` → 显示 `字段名: `（值留空）。
 - 想让某字段"暂无数据"，实时数据里给它 `null`/`""` 或干脆不传该键（保留上次值）。要清空就显式传空。
 
-### 4.4 显隐与流向如何被驱动
-- 每帧用当前信号实时求值：节点 `visibleWhen` 不满足→隐藏；连线 `showWhen` 不满足或两端节点被隐藏→不画；连线 `dirRules` 顺序匹配出流向（箭头/流动动画方向随之变化）。
+### 4.4 显隐 / 图标 / 流向如何被驱动
+- 每帧用当前信号实时求值：节点 `visibleWhen` 不满足→隐藏；节点 `iconRules` 顺序匹配出当前图标（首个命中生效，都不命中用自身图标）；连线 `showWhen` 不满足或两端节点被隐藏→不画；连线 `dirRules` 顺序匹配出流向（箭头/流动动画方向随之变化）。
 - 没传的信号回退到画布里的静态默认值（节点字段值 / 全局信号样例）。
 
 ---
@@ -203,6 +214,27 @@ const state = resolveDynamic(topology, liveSignals);
 ]
 ```
 
+节点图标规则 `iconRules` 示例：`icon` 是元素库里的 `type`（前端用 `type→图标文件` 同一张映射解析）。
+
+用**离散状态字段**驱动（后台推一个中文名`状态`/英文名`Status`的字段，值为 充电/放电/待机；信号键用英文名）：
+```json
+"iconRules": [
+  { "when": {"var":"bms_1.Status","op":"==","val":"充电"}, "icon":"bms_charge" },
+  { "when": {"var":"bms_1.Status","op":"==","val":"放电"}, "icon":"bms_discharge" },
+  { "when": {"var":"bms_1.Status","op":"==","val":"待机"}, "icon":"bms_standby" }
+]
+```
+
+或用**数值字段**驱动（后台只推功率，充电为正、放电为负、约 0 为待机）：
+```json
+"iconRules": [
+  { "when": {"var":"bms_1.P(kW)","op":">","val":1},  "icon":"bms_charge" },
+  { "when": {"var":"bms_1.P(kW)","op":"<","val":-1}, "icon":"bms_discharge" },
+  { "when": {"var":"bms_1.P(kW)","op":"between","val":"-1,1"}, "icon":"bms_standby" }
+]
+```
+> 顺序匹配、首个命中生效；都不命中时用节点自身 `type` 的图标兜底。
+
 ---
 
 ## 6. 画布 JSON 结构速览
@@ -219,7 +251,9 @@ const state = resolveDynamic(topology, liveSignals);
   "nodes": [
     { "id":"pcs_1", "type":"pcs", "label":{"zh":"PCS变流器","en":"PCS"},
       "position":{"x":480,"y":220}, "data":[{"key":{"zh":"P(kW)","en":"P(kW)"},"value":0}],
-      "visibleWhen": {...} }                              // 可选：显示条件
+      "visibleWhen": {...},                               // 可选：显示条件
+      "iconRules": [ {"when":{...},"icon":"bms_charge"} ] // 可选：图标规则(icon=元素库type，顺序匹配首个命中，否则用自身type图标)
+    }
   ],
   "edges": [
     { "from":"pv_1", "to":"pcs_1", "edgeType":"ac_power", "route":"smart", "dir":"forward",

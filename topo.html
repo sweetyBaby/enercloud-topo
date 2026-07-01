@@ -205,6 +205,9 @@
         <div class="pr" id="prow-rule"><label data-i18n="显示条件（数据驱动）">显示条件（数据驱动）</label>
           <div class="rule-line"><span id="np-rule-sum" class="rule-sum">无（始终显示）</span>
             <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editNodeRule()" data-i18n="编辑">编辑</button></div></div>
+        <div class="pr" id="prow-iconrule"><label data-i18n="图标规则（数据驱动）">图标规则（数据驱动）</label>
+          <div class="rule-line"><span id="np-icon-sum" class="rule-sum">无（用自身图标）</span>
+            <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editNodeIconRules()" data-i18n="编辑">编辑</button></div></div>
         <div class="pr" id="prow-action"><label data-i18n="事件绑定">事件绑定</label>
           <select id="p-action-trigger" onchange="applyNodeAction()">
             <option value="none" data-i18n="不绑定">不绑定</option>
@@ -408,7 +411,7 @@
     <button id="sim-add-inj" class="rm-add" style="margin:2px 0 4px" onclick="addInjRow()" data-i18n="+ 添加注入">+ 添加注入</button>
     <div class="sim-sec"><span data-i18n="批量样例 JSON">批量样例 JSON</span><span class="sim-sec-x" data-i18n="（一次性设置多个信号的值）">（一次性设置多个信号的值）</span></div>
     <div class="sim-hint" data-i18n="粘贴 {信号名:值} 批量覆盖注入；点「填入当前」生成模板再改。">粘贴 {信号名:值} 批量覆盖注入；点「填入当前」生成模板再改。</div>
-    <textarea id="sim-json" oninput="autoGrowSimJSON()" placeholder='{"bms_1.SOC(%)":20,"grid_1.在线":true}'></textarea>
+    <textarea id="sim-json" oninput="autoGrowSimJSON()" placeholder='{"bms_1.SOC(%)":20,"grid_1.Online":true}'></textarea>
     <div id="sim-foot">
       <button class="tb" onclick="fillSimTemplate()" data-i18n="填入当前">填入当前</button>
       <button class="tb" onclick="pasteSimJSON()" data-i18n="应用JSON">应用JSON</button>

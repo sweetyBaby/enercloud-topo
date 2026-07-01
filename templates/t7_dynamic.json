@@ -108,7 +108,7 @@
           }
         ],
         "visibleWhen": {
-          "var": "grid_1.在线",
+          "var": "grid_1.Online",
           "op": "falsy"
         }
       }
@@ -122,7 +122,7 @@
         "dir": "forward",
         "lbl": "并网",
         "showWhen": {
-          "var": "grid_1.在线",
+          "var": "grid_1.Online",
           "op": "truthy"
         }
       },
@@ -168,7 +168,7 @@
         "dir": "forward",
         "lbl": "孤岛",
         "showWhen": {
-          "var": "grid_1.在线",
+          "var": "grid_1.Online",
           "op": "falsy"
         }
       }
