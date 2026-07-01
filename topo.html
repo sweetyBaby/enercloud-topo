@@ -482,5 +482,17 @@
 </div></div>
 
 <script src="topo-editor/topology-editor-icons.js"></script>
-<script src="topo-editor/topology-editor.js"></script>
+<!-- topology-editor 已按逻辑拆分为 01→11 有序片段；顺序即执行顺序，共享同一全局作用域，等价于原单文件，不可乱序 -->
+<script src="topo-editor/topology-editor-01-core.js"></script>
+<script src="topo-editor/topology-editor-02-toolbar.js"></script>
+<script src="topo-editor/topology-editor-03-input.js"></script>
+<script src="topo-editor/topology-editor-04-geometry.js"></script>
+<script src="topo-editor/topology-editor-05-routing.js"></script>
+<script src="topo-editor/topology-editor-06-render.js"></script>
+<script src="topo-editor/topology-editor-07-editing.js"></script>
+<script src="topo-editor/topology-editor-08-serialize.js"></script>
+<script src="topo-editor/topology-editor-09-rules.js"></script>
+<script src="topo-editor/topology-editor-10-library-export.js"></script>
+<script src="topo-editor/topology-editor-11-templates-runtime.js"></script>
+<script src="topo-editor/topology-editor-12-bootstrap.js"></script><!-- 必须最后：待 01→11 全部函数定义后再启动 init() -->
 </body></html>

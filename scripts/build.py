@@ -46,12 +46,31 @@ if DIST.exists():
     shutil.rmtree(DIST)
 DIST.mkdir(parents=True)
 
+# 编辑器逻辑已按职责拆为 12 个有序片段（01→12 顺序即执行顺序，共享同一全局作用域，等价于原单文件；
+#  12-bootstrap 必须最后：待 01→11 全部函数定义后再启动 init()）。逐个 minify 后拷贝到 dist，
+#  topo.html 按同一顺序用 <script> 引入。新增/调整片段务必同步维护本列表与 topo.html 的 <script> 顺序。
+EDITOR_JS_PARTS = [
+    "topology-editor-01-core.js",
+    "topology-editor-02-toolbar.js",
+    "topology-editor-03-input.js",
+    "topology-editor-04-geometry.js",
+    "topology-editor-05-routing.js",
+    "topology-editor-06-render.js",
+    "topology-editor-07-editing.js",
+    "topology-editor-08-serialize.js",
+    "topology-editor-09-rules.js",
+    "topology-editor-10-library-export.js",
+    "topology-editor-11-templates-runtime.js",
+    "topology-editor-12-bootstrap.js",  # 必须最后：待 01→11 全部函数定义后再启动 init()
+]
+
 outputs = {
     "topo.html": minify_html(read("topo.html")),
     "topo-editor/topology-editor.css": minify_css(read("topo-editor/topology-editor.css")) + "\n",
     "topo-editor/topology-editor-icons.js": minify_js(read("topo-editor/topology-editor-icons.js")) + "\n",
-    "topo-editor/topology-editor.js": minify_js(read("topo-editor/topology-editor.js")) + "\n",
 }
+for part in EDITOR_JS_PARTS:
+    outputs["topo-editor/" + part] = minify_js(read("topo-editor/" + part)) + "\n"
 
 for rel, content in outputs.items():
     write(rel, content)

@@ -203,7 +203,7 @@ ElementLibrary ──定义── Node.type 的默认图标/字段/尺寸、Edge
 | 路径 | 作用 |
 |---|---|
 | `topo.html` | 页面骨架 + 全部工具栏/面板/弹框 DOM（约 486 行）|
-| `topo-editor/topology-editor.js` | 全部逻辑：状态、渲染、交互、规则、模板、导入导出、运行态（约 5920 行，单文件）|
+| `topo-editor/topology-editor-01..12-*.js` | 全部逻辑，按职责拆为 12 个有序片段（详见下表）。均为普通 `<script>`，共享同一全局作用域，`topo.html` 按 01→12 顺序引入——顺序即执行顺序，等价于原单文件，**不可乱序**。|
 | `topo-editor/topology-editor.css` | 样式 |
 | `topo-editor/topology-editor-icons.js` | 历史遗留空桩 `IMG_DATA={};IMGS={}`（图标已文件化，见 §9）|
 | `icons/` + `icons/index.json` | 图标文件 + 清单（面板单一事实来源）|
@@ -214,6 +214,25 @@ ElementLibrary ──定义── Node.type 的默认图标/字段/尺寸、Edge
 | `scripts/server.js` | 生产服务器（托管 `dist/`，读写项目根 `templates/`）|
 | `scripts/template-store.js` | 模板 API 共享逻辑（dev 与生产共用）|
 | `scripts/build.py` | 构建：压缩资源到 `dist/`，扫描生成 `icons/`、`templates/`、`dic/` 的 index.json |
+
+#### 6.2.1 编辑器 JS 分片（原 `topology-editor.js` 约 5920 行拆分而来）
+
+> 原单文件里所有函数声明在任何代码运行前就已解析；拆成多个 `<script>` 后，函数声明**不跨 `<script>` 提升**，每个标签「先执行、再加载下一个」。因此把「初始主题 + 应用启动」统一放到最后加载的 `12-bootstrap.js`——`init()` 体内会调用分布在 02/03/06/11 等后续文件的函数，若启动代码留在 01 且 `Promise.all` 提前 resolve，`init()` 会抛 `ReferenceError`。**新增分片必须同步维护 `topo.html` 的 `<script>` 顺序与 `scripts/build.py` 的 `EDITOR_JS_PARTS`，且 12-bootstrap 恒为最后。**
+
+| # | 文件 | 职责 |
+|---|---|---|
+| 01 | `topology-editor-01-core.js` | 主题/ET 常量、图标/后台加载、核心状态、undo/redo、草稿、`init` |
+| 02 | `topology-editor-02-toolbar.js` | 侧栏、连线栏、下拉、背景、主题切换 |
+| 03 | `topology-editor-03-input.js` | `canvas` 常量、i18n、全部鼠标/键盘/右键事件 |
+| 04 | `topology-editor-04-geometry.js` | 节点/连线几何、端口、吸附、裁剪 |
+| 05 | `topology-editor-05-routing.js` | A\* 正交走线、母线汇流、`edgePath` |
+| 06 | `topology-editor-06-render.js` | `drawAll`/`drawNode`/`drawEdge`、字段 chip 绘制 |
+| 07 | `topology-editor-07-editing.js` | chip 交互、绑定 UI、对齐、复制粘贴、上传 |
+| 08 | `topology-editor-08-serialize.js` | JSON 生成/导入/迁移、校验报告、导出 |
+| 09 | `topology-editor-09-rules.js` | 数据驱动引擎、规则编辑器、信号面板 |
+| 10 | `topology-editor-10-library-export.js` | `RUNTIME_JS` 模板、元素库 ZIP 导出 |
+| 11 | `topology-editor-11-templates-runtime.js` | 模板系统、走线样式、只读运行态 |
+| **12** | **`topology-editor-12-bootstrap.js`** | **入口：`setTheme('blue_screen')` + `Promise.all(...).then(init)`（必须最后加载）** |
 | `demo.html` | iframe + postMessage 接入示例（可运行）|
 
 ### 6.3 关键函数索引
@@ -980,7 +999,7 @@ TopoRuntime.config();               // 返回运行态配置
 - 图标清单、设备类型、设备实例、字段字典、模板均文件化管理。
 - 模板单文件存储，清单扫描生成（无手动维护的 index.json）。
 - 编辑器与运行态复用同一套渲染逻辑；`runtime.js` 与编辑器规则引擎需保持一致，避免漂移。
-- 后续建议将 `topology-editor.js`（约 5920 行单文件）按配置 / 核心状态 / 渲染 / 交互 / 规则 / 模板 / 导出 / 运行态拆分模块。
+- ✅ 已将原 `topology-editor.js`（约 5920 行单文件）按职责拆为 11 个有序片段（见 §6.2）；仍为共享全局作用域的普通脚本，纯行切分、构建产物与原文件逐 token 等价，行为不变。
 
 ---
 
@@ -1122,7 +1141,7 @@ npm start       # node scripts/server.js
 
 | 风险/问题 | 说明 | 建议 |
 |---|---|---|
-| 单文件 JS 过大 | `topology-editor.js` 约 5920 行聚合全部职责 | 按模块拆分，优先拆纯逻辑（规则/导出/校验）|
+| ~~单文件 JS 过大~~（已拆）| 原 `topology-editor.js` 约 5920 行 → 已拆为 11 个有序片段（§6.2）| 后续可进一步 ES 模块化 + 单测（当前仍为共享全局作用域的普通脚本）|
 | 规则与 runtime 逻辑重复 | 元素库包 `runtime.js` 与编辑器规则引擎并存 | 抽共享规则模块，加一致性测试防漂移 |
 | 后端字段命名不一致 | 信号键依赖节点 ID 和字段英文名，大小写/符号不一致会失效 | 联调前以画布 JSON 枚举键名 |
 | 模板写入依赖服务端 | 纯静态部署无法写模板 | 用 Node 服务或对接平台后端 `/api/templates` |
