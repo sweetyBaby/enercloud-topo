@@ -192,7 +192,9 @@ canvas{display:block;cursor:default}
 .dlg-close:hover{color:#e06060}
 #fb-title{font-size:13px;font-weight:700;color:var(--ui-accent);margin-bottom:10px}
 #fb-box .fb-l{display:block;font-size:12px;color:var(--ui-text2);margin:8px 0 3px}
-#fb-box select{width:100%;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-size:12px;padding:6px;border-radius:5px}
+#fb-box select{width:100%;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-size:12px;padding:6px;border-radius:5px;outline:none}
+#fb-box select:focus{border-color:var(--ui-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--ui-accent) 30%,transparent)}
+#fb-box select option{background:var(--ui-bg2);color:var(--ui-text)}
 #fb-acts{display:flex;gap:8px;align-items:center;margin-top:14px}
 #fb-acts .tb{padding:5px 12px}#fb-acts .grn{border-color:#2ecc71;color:#2ecc71}
 #bgpanel-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:40}
@@ -333,11 +335,25 @@ canvas{display:block;cursor:default}
 .rule-line{display:flex;align-items:center;gap:8px}
 .rule-sum{flex:1;min-width:0;font-size:12px;color:var(--ui-text2);background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);border-radius:6px;padding:6px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rule-sum.has{color:#ffcc44;border-color:#7a6320}
-#simpanel{position:fixed;top:0;right:0;bottom:0;width:344px;max-width:90vw;display:flex;flex-direction:column;background:var(--ui-bg);border-left:1px solid var(--ui-accent);box-shadow:-10px 0 36px rgba(0,0,0,.5);z-index:250;transform:translateX(102%);transition:transform .22s ease}
-#simpanel.show{transform:translateX(0)}
-#sim-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--ui-bg2);border-bottom:1px solid var(--ui-border);color:var(--ui-accent);font-weight:600;font-size:14px;flex-shrink:0}
-#sim-close{cursor:pointer;color:var(--ui-text2);padding:0 4px;font-size:16px}#sim-close:hover{color:var(--ui-accent)}
-#sim-body{flex:1;overflow-y:auto;padding:10px 14px}
+/* 信号面板 / 规则面板：共用右侧槽位（互斥显示），共用同一套外观 */
+.simpanel{position:fixed;top:0;right:0;bottom:0;width:344px;max-width:90vw;display:flex;flex-direction:column;background:var(--ui-bg);border-left:1px solid var(--ui-accent);box-shadow:-10px 0 36px rgba(0,0,0,.5);z-index:250;transform:translateX(102%);transition:transform .22s ease}
+.simpanel.show{transform:translateX(0)}
+.sim-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--ui-bg2);border-bottom:1px solid var(--ui-border);color:var(--ui-accent);font-weight:600;font-size:14px;flex-shrink:0}
+.sim-close{cursor:pointer;color:var(--ui-text2);padding:0 4px;font-size:16px}.sim-close:hover{color:var(--ui-accent)}
+.sim-body{flex:1;overflow-y:auto;padding:10px 14px}
+/* 全局信号网格：中文名｜英文名｜默认值｜绑定（与数据字段完全一致，重名/缺名红框见 .df-invalid） */
+.siggrid{display:grid;grid-template-columns:2fr 1.2fr .85fr auto;column-gap:4px;row-gap:5px;align-items:center}
+/* 信号面板输入框深色（.simpanel 不在 .pr 作用域内，需自带基础样式，避免浏览器默认白底） */
+.siggrid input{width:100%;box-sizing:border-box;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:5px 6px;border-radius:4px;outline:none;min-width:0}
+.siggrid input:focus{border-color:var(--ui-accent)}
+.siggrid .dh{font-size:11px;font-weight:600;white-space:nowrap;padding-left:4px}
+.siggrid .dh-zh{color:#4dd0ff}.siggrid .dh-en{color:#2ecc71}.siggrid .dh-val{color:#f1c40f}.siggrid .dh-act{color:#b38bff}
+.siggrid button{width:30px;background:var(--ui-btn-bg);border:1px solid var(--ui-border);color:var(--ui-text2);font-size:12px;padding:4px 0;border-radius:3px;cursor:pointer}
+.siggrid .df-del:hover{border-color:#e06060;color:#e06060}
+.siggrid .df-bind{filter:grayscale(1);opacity:.6}
+.siggrid .df-bind:hover{filter:none;opacity:1;border-color:var(--ui-accent);color:var(--ui-accent)}
+.siggrid .df-bind.bound{filter:none;opacity:1;border-color:#2ecc71;background:color-mix(in srgb,#2ecc71 16%,var(--ui-btn-bg))}
+.siggrid .df-zh-in{border-left:3px solid #4dd0ff}.siggrid .df-en-in{border-left:3px solid #2ecc71}
 .sim-sec{font-size:12px;font-weight:600;color:var(--ui-accent);margin:14px 0 6px;letter-spacing:.5px}
 .sim-sec:first-child{margin-top:2px}
 .sim-sec-x{font-weight:400;color:var(--ui-text2);font-size:11px;margin-left:4px}
@@ -383,8 +399,8 @@ canvas{display:block;cursor:default}
 .sim-crow{display:flex;align-items:center;gap:6px;margin-bottom:6px}
 .sim-cname{flex:1;min-width:0;font-size:12px;color:var(--ui-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:6px}
 .sim-ctype{flex-shrink:0;font-size:10px;font-weight:600;color:var(--ui-accent);border:1px solid var(--ui-border);border-radius:4px;padding:0 5px;line-height:16px}
-#sim-runview-row{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ui-text);cursor:pointer;margin:0 0 4px}
-#sim-runview-row input{width:auto;margin:0;flex-shrink:0}
+#sim-runview-row,#sim-rulebadge-row{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ui-text);cursor:pointer;margin:0 0 4px}
+#sim-runview-row input,#sim-rulebadge-row input{width:auto;margin:0;flex-shrink:0}
 #sim-add{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
 #sim-add input{flex:1;min-width:60px;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:5px 7px;border-radius:5px}
 #sim-newopts{box-sizing:border-box;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:5px 7px;border-radius:5px}

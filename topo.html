@@ -54,7 +54,8 @@
           <div class="mi" onclick="dlAllIconsZip();closeMenus()" data-i18n="🗂 导出元素库包 (ZIP)">🗂 导出元素库包 (ZIP)</div>
         </div>
       </div>
-      <button class="tb" id="btn-preview" onclick="toggleSigPanel()" title="规则与信号：总览全部显隐/流向规则、管理全局信号、注入测试数据（规则在画布上始终实时生效）" data-i18n="⚙ 规则与信号">⚙ 规则与信号</button>
+      <button class="tb" id="btn-signals" onclick="toggleSignalPanel()" title="信号：管理全局信号（中英文名/默认值/后台绑定）、注入测试数据、批量样例 JSON" data-i18n="⚡ 信号">⚡ 信号</button>
+      <button class="tb" id="btn-rules" onclick="toggleRulePanel()" title="规则：总览全部显隐/图标/流向规则，切换运行视图预览（规则在画布上始终实时生效）" data-i18n="📏 规则">📏 规则</button>
       <button class="tb" id="btn-runview" onclick="toggleRunView()" title="预览效果：按规则彻底隐藏不该显示的元素/连线，并应用数据驱动流向，查看整个图的运行效果" data-i18n="▶ 预览效果">▶ 预览效果</button>
     </div>
   </div>
@@ -375,34 +376,16 @@
     </div>
   </div>
 </div>
-<div id="simpanel">
-  <div id="sim-head"><span data-i18n="⚙ 规则与信号">⚙ 规则与信号</span>
-    <span id="sim-close" onclick="toggleSigPanel()" title="关闭面板">✕</span></div>
-  <div id="sim-body">
-    <label id="sim-runview-row" title="开启后彻底隐藏被规则隐藏的元素，预览运行效果；关闭时编辑态把它们「虚化」仍可点选编辑">
-      <input type="checkbox" id="sim-runview" onchange="toggleRunView(this.checked)">
-      <span data-i18n="运行视图（彻底隐藏被规则隐藏者）">运行视图（彻底隐藏被规则隐藏者）</span></label>
-    <div class="sim-hint" data-i18n="规则随信号实时生效：编辑态被隐藏的元素/连线会「虚化」显示，仍可点选并编辑；勾选「运行视图」可预览真实显隐效果。">规则随信号实时生效：编辑态被隐藏的元素/连线会「虚化」显示，仍可点选并编辑；勾选「运行视图」可预览真实显隐效果。</div>
-
-    <div class="sim-sec"><span data-i18n="全局信号">全局信号</span><span class="sim-sec-x" data-i18n="（添加后画布上所有元素/连线的规则均可引用，随图导出）">（添加后画布上所有元素/连线的规则均可引用，随图导出）</span></div>
+<!-- 信号面板：全局信号管理（中英文名/默认值/后台绑定）+ 注入测试 + 批量样例 JSON -->
+<div id="sigpanel" class="simpanel">
+  <div class="sim-head"><span data-i18n="⚡ 信号">⚡ 信号</span>
+    <span class="sim-close" onclick="closeSidePanels()" title="关闭面板">✕</span></div>
+  <div id="sig-body" class="sim-body">
+    <div class="sim-sec"><span data-i18n="全局信号">全局信号</span><span class="sim-sec-x" data-i18n="（中英文名必填·英文名作信号键；可设默认值、绑定后台字段；随图导出，任意规则可引用）">（中英文名必填·英文名作信号键；可设默认值、绑定后台字段；随图导出，任意规则可引用）</span></div>
     <div id="sim-custom"></div>
-    <div id="sim-add">
-      <input id="sim-newname" placeholder="信号名 如 mode">
-      <select id="sim-newtype" class="sim-sel" style="flex:0 0 84px" onchange="onNewSigType()">
-        <option value="number" data-i18n="数值">数值</option>
-        <option value="bool" data-i18n="布尔">布尔</option>
-        <option value="enum" data-i18n="枚举">枚举</option>
-        <option value="text" data-i18n="文本">文本</option>
-      </select>
-      <input id="sim-newval" placeholder="当前值">
-      <button class="tb" style="flex-shrink:0;padding:5px 9px" onclick="addCustomSignal()" data-i18n="+ 信号">+ 信号</button>
-    </div>
-    <input id="sim-newopts" style="width:100%;margin-top:5px;display:none" placeholder="枚举可选值，逗号分隔，如 自动,手动,离网">
+    <button id="sim-add-sig" class="rm-add" style="margin:4px 0 6px" onclick="addCustomSignal()" data-i18n="+ 添加信号">+ 添加信号</button>
 
-    <div class="sim-sec"><span data-i18n="规则总览">规则总览</span><span class="sim-sec-x" data-i18n="（仅查看；新增/修改请选中元素或连线，在右侧属性面板里设置）">（仅查看；新增/修改请选中元素或连线，在右侧属性面板里设置）</span></div>
-    <div id="sim-rules"></div>
-
-    <div class="sim-sec"><span data-i18n="注入信号（测试）">注入信号（测试）</span><span class="sim-sec-x" data-i18n="（临时覆盖某信号的值，验证规则；不填用当前值）">（临时覆盖某信号的值，验证规则；不填用当前值）</span></div>
+    <div class="sim-sec"><span data-i18n="注入信号（测试）">注入信号（测试）</span><span class="sim-sec-x" data-i18n="（临时覆盖某信号的值，验证规则；不填用默认值）">（临时覆盖某信号的值，验证规则；不填用默认值）</span></div>
     <div id="sim-inj-tools">
       <button type="button" class="sim-acc-btn" onclick="injExpandAll()" title="展开全部分组" data-i18n="▼ 全部展开">▼ 全部展开</button>
       <button type="button" class="sim-acc-btn" onclick="injCollapseAll()" title="折叠全部分组" data-i18n="▶ 全部折叠">▶ 全部折叠</button>
@@ -417,6 +400,22 @@
       <button class="tb" onclick="pasteSimJSON()" data-i18n="应用JSON">应用JSON</button>
       <button class="tb red" onclick="clearSim()" data-i18n="清空注入">清空注入</button>
     </div>
+  </div>
+</div>
+<!-- 规则面板：运行视图开关 + 规则总览（显隐/图标/流向） -->
+<div id="rulepanel" class="simpanel">
+  <div class="sim-head"><span data-i18n="📏 规则">📏 规则</span>
+    <span class="sim-close" onclick="closeSidePanels()" title="关闭面板">✕</span></div>
+  <div id="rule-body" class="sim-body">
+    <label id="sim-runview-row" title="开启后彻底隐藏被规则隐藏的元素，预览运行效果；关闭时编辑态把它们「虚化」仍可点选编辑">
+      <input type="checkbox" id="sim-runview" onchange="toggleRunView(this.checked)">
+      <span data-i18n="运行视图（彻底隐藏被规则隐藏者）">运行视图（彻底隐藏被规则隐藏者）</span></label>
+    <label id="sim-rulebadge-row" title="在画布上把「配置了规则」的元素/连线用琥珀色漏斗标记标出；进入本面板默认开启，关闭面板自动关闭">
+      <input type="checkbox" id="rule-badge-toggle" onchange="toggleRuleBadges(this.checked)">
+      <span data-i18n="在画布标出带规则的元素">在画布标出带规则的元素</span></label>
+    <div class="sim-hint" data-i18n="规则随信号实时生效：编辑态被隐藏的元素/连线会「虚化」显示，仍可点选并编辑；勾选「运行视图」可预览真实显隐效果。">规则随信号实时生效：编辑态被隐藏的元素/连线会「虚化」显示，仍可点选并编辑；勾选「运行视图」可预览真实显隐效果。</div>
+    <div class="sim-sec"><span data-i18n="规则总览">规则总览</span><span class="sim-sec-x" data-i18n="（仅查看；新增/修改请选中元素或连线，在右侧属性面板里设置）">（仅查看；新增/修改请选中元素或连线，在右侧属性面板里设置）</span></div>
+    <div id="sim-rules"></div>
   </div>
 </div>
 <div id="ctxmenu">

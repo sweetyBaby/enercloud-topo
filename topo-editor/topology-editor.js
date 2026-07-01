@@ -129,6 +129,7 @@ let suppressNodeActionClick=false;
 // previewMode=运行视图（彻底隐藏被规则隐藏的元素）；panelOpen=「规则与信号」侧栏是否展开；
 // _drawAlpha=当前绘制透明度（编辑态把被规则隐藏的元素「虚化」仍可点选编辑）
 let previewMode=false,panelOpen=false,_drawAlpha=1,signalValues={},injRows=[],customSignals=[],_dyn={hiddenNodes:new Set(),hiddenEdges:new Set(),dirMap:new Map(),iconMap:new Map()};
+let showRuleBadges=false;   // 是否在画布上标出「带规则」的元素/连线；进入规则面板默认开、关闭面板则关（面板内可手动切换）
 let injCollapsed=new Set(),_injInited=false;   // 注入信号卡片手风琴：折叠的元素键集合 + 「默认首张展开」是否已初始化
 let injDraft=null;   // 新增注入草稿（元素/字段/值）；点 ✓ 确认后才并入 injRows 卡片列表，避免选元素即跳转
 const GHOST_A=0.16,GHOST_SEL=0.5; // 虚化透明度：普通/选中
@@ -1070,14 +1071,17 @@ function fieldSigKey(f){ return (f&&(f.keyEn||f.key))||''; }
 function fieldSig(n,f){ return n.id+'.'+fieldSigKey(f); }
 // 数据字段名称校验：同一节点内「中文名」「英文名」各自必填且不可重复（中、英分开判定，故允许同一字段中英文同名，如 P(kW)）。
 // 返回与 n.data 等长的数组，每项 {emptyZh,emptyEn,dupZh,dupEn}。
-function fieldNameIssues(n){
-  const data=(n&&n.data)||[];
+// 通用名称校验：items=[{zh,en}] → [{emptyZh,emptyEn,dupZh,dupEn}]（zh、en 各自必填且组内唯一；允许同一项 zh===en）
+function _nameIssues(items){
   const zhCount={},enCount={};
-  data.forEach(f=>{const zh=String(f.key||'').trim(),en=String(f.keyEn||'').trim();
+  items.forEach(it=>{const zh=String(it.zh||'').trim(),en=String(it.en||'').trim();
     if(zh)zhCount[zh]=(zhCount[zh]||0)+1; if(en)enCount[en]=(enCount[en]||0)+1;});
-  return data.map(f=>{const zh=String(f.key||'').trim(),en=String(f.keyEn||'').trim();
+  return items.map(it=>{const zh=String(it.zh||'').trim(),en=String(it.en||'').trim();
     return {emptyZh:!zh,emptyEn:!en,dupZh:!!zh&&zhCount[zh]>1,dupEn:!!en&&enCount[en]>1};});
 }
+function fieldNameIssues(n){ return _nameIssues(((n&&n.data)||[]).map(f=>({zh:f.key,en:f.keyEn}))); }
+// 全局信号名称校验：全局范围内中文名、英文名各自必填且唯一
+function globalSigIssues(){ return _nameIssues((customSignals||[]).map(s=>({zh:s.key,en:s.keyEn}))); }
 function fieldNameOk(s){ return s&&!s.emptyZh&&!s.emptyEn&&!s.dupZh&&!s.dupEn; }
 function nodeHasFieldNameError(n){ return fieldNameIssues(n).some(s=>!fieldNameOk(s)); }
 // 文本框 + 变量节点：都用 _textBox 包围盒（命中/对齐/缩放等几何逻辑一致）
@@ -2417,7 +2421,7 @@ function drawEdge(e){
   // 编辑态：带「显示/流向」条件的连线，在中点旁标琥珀色小点
   if(!previewMode){ const m=pointAt(pts,polyLen(pts)/2);
     if(_dyn.hiddenEdges.has(e)) drawHiddenBadge(m[0], m[1]);              // 被规则隐藏：醒目⊘标记，区别于其它虚化/普通线
-    else if(edgeHasRule(e)) drawCondBadge(m[0]+9/zoom, m[1]-9/zoom);      // 有规则但当前显示：琥珀点
+    else if(showRuleBadges&&edgeHasRule(e)) drawCondBadge(m[0]+9/zoom, m[1]-9/zoom);   // 「带规则」标记：仅规则面板开启时显示
   }
   // 选中连线时，仅在「线上的真实节点」显示可拖动方块手柄：每个方向变更处(拐点) + 已存拐点 + 起止端。
   // 不显示"段中点新增拐点"标记，也不显示其他线的浮动手柄——避免越拖越乱、或线被拖走后留下孤立节点。
@@ -2507,7 +2511,7 @@ function drawNode(n){
   // 编辑态：带「显示」条件的节点，在图标右上角标琥珀色小点
   if(!previewMode){
     if(_dyn.hiddenNodes.has(n.id)) drawHiddenBadge(n.x+s*0.34, n.y-s*0.6);    // 被规则隐藏：醒目⊘标记
-    else if(nodeHasRule(n)) drawCondBadge(n.x+s*0.34, n.y-s*0.66);
+    else if(showRuleBadges&&nodeHasRule(n)) drawCondBadge(n.x+s*0.34, n.y-s*0.66);   // 「带规则」标记：仅规则面板开启时显示
   }
   if(!n.hideLabel){
   const lfs=(n.fontSize||14)/zoom;
@@ -3143,7 +3147,7 @@ function openFieldBind(i){
   const ov=document.createElement('div');ov.id='fb-overlay';ov.onclick=e=>{if(e.target===ov)closeFieldBind();};
   // 设备选项：空=跟随本节点；否则具体设备(携带其 deviceType)
   const followLbl=n.deviceId?deviceNameOf(n.deviceId):(nodeDeviceType(n)?('⚠ 未指定实例·'+deviceTypeLabel(nodeDeviceType(n))):'⚠ 未指定设备');
-  const devOpts=['<option value="">（跟随本节点：'+tplEsc(followLbl)+'）</option>']
+  const devOpts=['<option value="">跟随本节点：'+tplEsc(followLbl)+'</option>']
     .concat(DEVICE_LIST.map(d=>{const sel=(b.deviceId===d.deviceId)?' selected':'';return '<option value="'+tplEsc(d.deviceId)+'" data-dt="'+tplEsc(d.deviceType)+'"'+sel+'>'+tplEsc(deviceTypeLabel(d.deviceType)+' · '+d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</option>';}));
   ov.innerHTML='<div id="fb-box"><button class="dlg-close" onclick="closeFieldBind()" title="关闭" aria-label="关闭">✕</button><div id="fb-title">绑定后台字段：'+tplEsc(f.key||('字段'+(i+1)))+'</div>'+
     '<label class="fb-l">来源设备</label><select id="fb-dev">'+devOpts.join('')+'</select>'+
@@ -3197,6 +3201,51 @@ function confirmFieldBind(i){
   f.bind=bind;
   if(!f.key){ f.key=field; f.keyEn=f.keyEn||field; }        // 字段名未填则用后台字段名兜底
   snapshot();closeFieldBind();renderDFs(n);
+}
+// ───── 全局信号后台绑定弹窗：全局信号无所属节点，必须选具体设备实例 → 分类(location) → 字段(field) ─────
+function openGlobalBind(idx){
+  const s=(customSignals||[])[idx];if(!s)return;
+  const gi=globalSigIssues()[idx]||{};
+  if(gi.emptyZh||gi.emptyEn){flashHint(lang==='en'?'Fill both Chinese & English names before binding':'请先填写该信号的中文名和英文名，方可绑定');return;}
+  if(gi.dupZh||gi.dupEn){flashHint(lang==='en'?'Signal name duplicated — make it unique before binding':'该信号名重复（中/英文名需全局唯一），请先修正再绑定');return;}
+  closeFieldBind();
+  const b=s.bind||{};
+  const ov=document.createElement('div');ov.id='fb-overlay';ov.onclick=e=>{if(e.target===ov)closeFieldBind();};
+  const devOpts=['<option value="">请选择设备实例</option>']
+    .concat(DEVICE_LIST.map(d=>{const sel=(b.deviceId===d.deviceId)?' selected':'';return '<option value="'+tplEsc(d.deviceId)+'" data-dt="'+tplEsc(d.deviceType)+'"'+sel+'>'+tplEsc(deviceTypeLabel(d.deviceType)+' · '+d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</option>';}));
+  ov.innerHTML='<div id="fb-box"><button class="dlg-close" onclick="closeFieldBind()" title="关闭" aria-label="关闭">✕</button><div id="fb-title">绑定后台字段（全局信号）：'+tplEsc(sigDisplayName(s)||('信号'+(idx+1)))+'</div>'+
+    '<label class="fb-l">来源设备</label><select id="fb-dev">'+devOpts.join('')+'</select>'+
+    '<label class="fb-l">分类(location)</label><select id="fb-loc"></select>'+
+    '<label class="fb-l">字段(field)</label><select id="fb-field"></select>'+
+    '<div id="fb-acts"><button class="tb" onclick="clearGlobalBind('+idx+')">清除绑定</button><span style="flex:1"></span>'+
+    '<button class="tb" onclick="closeFieldBind()">取消</button><button class="tb grn" id="fb-confirm" onclick="confirmGlobalBind('+idx+')">确定</button></div>'+
+    '<div class="phint" id="fb-hint" style="margin-top:6px"></div></div>';
+  document.body.appendChild(ov);
+  const effType=()=>{const o=document.getElementById('fb-dev').selectedOptions[0];return (o&&o.getAttribute('data-dt'))||'';};
+  const resolvable=()=>!!document.getElementById('fb-dev').value;
+  const fillField=(curField)=>{const dt=effType();const loc=document.getElementById('fb-loc').value;const fields=dictFields(dt,loc);
+    document.getElementById('fb-field').innerHTML=fields.length?fields.map(x=>'<option'+(x===curField?' selected':'')+'>'+tplEsc(x)+'</option>').join(''):'<option value="">（无字段）</option>';};
+  const updateGate=()=>{const ok=resolvable();['fb-loc','fb-field'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=!ok;});
+    const cb=document.getElementById('fb-confirm');if(cb){cb.disabled=!ok;cb.style.opacity=ok?'':'.45';cb.style.cursor=ok?'':'not-allowed';}
+    const h=document.getElementById('fb-hint');if(!ok){h.textContent='⚠ 请选择具体设备实例（全局信号无所属节点，必须指定来源设备）。';h.style.color='#e0a020';}
+    else{const dt=effType();h.textContent='字典：'+(dt?deviceTypeLabel(dt):'—')+'（'+dictLocations(dt).length+' 个分类）';h.style.color='';}};
+  const fillLoc=(curLoc,curField)=>{const dt=effType();const locs=dictLocations(dt);const loc=document.getElementById('fb-loc');
+    loc.innerHTML=locs.length?locs.map(l=>'<option'+(l===curLoc?' selected':'')+'>'+tplEsc(l)+'</option>').join(''):'<option value="">（该类型无字典，重启服务后点🔄刷新）</option>';
+    fillField(curField);updateGate();};
+  let curLoc='',curField='';if(b.field){const p=String(b.field).split('.');curField=p.pop();curLoc=p.join('.');}
+  document.getElementById('fb-dev').onchange=()=>fillLoc('','');
+  document.getElementById('fb-loc').onchange=()=>fillField('');
+  fillLoc(curLoc,curField);
+}
+function clearGlobalBind(idx){const s=(customSignals||[])[idx];if(s)delete s.bind;closeFieldBind();renderCustomSignals();_pathCacheSig='';}
+function confirmGlobalBind(idx){
+  const s=(customSignals||[])[idx];if(!s)return;
+  const devSel=document.getElementById('fb-dev'),loc=document.getElementById('fb-loc').value,field=document.getElementById('fb-field').value;
+  if(!devSel.value){flashHint('请选择具体设备实例（全局信号必须指定来源设备）');return;}
+  if(!loc||!field){flashHint('请选择分类与字段');return;}
+  const o=devSel.selectedOptions[0],did=devSel.value,dt=o&&o.getAttribute('data-dt');
+  s.bind={field:loc+'.'+field, deviceId:did, deviceType:dt||''};
+  closeFieldBind();renderCustomSignals();_pathCacheSig='';
 }
 function resetRotation(){const n=nodes.find(x=>x.id===selNode);if(!n)return;snapshot();n.rotation=0;document.getElementById('p-rot').value=0;document.getElementById('p-rot-v').textContent=0;snapshot();}
 function resetFieldPos(){const n=nodes.find(x=>x.id===selNode);if(!n||!n.data)return;snapshot();n.data.forEach(f=>{f.ox=0;f.oy=0;});snapshot();}
@@ -3807,7 +3856,7 @@ function buildJSON(){
       display:{ showLabel:!n.hideLabel, showFields:!n.hideFields },
       data:(n.data||[]).map(f=>{
         const fo={
-          key:{zh:f.key, en:f.keyEn||f.key},
+          key:{zh:f.key, en:(f.keyEn===''?'':(f.keyEn||f.key))},   // 显式空英文名保留为空(让校验/重载后仍能拦截)；仅 keyEn 缺省(旧数据)才兜底中文名
           value:(f.dv==null||f.dv==='')?'':f.dv,
           hidden:!!f.hidden,
           offset:{x:parseFloat((f.ox||0).toFixed(1)), y:parseFloat((f.oy||0).toFixed(1))}
@@ -3889,7 +3938,13 @@ function buildJSON(){
     return eo;})
   };
   // ★ 数据驱动：自定义全局信号目录（节点字段信号 id.字段 由运行端按 nodes 自动派生，无需导出）
-  if(customSignals&&customSignals.length) obj.signals=customSignals.map(s=>{const o={name:s.name,label:s.label||s.name,sample:s.sample};if(s.type)o.type=s.type;if(Array.isArray(s.options)&&s.options.length)o.options=s.options.slice();return o;});
+  // ★ 全局信号：与数据字段完全一致 —— key:{zh,en}（英文名作信号键）+ value(默认值) + 可选后台绑定 bind（无类型概念，类型按值推断）
+  if(customSignals&&customSignals.length) obj.signals=customSignals.map(s=>{
+    // key.en 用真实英文名（空则保留空）——不兜底成中文名，否则草稿/导出重载后会掩盖「缺英文名」使校验失效
+    const o={key:{zh:s.key||'', en:(s.keyEn||'')}, value:(s.dv==null?'':s.dv)};
+    if(s.bind&&s.bind.field)o.bind={field:s.bind.field, deviceType:s.bind.deviceType||'', deviceId:s.bind.deviceId||''};
+    return o;
+  });
   // ★ 数据驱动：当前注入的样例信号值（预览数据，随图导出，便于运行端/再次编辑时作默认值）
   if(signalValues&&Object.keys(signalValues).length){
     const valid=new Set(collectSignals().map(s=>s.name)),samples={};
@@ -3910,6 +3965,15 @@ function buildJSON(){
       // signal=端到端信号键(节点id.英文字段名)；label 保留中文名便于人读
       dataBindings.push({ signal:fieldSig(n,f), node:n.id, label:f.key||fieldSigKey(f), source });
     });
+  });
+  // 全局信号的后台绑定：signal=英文名(无节点前缀)，node=null 表示全局量
+  (customSignals||[]).forEach(s=>{
+    if(!s.bind||!s.bind.field||!fieldSigKey(s))return;
+    const deviceId=s.bind.deviceId||'';
+    const dev=deviceId?DEVICE_LIST.find(d=>d.deviceId===deviceId):null;
+    const source={deviceType:s.bind.deviceType||'', deviceId, field:s.bind.field};
+    if(dev&&dev.deviceName)source.deviceName=dev.deviceName;
+    dataBindings.push({ signal:fieldSigKey(s), node:null, label:sigDisplayName(s), source });
   });
   if(dataBindings.length)obj.dataBindings=dataBindings;
   return JSON.stringify(obj,null,2);
@@ -3974,16 +4038,33 @@ function duplicateFieldNameReport(){
   });
   return dups;
 }
-// 在 JSON 面板顶部渲染导出校验横幅：ID 重复/为空 + 字段缺中英文名（红·硬性·阻断导出）+ 字段未绑定（黄·风险·仍可导出）
+// 导出前校验：全局信号「中文名/英文名」缺失或全局重复（英文名是信号键，缺失/重复→冲突，属严重问题，阻断导出）
+function globalSignalNameReport(){
+  const out=[]; const gi=globalSigIssues();
+  (customSignals||[]).forEach((s,i)=>{
+    const iss=gi[i]; if(fieldNameOk(iss))return;
+    let reason;
+    if(iss.emptyZh&&iss.emptyEn)reason='缺中文名和英文名';
+    else if(iss.emptyZh)reason='缺中文名';
+    else if(iss.emptyEn)reason='缺英文名';
+    else if(iss.dupZh&&iss.dupEn)reason='中文名、英文名均重复';
+    else if(iss.dupZh)reason='中文名重复：'+s.key;
+    else reason='英文名重复：'+s.keyEn;
+    out.push({idx:i+1, name:(s.key||s.keyEn||('信号'+(i+1))), reason});
+  });
+  return out;
+}
+// 在 JSON 面板顶部渲染导出校验横幅：ID 重复/为空 + 字段缺中英文名/重名 + 全局信号缺名/重名（红·硬性·阻断导出）+ 字段未绑定（黄·风险·仍可导出）
 function renderBindRisk(){
   const el=document.getElementById('jbind-risk');if(!el)return;
   const {dups,emptyCount}=duplicateIdReport();
   const nameMiss=missingFieldNameReport();
   const nameDup=duplicateFieldNameReport();
+  const sigBad=globalSignalNameReport();
   const miss=unboundBindingReport();
-  if(!dups.length&&!emptyCount&&!nameMiss.length&&!nameDup.length&&!miss.length){el.style.display='none';el.innerHTML='';return;}
-  // 有 ID 冲突 / 字段缺名 / 字段重名 → 整条横幅切成红色（严重·阻断导出）；否则保持黄色（风险·仍可导出）
-  const severe=!!(dups.length||emptyCount||nameMiss.length||nameDup.length);
+  if(!dups.length&&!emptyCount&&!nameMiss.length&&!nameDup.length&&!sigBad.length&&!miss.length){el.style.display='none';el.innerHTML='';return;}
+  // 有 ID 冲突 / 字段缺名/重名 / 全局信号缺名/重名 → 整条横幅切成红色（严重·阻断导出）；否则保持黄色（风险·仍可导出）
+  const severe=!!(dups.length||emptyCount||nameMiss.length||nameDup.length||sigBad.length);
   el.style.borderColor=severe?'#ff6b6b':'';
   el.style.background=severe?'rgba(255,107,107,.12)':'';
   let html='';
@@ -4005,6 +4086,12 @@ function renderBindRisk(){
       '<div style="color:#ff6b6b"><b>✕ '+nameDup.length+' 个数据字段名在同节点内重复：中/英文名需唯一（英文名重复会造成信号键冲突），已阻止导出，请先修正：</b>'+
       '<div style="margin-top:5px;max-height:160px;overflow:auto;font-size:12px;line-height:1.5">'+items+'</div></div>';
   }
+  if(sigBad.length){
+    const items=sigBad.map(m=>'· '+tplEsc('全局信号「'+m.name+'」：'+m.reason)).join('<br>');
+    html+=(html?'<div style="height:8px"></div>':'')+
+      '<div style="color:#ff6b6b"><b>✕ '+sigBad.length+' 个全局信号缺中/英文名或名称重复：英文名是信号键，需必填且全局唯一，已阻止导出，请先修正：</b>'+
+      '<div style="margin-top:5px;max-height:160px;overflow:auto;font-size:12px;line-height:1.5">'+items+'</div></div>';
+  }
   if(miss.length){
     const items=miss.map(m=>'· '+tplEsc(m.label+' ('+m.node+') → '+m.key+'：'+m.reason)).join('<br>');
     html+=(html?'<div style="height:8px"></div>':'')+
@@ -4015,10 +4102,11 @@ function renderBindRisk(){
 }
 function refreshJSON(){document.getElementById('jout').textContent=buildJSON();renderBindRisk();}
 function showJSON(){document.getElementById('jout').textContent=buildJSON();renderBindRisk();document.getElementById('jpanel').classList.add('show');
-  const {dups,emptyCount}=duplicateIdReport();const nameMiss=missingFieldNameReport();const nameDup=duplicateFieldNameReport();const miss=unboundBindingReport();
+  const {dups,emptyCount}=duplicateIdReport();const nameMiss=missingFieldNameReport();const nameDup=duplicateFieldNameReport();const sigBad=globalSignalNameReport();const miss=unboundBindingReport();
   if(dups.length||emptyCount)flashHint(lang==='en'?'⚠ Duplicate/empty node IDs — fix before use':'✕ 存在重复/为空的节点 ID，会造成信号键冲突，请先修正');
   else if(nameMiss.length)flashHint(lang==='en'?('✕ '+nameMiss.length+' field(s) missing zh/en name — fix before export'):('✕ 有 '+nameMiss.length+' 个数据字段缺中文名或英文名，请先补全（英文名作信号键）'));
   else if(nameDup.length)flashHint(lang==='en'?('✕ '+nameDup.length+' duplicate field name(s) — fix before export'):('✕ 有 '+nameDup.length+' 个数据字段名在同节点内重复，请先修正（英文名重复会冲突）'));
+  else if(sigBad.length)flashHint(lang==='en'?('✕ '+sigBad.length+' global signal name issue(s) — fix before export'):('✕ 有 '+sigBad.length+' 个全局信号缺中/英文名或名称重复，请先修正'));
   else if(miss.length)flashHint(lang==='en'?('Warning: '+miss.length+' field(s) not bound — export allowed'):('⚠ 有 '+miss.length+' 个数据字段未绑定后台字段（仍可导出）'));
 }
 function hideJSON(){document.getElementById('jpanel').classList.remove('show');}
@@ -4040,6 +4128,12 @@ function blockExportForIds(){
   if(nameDup.length){
     renderBindRisk();
     flashHint(lang==='en'?('Export blocked: '+nameDup.length+' duplicate field name(s) in a node — fix first'):('✕ 有 '+nameDup.length+' 个数据字段名在同节点内重复，已阻止导出，请先修正'));
+    return true;
+  }
+  const sigBad=globalSignalNameReport();
+  if(sigBad.length){
+    renderBindRisk();
+    flashHint(lang==='en'?('Export blocked: '+sigBad.length+' global signal name issue(s) — fix first'):('✕ 有 '+sigBad.length+' 个全局信号缺中/英文名或名称重复，已阻止导出，请先修正'));
     return true;
   }
   return false;
@@ -4096,7 +4190,7 @@ function parseImportedNode(o){
     const off=f.offset||{};
     let dv=(f.value!==undefined?f.value:f.dv);
     if(dv==='--'||dv==null)dv='';   // 兼容旧导出的占位符 '--'：视为无值（空）
-    const fld={key:(key.zh||''), keyEn:(key.en||key.zh||''), dv:dv, hidden:!!f.hidden,
+    const fld={key:(key.zh||''), keyEn:(key.en===''?'':(key.en||key.zh||'')), dv:dv, hidden:!!f.hidden,   // 显式空英文名保留为空；仅 en 缺省(旧数据)才兜底中文名
             ox:(+off.x||+f.ox||0), oy:(+off.y||+f.oy||0)};
     if(f.bind&&f.bind.field){
       // followNode=true（或旧格式缺省 device）→ 内部只存 field 保持「跟随节点」；否则固化显式来源
@@ -4233,7 +4327,7 @@ async function importCanvasJSON(obj){
            spd:(s.speed!=null?s.speed:0.5), desc:''};
   });
   // 1.5) 还原自定义全局信号 + 清空上次注入
-  customSignals=(Array.isArray(obj.signals)?obj.signals:[]).filter(s=>s&&s.name).map(s=>{const o={name:s.name,label:s.label||s.name,sample:s.sample};if(s.type)o.type=s.type;if(Array.isArray(s.options))o.options=s.options.slice();return o;});
+  customSignals=(Array.isArray(obj.signals)?obj.signals:[]).map(normalizeSignal).filter(Boolean);
   signalValues={};injRows=[];injDraft=null;_injInited=false;
   // 2) 还原节点 / 连线（仅保留两端节点都存在的连线）
   const newNodes=obj.nodes.map(parseImportedNode).filter(Boolean);
@@ -4346,7 +4440,8 @@ function collectSignals(){
     const iss=fieldNameIssues(n);
     (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i]))add(fieldSig(n,f),nodeLabel(n)+' · '+(f.key||fieldSigKey(f)));});
   });
-  (customSignals||[]).forEach(s=>add(s.name,s.label||s.name));
+  const gi=globalSigIssues();   // 全局信号：信号键=英文名，仅合法(中英文名必填且唯一)的入列
+  (customSignals||[]).forEach((s,i)=>{if(fieldSigKey(s)&&fieldNameOk(gi[i]))add(fieldSigKey(s),sigDisplayName(s));});
   return out;
 }
 // 构造求值上下文：静态默认值(节点字段dv/自定义样例) 叠加注入的样例值
@@ -4357,7 +4452,8 @@ function buildCtx(values){
     const iss=fieldNameIssues(n);
     (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i]))ctx[fieldSig(n,f)]=f.dv;});
   });
-  (customSignals||[]).forEach(s=>{if(s.name!=null&&s.sample!==undefined)ctx[s.name]=s.sample;});
+  const gi=globalSigIssues();
+  (customSignals||[]).forEach((s,i)=>{if(fieldSigKey(s)&&fieldNameOk(gi[i])&&s.dv!==undefined)ctx[fieldSigKey(s)]=s.dv;});
   if(values)Object.keys(values).forEach(k=>{ctx[k]=values[k];});
   return ctx;
 }
@@ -4393,12 +4489,27 @@ function effDir(e){ return _dyn.dirMap.has(e)?_dyn.dirMap.get(e):(e.dir||'forwar
 function effIconType(n){ return (_dyn.iconMap&&_dyn.iconMap.has(n.id))?_dyn.iconMap.get(n.id):n.type; }
 function nodeHasRule(n){ return n&&(n.visibleWhen!=null||(Array.isArray(n.iconRules)&&n.iconRules.length>0)); }
 function edgeHasRule(e){ return e&&(e.showWhen!=null||(Array.isArray(e.dirRules)&&e.dirRules.length>0)); }
-// 编辑态下「带条件」的元素角标（琥珀色小点）
+// 编辑态下「带规则」的元素角标：琥珀色小圆角标签内含「规」字(EN: R)，语义明确——表示该元素配置了数据驱动规则，
+// 与青色的数据值卡片区分，避免被误认为多余的数据点。
 function drawCondBadge(x,y){
-  ctx.save();ctx.shadowBlur=0;
-  ctx.beginPath();ctx.arc(x,y,4.5/zoom,0,Math.PI*2);
+  ctx.save();ctx.shadowBlur=0;ctx.setLineDash([]);
+  const w=17/zoom,h=17/zoom,rr=4.5/zoom;
+  ctx.beginPath();
+  if(ctx.roundRect)ctx.roundRect(x-w/2,y-h/2,w,h,rr);else ctx.rect(x-w/2,y-h/2,w,h);
   ctx.fillStyle='#ffcc44';ctx.fill();
-  ctx.lineWidth=1.4/zoom;ctx.strokeStyle='#3a2a00';ctx.stroke();
+  ctx.lineWidth=1.2/zoom;ctx.strokeStyle='#3a2a00';ctx.stroke();
+  // 漏斗(过滤/条件)图标——矢量填充，任意缩放都清晰；语义=按条件筛选→「带规则」，不会被误认为数据点
+  const k=4.4/zoom;
+  ctx.fillStyle='#241a00';
+  ctx.beginPath();
+  ctx.moveTo(x-k,     y-k*0.78);
+  ctx.lineTo(x+k,     y-k*0.78);
+  ctx.lineTo(x+k*0.32,y+k*0.05);
+  ctx.lineTo(x+k*0.32,y+k*0.92);
+  ctx.lineTo(x-k*0.32,y+k*0.92);
+  ctx.lineTo(x-k*0.32,y+k*0.05);
+  ctx.closePath();
+  ctx.fill();
   ctx.restore();
 }
 // 「被规则隐藏」标记：在虚化的元素/连线上画一个醒目的斜杠圆（⊘），与普通线区分，避免混淆。强制满透明绘制。
@@ -4479,12 +4590,12 @@ function signalValueMeta(name){
   if(!name)return {kind:'text'};
   const p=parseSignal(name);
   if(p.node==='@global'){
-    const s=(customSignals||[]).find(c=>c.name===p.field);
+    const s=(customSignals||[]).find(c=>fieldSigKey(c)===p.field);
     if(!s)return {kind:'text'};
-    const t=sigTypeOf(s);
-    if(t==='bool')return {kind:'bool'};
-    if(t==='enum')return {kind:'enum',options:(s.options||[]).map(String)};
-    if(t==='number')return {kind:'num'};
+    // 与节点数据字段一致：按默认值(dv)推断类型（不再有显式类型列）
+    if(typeof s.dv==='boolean')return {kind:'bool'};
+    if(typeof s.dv==='number')return {kind:'num'};
+    if(s.dv!==''&&s.dv!=null&&!isNaN(Number(s.dv)))return {kind:'num'};
     return {kind:'text'};
   }
   const n=nodes.find(x=>x.id===p.node);
@@ -4826,7 +4937,7 @@ function fillSimTemplate(){
   collectSignals().forEach(s=>{obj[s.name]=ctxv[s.name];});
   const ta=document.getElementById('sim-json');if(ta)ta.value=JSON.stringify(obj,null,2);
   autoGrowSimJSON();   // 同步改高度（内部读取 scrollHeight 触发回流）→ 此后 body 高度已是最新，可直接滚到底
-  const body=document.getElementById('sim-body');
+  const body=document.getElementById('sig-body');
   if(body){ body.scrollTop=body.scrollHeight; setTimeout(()=>{ if(body)body.scrollTop=body.scrollHeight; },60); }   // 定位到底部「批量样例」处
 }
 // 面板规则摘要
@@ -4855,17 +4966,31 @@ function refreshEdgeRuleSummary(e){
   }
 }
 
-// ───── 「规则与信号」侧栏 + 运行视图 ─────
-// 规则始终实时生效（编辑态虚化、运行视图彻底隐藏）；侧栏仅用于「总览规则 / 管理全局信号 / 注入测试」。
-// 注意：togglePanel(side) 已被左右属性面板折叠占用，这里用独立名 toggleSigPanel。
-function setSigPanel(on){
-  panelOpen=!!on;
-  const b=document.getElementById('btn-preview');
-  if(b)b.classList.toggle('act',panelOpen);
-  document.getElementById('simpanel').classList.toggle('show',panelOpen);
-  if(panelOpen)renderSimPanel();
+// ───── 「信号」面板 + 「规则」面板（右侧共用槽位，互斥）+ 运行视图 ─────
+// 规则始终实时生效（编辑态虚化、运行视图彻底隐藏）。信号面板=全局信号管理+注入测试+批量JSON；规则面板=运行视图+规则总览。
+let sidePanel=null;   // 'signal' | 'rule' | null
+// 直接设定当前侧栏（不做切换）；切换语义放在 toggle* 里，避免 setSidePanel('signal') 被误当成 toggle
+function setSidePanel(which){
+  sidePanel=which||null;
+  panelOpen=!!sidePanel;                                       // 兼容旧标志
+  const sp=document.getElementById('sigpanel'),rp=document.getElementById('rulepanel');
+  if(sp)sp.classList.toggle('show',sidePanel==='signal');
+  if(rp)rp.classList.toggle('show',sidePanel==='rule');
+  const bs=document.getElementById('btn-signals'),br=document.getElementById('btn-rules');
+  if(bs)bs.classList.toggle('act',sidePanel==='signal');
+  if(br)br.classList.toggle('act',sidePanel==='rule');
+  // 规则标记：进入规则面板默认开启、离开(切走/关闭)则关闭；面板内可手动切换
+  showRuleBadges=(sidePanel==='rule');
+  const rbt=document.getElementById('rule-badge-toggle');if(rbt)rbt.checked=showRuleBadges;
+  if(sidePanel)renderSimPanel();
 }
-function toggleSigPanel(){ setSigPanel(!panelOpen); }
+function toggleSignalPanel(){ setSidePanel(sidePanel==='signal'?null:'signal'); }   // 再次点击同一按钮=关闭
+function toggleRulePanel(){ setSidePanel(sidePanel==='rule'?null:'rule'); }
+function toggleRuleBadges(on){ showRuleBadges=(on!=null)?!!on:!showRuleBadges; const rbt=document.getElementById('rule-badge-toggle');if(rbt)rbt.checked=showRuleBadges; }
+function closeSidePanels(){ setSidePanel(null); }
+// 兼容旧入口：setSigPanel(true)=打开信号面板(可靠打开，不 toggle)；(false)=关闭
+function setSigPanel(on){ if(on)setSidePanel('signal'); else closeSidePanels(); }
+function toggleSigPanel(){ toggleSignalPanel(); }
 // 运行视图/预览开关：开=彻底隐藏被规则隐藏的元素并应用数据驱动流向（看整图运行效果）；关=回到编辑态（被隐藏者虚化+⊘标记，仍可编辑）
 function toggleRunView(on){
   previewMode=(on!=null)?!!on:!previewMode;
@@ -4880,8 +5005,9 @@ function togglePreview(){ toggleSigPanel(); }
 function injSignalName(r){ if(!r)return null; if(r.node==='@global')return r.field||null; if(r.node&&r.field)return r.node+'.'+r.field; return null; }
 // 信号名 → 注入行结构（导入/粘贴时反解）
 function parseSignal(name){ const i=String(name).lastIndexOf('.'); if(i>0){const nd=name.slice(0,i),fd=name.slice(i+1);if(nodes.some(n=>n.id===nd))return {node:nd,field:fd};} return {node:'@global',field:name}; }
-// 注入行 → signalValues（供求值用）
-function syncInjections(){ signalValues={}; injRows.forEach(r=>{const nm=injSignalName(r);if(nm&&r.val!=='')signalValues[nm]=autoNum(r.val);}); }
+// 注入行 → signalValues（供求值用）。全局信号为自由文本，保留原样(不 autoNum，避免把 "true"/"false" 等字符悄悄转类型)；
+// 节点字段沿用 autoNum。数值/布尔比较由 cmpOp 在求值时用 _num/_looseEq 强转，字符串同样能命中规则。
+function syncInjections(){ signalValues={}; injRows.forEach(r=>{const nm=injSignalName(r);if(nm&&r.val!=='')signalValues[nm]=(r.node==='@global')?r.val:autoNum(r.val);}); }
 function signalExistsForRow(r){
   if(!r||!r.node||!r.field)return false;
   return fieldOptionsFor(r.node).some(o=>o.v===r.field);
@@ -4894,17 +5020,19 @@ function pruneInvalidInjections(){
 }
 // 某元素的「字段」可选项
 function fieldOptionsFor(node){
-  if(node==='@global')return (customSignals||[]).map(s=>({v:s.name,t:s.label||s.name}));
+  if(node==='@global'){const gi=globalSigIssues();return (customSignals||[]).map((s,i)=>({v:fieldSigKey(s),t:sigDisplayName(s),_bad:!fieldNameOk(gi[i])})).filter(o=>o.v&&!o._bad).map(o=>({v:o.v,t:o.t}));}
   const n=nodes.find(x=>x.id===node);if(!n)return [];
-  // 仅暴露节点「已绑定数据字段」；status / online 已移除，不再作为可选规则信号
+  // 仅暴露节点「合法的已绑定数据字段」；不合法(空名/同节点重名)字段不入列——与 buildCtx 的过滤一致，避免规则引用到求值时被忽略的信号
   // 信号值(v)=英文名(端到端信号键)；显示(t)=中文名，便于运营端识别
-  const opts=(n.data||[]).filter(f=>fieldSigKey(f)).map(f=>({v:fieldSigKey(f),t:(f.key||fieldSigKey(f))}));
+  const iss=fieldNameIssues(n);
+  const opts=[];
+  (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i]))opts.push({v:fieldSigKey(f),t:(f.key||fieldSigKey(f))});});
   return opts;
 }
 // 某行「值」的下拉建议（在线→true/false；状态→常见状态；数值→当前静态值）
 function valSuggestFor(r){
   const n=(r&&r.node&&r.node!=='@global')?nodes.find(x=>x.id===r.node):null;
-  if(r.node==='@global'){const s=(customSignals||[]).find(c=>c.name===r.field);if(!s)return [];const t=sigTypeOf(s);if(t==='bool')return ['true','false'];if(t==='enum')return (s.options||[]).map(String);return (s.sample!==''&&s.sample!=null)?[String(s.sample)]:[];}
+  if(r.node==='@global'){const s=(customSignals||[]).find(c=>fieldSigKey(c)===r.field);if(!s)return [];return (s.dv!==''&&s.dv!=null)?[String(s.dv)]:[];}
   const f=n&&(n.data||[]).find(d=>fieldSigKey(d)===r.field);return (f&&f.dv!=='')?[String(f.dv)]:[];
 }
 function renderSimPanel(){ renderRulesList(); renderInjRows(); renderCustomSignals(); autoGrowSimJSON(); }
@@ -4925,7 +5053,9 @@ function hasPendingInjRow(){ return !!injDraft; }
 // 注入「值」控件：按信号语义决定控件类型——布尔/枚举(在线、状态、枚举型全局信号)用下拉；数值/文本用输入框（不再用 datalist 让数值也带下拉）
 function makeInjValueInput(r){
   const name=injSignalName(r);
-  const meta=name?signalValueMeta(name):{kind:'text'};
+  // 全局信号无固定类型，值可为任意字符 → 一律用自由文本输入(占位「值」)，不锁数值/下拉
+  const isGlobal=name&&parseSignal(name).node==='@global';
+  const meta=(name&&!isGlobal)?signalValueMeta(name):{kind:'text'};
   if(meta.kind==='bool'){
     const sel=document.createElement('select');sel.className='sim-val';
     [['',(lang==='en'?'value…':'值…')],['true','true'],['false','false']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;sel.appendChild(o);});
@@ -5060,73 +5190,87 @@ function addInjRow(){
   injDraft={node:'',field:'',val:''};renderInjRows();
 }
 // 全局信号类型：number(数值) / bool(布尔) / enum(枚举) / text(文本)。老数据无 type 时按样例值推断。
-function sigTypeOf(s){ if(s&&s.type)return s.type; if(typeof (s&&s.sample)==='boolean')return 'bool'; if(typeof (s&&s.sample)==='number')return 'number'; return 'text'; }
+// 全局信号内部模型：{key:中文名, keyEn:英文名, dv:默认值, type, options?, bind?}——与数据字段一致，信号键=fieldSigKey(=keyEn||key)。
+// 归一化：兼容 旧导出{name,label,sample,type,options} / 新导出{key:{zh,en},value,type,options,bind} / 内部{key,keyEn,dv,...}
+function normalizeSignal(s){
+  if(!s||typeof s!=='object')return null;
+  if(s.key&&typeof s.key==='object'){                 // 新导出格式
+    // 保留 en 的真实值（含空串）——不兜底成中文名，否则会掩盖「缺英文名」使校验失效
+    const zh=s.key.zh||'', en=s.key.en||'';
+    if(!zh&&!en)return null;
+    const o={key:zh, keyEn:en, dv:(s.value!==undefined?s.value:''), type:s.type};
+    if(Array.isArray(s.options))o.options=s.options.slice();
+    if(s.bind&&s.bind.field)o.bind={field:s.bind.field, deviceType:s.bind.deviceType||'', deviceId:s.bind.deviceId||''};
+    return o;
+  }
+  if(typeof s.key==='string'||s.keyEn){               // 已是内部格式
+    const o={key:s.key||'', keyEn:s.keyEn||'', dv:(s.dv!==undefined?s.dv:''), type:s.type};
+    if(Array.isArray(s.options))o.options=s.options.slice();
+    if(s.bind&&s.bind.field)o.bind={field:s.bind.field, deviceType:s.bind.deviceType||'', deviceId:s.bind.deviceId||''};
+    return o;
+  }
+  if(s.name){                                          // 旧导出格式：keyEn=name(保持信号键不变)，key=label||name
+    const o={key:(s.label||s.name), keyEn:s.name, dv:(s.sample!==undefined?s.sample:''), type:s.type};
+    if(Array.isArray(s.options))o.options=s.options.slice();
+    return o;
+  }
+  return null;
+}
+// 全局信号的显示名（中文名优先）
+function sigDisplayName(s){ return (s&&(s.key||s.keyEn))||''; }
+function sigTypeOf(s){ if(s&&s.type)return s.type; if(typeof (s&&s.dv)==='boolean')return 'bool'; if(typeof (s&&s.dv)==='number')return 'number'; return 'text'; }
 function sigTypeLabel(t){ return ({number:(lang==='en'?'NUM':'数值'),bool:(lang==='en'?'BOOL':'布尔'),enum:(lang==='en'?'ENUM':'枚举'),text:(lang==='en'?'TEXT':'文本')})[t]||t; }
+// 全局信号列表：与数据字段一致的网格（中文名｜英文名｜类型｜默认值｜绑定），中英文名必填且全局唯一(红框校验)，可绑定后台字段
 function renderCustomSignals(){
   const wrap=document.getElementById('sim-custom');if(!wrap)return;
-  wrap.innerHTML='';
-  if(!customSignals.length){const e=document.createElement('div');e.className='sim-empty';e.textContent=(lang==='en'?'No global signals yet (e.g. mode, islanding). Add one below — any rule can then reference it.':'暂无全局信号（如 mode、islanding）。在下方添加后，任意元素/连线的规则均可引用。');wrap.appendChild(e);return;}
+  wrap.className='siggrid';
+  let html='<span class="dh dh-zh" data-i18n="中文名">中文名</span><span class="dh dh-en" data-i18n="英文名">英文名</span><span class="dh dh-val" data-i18n="默认值">默认值</span><span class="dh dh-act" data-i18n="绑定">绑定</span>';
+  wrap.innerHTML=html;
+  if(!customSignals.length){
+    const e=document.createElement('div');e.className='sim-empty';e.style.gridColumn='1/-1';
+    e.textContent=(lang==='en'?'No global signals yet (e.g. 运行模式/mode). Add below — Chinese & English names required; English name is the signal key.':'暂无全局信号（如 运行模式/mode、并网/islanding）。点下方添加；中英文名必填，英文名作信号键，任意规则可引用。');
+    wrap.appendChild(e);return;
+  }
+  const gi=globalSigIssues();
   customSignals.forEach((s,idx)=>{
-    const row=document.createElement('div');row.className='sim-crow';
-    const nm=document.createElement('span');nm.className='sim-cname';
-    const tb=document.createElement('span');tb.className='sim-ctype';tb.textContent=sigTypeLabel(sigTypeOf(s));
-    const nt=document.createElement('span');nt.textContent=s.name;nt.title=s.name+' · '+sigTypeLabel(sigTypeOf(s));nt.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-    nm.appendChild(tb);nm.appendChild(nt);
-    const vctrl=makeGlobalValueInput(s);
-    const del=document.createElement('button');del.type='button';del.className='rm-del';del.textContent='×';del.title='删除信号';del.onclick=()=>{customSignals.splice(idx,1);renderSimPanel();_pathCacheSig='';};
-    row.appendChild(nm);row.appendChild(vctrl);row.appendChild(del);wrap.appendChild(row);
+    const iss=gi[idx]||{};
+    const zh=document.createElement('input');zh.className='df-zh-in'+((iss.emptyZh||iss.dupZh)?' df-invalid':'');zh.value=s.key||'';zh.placeholder='中文名(必填)';zh.title=iss.dupZh?'中文名重复（全局唯一）':'中文名（必填）';zh.oninput=e=>{s.key=e.target.value;refreshGlobalSigValidity();_pathCacheSig='';};
+    const en=document.createElement('input');en.className='df-en-in'+((iss.emptyEn||iss.dupEn)?' df-invalid':'');en.value=s.keyEn||'';en.placeholder='英文名(必填)';en.title=iss.dupEn?'英文名重复（全局唯一·作信号键会冲突）':'英文名（必填·作信号键）';en.oninput=e=>{s.keyEn=e.target.value;refreshGlobalSigValidity();_pathCacheSig='';};
+    // 默认值：与数据字段一致的普通输入框（类型按值自动推断，无需单列）
+    const dv=document.createElement('input');dv.className='df-val-in';dv.value=(s.dv==null?'':String(s.dv));dv.placeholder='--';dv.title='默认值（可留空）';dv.oninput=e=>{s.dv=e.target.value;_pathCacheSig='';};
+    const acts=document.createElement('span');acts.className='df-acts';
+    const bound=!!(s.bind&&s.bind.field);
+    const bindBtn=document.createElement('button');bindBtn.type='button';bindBtn.className='df-bind'+(bound?' bound':'');bindBtn.textContent='🔗';bindBtn.title=bound?'已绑定后台字段，点击修改':'绑定后台字段';bindBtn.onclick=()=>openGlobalBind(idx);
+    const del=document.createElement('button');del.type='button';del.className='df-del';del.textContent='✕';del.title='删除信号';del.onclick=()=>{customSignals.splice(idx,1);renderSimPanel();_pathCacheSig='';};
+    acts.appendChild(bindBtn);acts.appendChild(del);
+    wrap.appendChild(zh);wrap.appendChild(en);wrap.appendChild(dv);wrap.appendChild(acts);
+    if(bound){
+      const bl=document.createElement('div');bl.className='df-bindline'+((s.bind.deviceId)?'':' warn');
+      const sum=document.createElement('span');sum.className='df-bindsum';sum.textContent='↳ '+(sigDisplayName(s)||('信号'+(idx+1)))+'  ←  '+globalBindSummary(s);sum.onclick=()=>openGlobalBind(idx);sum.title='点击编辑绑定';
+      const clr=document.createElement('button');clr.type='button';clr.className='df-bindclr';clr.textContent='✕';clr.title='清除此信号的绑定';clr.onclick=()=>clearGlobalBind(idx);
+      bl.appendChild(sum);bl.appendChild(clr);wrap.appendChild(bl);
+    }
   });
 }
-// 全局信号「当前值」控件：按类型给布尔/枚举下拉或数值/文本输入；该值即参与规则实时求值
-function makeGlobalValueInput(s){
-  const t=sigTypeOf(s);
-  if(t==='bool'){
-    const sel=document.createElement('select');sel.className='sim-val';sel.style.width='78px';
-    [['','—'],['true','true'],['false','false']].forEach(([v,tx])=>{const o=document.createElement('option');o.value=v;o.textContent=tx;sel.appendChild(o);});
-    sel.value=(s.sample===true?'true':(s.sample===false?'false':''));
-    sel.onchange=e=>{s.sample=(e.target.value===''?'':(e.target.value==='true'));};
-    return sel;
-  }
-  if(t==='enum'){
-    const sel=document.createElement('select');sel.className='sim-val';sel.style.width='96px';
-    const ph=document.createElement('option');ph.value='';ph.textContent='—';sel.appendChild(ph);
-    (s.options||[]).forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});
-    if(s.sample!=null&&s.sample!==''&&!(s.options||[]).map(String).includes(String(s.sample))){const o=document.createElement('option');o.value=String(s.sample);o.textContent=String(s.sample);sel.appendChild(o);}
-    sel.value=(s.sample!=null?String(s.sample):'');
-    sel.onchange=e=>{s.sample=e.target.value;};
-    return sel;
-  }
-  const inp=document.createElement('input');inp.className='sim-val';inp.value=(s.sample!=null?s.sample:'');inp.placeholder=(t==='number'?(lang==='en'?'number':'数值'):(lang==='en'?'value':'值'));
-  if(t==='number')inp.type='number';
-  inp.oninput=e=>{const v=e.target.value;s.sample=(v===''?'':(t==='number'?autoNum(v):v));};
-  return inp;
+// 全局信号名必填且唯一：即时红框（不整体重渲染，避免输入丢焦点）
+function refreshGlobalSigValidity(){
+  const gi=globalSigIssues();
+  const zhs=document.querySelectorAll('#sim-custom .df-zh-in'), ens=document.querySelectorAll('#sim-custom .df-en-in');
+  gi.forEach((s,i)=>{ if(zhs[i])zhs[i].classList.toggle('df-invalid',s.emptyZh||s.dupZh); if(ens[i])ens[i].classList.toggle('df-invalid',s.emptyEn||s.dupEn); });
 }
-// 新建全局信号：切换类型时，枚举显示「可选值」输入，并调整当前值占位
-function onNewSigType(){
-  const t=(document.getElementById('sim-newtype')||{}).value;
-  const opts=document.getElementById('sim-newopts');if(opts)opts.style.display=(t==='enum')?'block':'none';
-  const val=document.getElementById('sim-newval');if(val)val.placeholder=(t==='bool'?'true/false':(t==='number'?(lang==='en'?'current value (number)':'当前值(数值)'):(lang==='en'?'current value':'当前值')));
+// 全局信号后台绑定摘要
+function globalBindSummary(s){
+  if(!s.bind||!s.bind.field)return '';
+  const did=s.bind.deviceId||'', dt=s.bind.deviceType||'';
+  if(!did)return '⚠ 未指定设备实例 · '+s.bind.field;
+  return (dt?deviceTypeLabel(dt)+'·':'')+deviceNameOf(did)+' / '+s.bind.field;
 }
+// 新增一条「空」全局信号（中英文名留空由用户填写，即时红框校验）；已有信号名不完整/重复时先修正
 function addCustomSignal(){
-  const nmEl=document.getElementById('sim-newname');const nm=(nmEl.value||'').trim();if(!nm)return;
-  if(customSignals.some(s=>s.name===nm)){alert(lang==='en'?'A global signal with this name already exists.':'已存在同名全局信号。');return;}
-  const type=(document.getElementById('sim-newtype')||{}).value||'number';
-  const rawVal=((document.getElementById('sim-newval')||{}).value||'').trim();
-  const sig={name:nm,label:nm,type:type};
-  if(type==='enum'){
-    const opts=((document.getElementById('sim-newopts')||{}).value||'').split(/[,，]/).map(x=>x.trim()).filter(Boolean);
-    sig.options=opts;
-    sig.sample=(rawVal!==''&&(!opts.length||opts.includes(rawVal)))?rawVal:(opts.length?opts[0]:'');
-  } else if(type==='bool'){
-    sig.sample=(rawVal==='')?true:(rawVal==='true'||rawVal==='1'||rawVal==='是');
-  } else if(type==='number'){
-    sig.sample=(rawVal==='')?0:autoNum(rawVal);
-  } else {
-    sig.sample=rawVal;
-  }
-  customSignals.push(sig);
-  nmEl.value='';const v=document.getElementById('sim-newval');if(v)v.value='';const o=document.getElementById('sim-newopts');if(o)o.value='';
+  if(customSignals.some((s,i)=>!fieldNameOk(globalSigIssues()[i]))){flashHint(lang==='en'?'Fix existing global signal names (required & unique) before adding':'请先补全/修正现有全局信号的中英文名（必填且不可重复），再添加');return;}
+  customSignals.push({key:'',keyEn:'',dv:''});   // 与数据字段一致：无类型列，默认值为普通文本(类型按值推断)
   renderSimPanel();_pathCacheSig='';
+  const zhs=document.querySelectorAll('#sim-custom .df-zh-in');const last=zhs[zhs.length-1];if(last)last.focus();
 }
 function pasteSimJSON(){
   const ta=document.getElementById('sim-json');const txt=ta.value.trim();if(!txt)return;
@@ -5276,7 +5420,13 @@ export function buildContext(topology, signals){
     });
     // 节点上下文仅含其数据字段；status / online 已移除（如需可经 signals / sampleSignals 自行提供任意键）
   });
-  (topology.signals||[]).forEach(function(s){if(s&&s.name!=null&&s.sample!==undefined)ctx[s.name]=s.sample;});
+  (topology.signals||[]).forEach(function(s){
+    if(!s)return;
+    var key,val;
+    if(s.key&&typeof s.key==='object'){ key=s.key.en||s.key.zh; val=s.value; }   // 新格式 {key:{zh,en},value}
+    else if(s.name!=null){ key=s.name; val=s.sample; }                            // 旧格式 {name,sample}
+    if(key!=null&&val!==undefined)ctx[key]=val;
+  });
   if(topology.sampleSignals)Object.keys(topology.sampleSignals).forEach(function(k){ctx[k]=topology.sampleSignals[k];});
   if(signals)Object.keys(signals).forEach(function(k){ctx[k]=signals[k];});
   return ctx;
@@ -5739,7 +5889,7 @@ function enterRuntimeMode(cfg){
   // 注入只读样式：隐藏编辑器全部外壳，画布铺满容器
   if(!document.getElementById('topo-rt-style')){
     const st=document.createElement('style');st.id='topo-rt-style';
-    st.textContent='body.rt #topbar,body.rt #ebar,body.rt #alignbar,body.rt #sidebar-wrap,body.rt #props,body.rt .panel-toggle,body.rt #chint,body.rt #ehint,body.rt #corner-info,body.rt #bgpanel,body.rt #bgpanel-overlay,body.rt #simpanel,body.rt #jpanel,body.rt #ctxmenu,body.rt #uo{display:none!important}'
+    st.textContent='body.rt #topbar,body.rt #ebar,body.rt #alignbar,body.rt #sidebar-wrap,body.rt #props,body.rt .panel-toggle,body.rt #chint,body.rt #ehint,body.rt #corner-info,body.rt #bgpanel,body.rt #bgpanel-overlay,body.rt .simpanel,body.rt #jpanel,body.rt #ctxmenu,body.rt #uo{display:none!important}'
       +'body.rt #main{height:100vh}body.rt #cwrap{width:100vw;height:100vh}body.rt.rt-lock #c{pointer-events:none}';
     document.head.appendChild(st);
   }
