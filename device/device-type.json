@@ -1,0 +1,53 @@
+[
+    {
+        "createBy": "admin",
+        "createTime": "2026-05-20 15:06:51",
+        "updateBy": null,
+        "updateTime": null,
+        "remark": "Battery control unit",
+        "dictCode": 1020,
+        "dictSort": 1,
+        "dictLabel": "BCU",
+        "dictValue": "BCU",
+        "dictType": "ems_archive_device_type",
+        "cssClass": "",
+        "listClass": "primary",
+        "isDefault": "Y",
+        "status": "0",
+        "default": true
+    },
+    {
+        "createBy": "admin",
+        "createTime": "2026-05-20 15:06:51",
+        "updateBy": null,
+        "updateTime": null,
+        "remark": "Energy management system",
+        "dictCode": 1021,
+        "dictSort": 2,
+        "dictLabel": "EMS",
+        "dictValue": "EMS",
+        "dictType": "ems_archive_device_type",
+        "cssClass": "",
+        "listClass": "success",
+        "isDefault": "N",
+        "status": "0",
+        "default": false
+    },
+    {
+        "createBy": "admin",
+        "createTime": "2026-05-20 15:06:51",
+        "updateBy": null,
+        "updateTime": null,
+        "remark": "Power conversion system",
+        "dictCode": 1022,
+        "dictSort": 3,
+        "dictLabel": "PCS",
+        "dictValue": "PCS",
+        "dictType": "ems_archive_device_type",
+        "cssClass": "",
+        "listClass": "warning",
+        "isDefault": "N",
+        "status": "0",
+        "default": false
+    }
+]
