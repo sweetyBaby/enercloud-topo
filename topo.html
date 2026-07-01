@@ -460,12 +460,9 @@
 <div id="tpl-overlay"><div id="tpl-box">
   <div id="tpl-head">
     <h4 id="tpl-title">📂 模板库</h4>
-    <button class="tb grn" id="tpl-saveas" onclick="saveCanvasAsTemplate()">💾 保存当前画布为模板</button>
+    <button id="tpl-close" onclick="closeTemplates()" aria-label="关闭" title="关闭">✕</button>
   </div>
   <div id="tpl-grid"></div>
-  <div style="text-align:right;margin-top:14px">
-    <button class="tb" id="tpl-close" onclick="closeTemplates()">关闭</button>
-  </div>
 </div></div>
 
 <!-- 模板 保存 / 重命名 对话框 -->

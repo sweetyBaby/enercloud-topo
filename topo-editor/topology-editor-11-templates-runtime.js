@@ -83,9 +83,6 @@ async function openTemplates(){
   const ov=document.getElementById('tpl-overlay');
   const grid=document.getElementById('tpl-grid');
   document.getElementById('tpl-title').textContent=lang==='en'?'📂 Templates':'📂 模板库';
-  document.getElementById('tpl-close').textContent=lang==='en'?'Close':'关闭';
-  const saveBtn=document.getElementById('tpl-saveas');
-  if(saveBtn)saveBtn.textContent=lang==='en'?'💾 Save current as template':'💾 保存当前画布为模板';
   ov.classList.add('show');
   grid.innerHTML='<div class="tpl-empty">'+(lang==='en'?'Loading…':'加载中…')+'</div>';
   let mf;
@@ -96,7 +93,7 @@ async function openTemplates(){
 function renderTemplateCards(mf){
   const grid=document.getElementById('tpl-grid');grid.innerHTML='';
   const list=(mf&&mf.templates)||[];
-  if(!list.length){grid.innerHTML='<div class="tpl-empty">'+(lang==='en'?'No templates yet. Click “Save current as template”.':'暂无模板，点上方「保存当前画布为模板」新建。')+'</div>';return;}
+  if(!list.length){grid.innerHTML='<div class="tpl-empty">'+(lang==='en'?'No templates yet.':'暂无模板。')+'</div>';return;}
   list.forEach(entry=>{
     const isDef=entry.id===mf.default;
     const card=document.createElement('div');card.className='tpl-card'+(isDef?' default':'');
