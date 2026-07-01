@@ -11,7 +11,7 @@
     "schemaVersion": "2.0",
     "meta": {
       "app": "储能拓扑编辑器",
-      "generatedAt": "2026-07-01T08:07:37.528Z",
+      "generatedAt": "2026-07-01T08:54:33.266Z",
       "lang": "zh",
       "libraryRef": {
         "name": "energy-topology",
@@ -82,7 +82,7 @@
           "x": 2301.2,
           "y": 990.3
         },
-        "sizeWorld": 738,
+        "sizeWorld": 737,
         "scale": 1,
         "rotation": 0,
         "fontSize": 14,
@@ -195,7 +195,7 @@
           "x": 2301.2,
           "y": 2554.9
         },
-        "sizeWorld": 738,
+        "sizeWorld": 737,
         "scale": 1,
         "rotation": 0,
         "fontSize": 14,
@@ -328,7 +328,7 @@
           "x": 452.5,
           "y": 1024.7
         },
-        "sizeWorld": 894,
+        "sizeWorld": 893,
         "scale": 1,
         "rotation": 0,
         "fontSize": 14,
@@ -375,7 +375,7 @@
           "x": 3549.6,
           "y": 990.3
         },
-        "sizeWorld": 738,
+        "sizeWorld": 737,
         "scale": 1,
         "rotation": 0,
         "fontSize": 14,
@@ -468,87 +468,27 @@
     "signals": [
       {
         "key": {
-          "zh": "P1",
-          "en": "P1"
+          "zh": "T1",
+          "en": "T1"
         },
-        "value": 0
+        "value": 0,
+        "bind": {
+          "field": "AuxDataLogs.AmbientT1",
+          "deviceType": "BCU",
+          "deviceId": "8f97b65308af41eb895ffe9c58e978e3"
+        }
       },
       {
         "key": {
-          "zh": "Q1",
-          "en": "Q1"
+          "zh": "T2",
+          "en": "T2"
         },
-        "value": 0
-      },
-      {
-        "key": {
-          "zh": "PcsP",
-          "en": "PcsP"
-        },
-        "value": 0
-      },
-      {
-        "key": {
-          "zh": "PcsI",
-          "en": "PcsI"
-        },
-        "value": 0
-      },
-      {
-        "key": {
-          "zh": "PcsP1",
-          "en": "PcsP1"
-        },
-        "value": 0
-      },
-      {
-        "key": {
-          "zh": "PcsU1",
-          "en": "PcsU1"
-        },
-        "value": 0
-      },
-      {
-        "key": {
-          "zh": "PcsI1",
-          "en": "PcsI1"
-        },
-        "value": 0
-      },
-      {
-        "key": {
-          "zh": "BmsU",
-          "en": "BmsU"
-        },
-        "value": 0
-      },
-      {
-        "key": {
-          "zh": "BmsI",
-          "en": "BmsI"
-        },
-        "value": 0
-      },
-      {
-        "key": {
-          "zh": "BmsP",
-          "en": "BmsP"
-        },
-        "value": 0
-      },
-      {
-        "key": {
-          "zh": "BmsSoc",
-          "en": "BmsSoc"
-        },
-        "value": 0
-      },
-      {
-        "key": {
-          "zh": "BmsState",
-          "en": "BmsState"
-        },
-        "value": 0
+        "value": "",
+        "bind": {
+          "field": "AuxDataLogs.AmbientT2",
+          "deviceType": "BCU",
+          "deviceId": "8f97b65308af41eb895ffe9c58e978e3"
+        }
       }
     ],
     "dataBindings": [
@@ -659,6 +599,28 @@
           "deviceType": "BCU",
           "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
           "field": "AuxDataLogs.HiContactor",
+          "deviceName": "Rack"
+        }
+      },
+      {
+        "signal": "T1",
+        "node": null,
+        "label": "T1",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
+          "field": "AuxDataLogs.AmbientT1",
+          "deviceName": "Rack"
+        }
+      },
+      {
+        "signal": "T2",
+        "node": null,
+        "label": "T2",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
+          "field": "AuxDataLogs.AmbientT2",
           "deviceName": "Rack"
         }
       }
