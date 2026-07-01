@@ -162,7 +162,10 @@ function tplDialog(opts){
     ov.classList.add('show');setTimeout(()=>inName.focus(),30);
     const done=v=>{ov.classList.remove('show');ok.onclick=null;ca.onclick=null;resolve(v);};
     ok.onclick=()=>{const name=inName.value.trim();if(!name){inName.focus();return;}
-      done({name,nameEn:inEn.value.trim()||name,desc:inDesc.value.trim(),overwrite:opts.showOverwrite&&owCb.checked});};
+      const result={name,nameEn:inEn.value.trim()||name,desc:inDesc.value.trim(),overwrite:opts.showOverwrite&&owCb.checked};
+      // opts.validate 返回非空错误串 → 提示并保持对话框打开（如重名），不关闭、不 resolve，让用户就地改名。
+      if(opts.validate){const err=opts.validate(result);if(err){flashHint(err);inName.focus();if(inName.select)inName.select();return;}}
+      done(result);};
     ca.onclick=()=>done(null);
   });
 }
@@ -185,22 +188,37 @@ async function saveCanvasAsTemplate(){
   let templates;
   try{const mf=await loadTplManifest();templates=(mf&&Array.isArray(mf.templates))?mf.templates:null;}catch(err){templates=null;}
   if(!templates){flashHint(lang==='en'?'Template service unavailable — cannot save now':'模板服务不可用，暂时无法保存（无法校验重名）');return;}
-  const curEntry=currentTemplateId?templates.find(t=>t.id===currentTemplateId):null;
+  const curTemplateId=currentTemplateId;   // 快照：对话框为异步等待，其间 currentTemplateId 可能被改动，覆盖目标与查名一律用此快照
+  const curEntry=curTemplateId?templates.find(t=>t.id===curTemplateId):null;
   // 当前模板名（语言相关、去首尾空格、无 id 兜底）：真正有名称才允许「覆盖」。
   const curName=((curEntry?(lang==='en'?(curEntry.nameEn||curEntry.name):(curEntry.name||curEntry.nameEn)):'')||'').trim();
-  // 仅「已加载的自定义模板」可覆盖：内置模板不允许被覆盖、未加载任何模板则一律另存为新。
-  const canOverwrite=!!(curEntry&&!curEntry.builtin&&curName);
+  // 只要「已加载模板且能在清单中找到」就展示「覆盖」选项（保证一致性：使用任意模板后都在）。
+  const canOverwrite=!!(curEntry&&curName);
+  // 默认是否勾选覆盖：仅自定义模板默认勾选；内置模板默认不勾（防误覆盖内置，但仍可手动勾选覆盖）。
+  const overwriteDefault=!!(canOverwrite&&!curEntry.builtin);
+  // 重名校验放在对话框「保存」点击处：中/英名与其它模板（非当前覆盖目标）重复则阻止保存并保持对话框打开。
+  //  overwriteId 依赖复选框实时状态，故在 validate 内按 r.overwrite 重算。
   const res=await tplDialog({title:lang==='en'?'💾 Save as template':'💾 保存为模板',
-    name:(canOverwrite?curName:''),showOverwrite:canOverwrite,overwriteDefault:canOverwrite,curName});
+    name:(canOverwrite?curName:''),showOverwrite:canOverwrite,overwriteDefault,curName,
+    validate:(r)=>{
+      const oid=(r.overwrite&&canOverwrite)?curTemplateId:null;
+      const clash=tplNameClash(templates,r.name,r.nameEn,oid);
+      if(!clash)return null;
+      const cn=(lang==='en'?(clash.nameEn||clash.name):clash.name)||clash.id;
+      // 仅当「未勾覆盖 且 撞的正是当前模板」时，勾选覆盖能解决 → 才提示勾选覆盖；
+      //  其余情形（已勾覆盖、或撞的是另一个模板）勾覆盖无用，只能改名。
+      const fixableByOverwrite=canOverwrite&&!r.overwrite&&clash.id===curTemplateId;
+      if(lang==='en'){
+        return fixableByOverwrite
+          ? ('A template named “'+cn+'” already exists — use another name, or tick “overwrite current template”')
+          : ('The name “'+cn+'” is already used by another template (name / English name must be unique) — use another name');
+      }
+      return fixableByOverwrite
+        ? ('已存在同名模板「'+cn+'」，请改用其它名称，或勾选「覆盖当前模板」')
+        : ('名称「'+cn+'」已被另一个模板使用（中/英文名均不可重复），请改用其它名称');
+    }});
   if(!res)return;
-  const overwriteId=(res.overwrite&&canOverwrite)?currentTemplateId:null;
-  // 重名校验：与其它模板（非当前覆盖目标）同名则拒绝，避免出现重复命名的模板。
-  const clash=tplNameClash(templates,res.name,res.nameEn,overwriteId);
-  if(clash){
-    const cn=(lang==='en'?(clash.nameEn||clash.name):clash.name)||clash.id;
-    flashHint(lang==='en'?('A template named “'+cn+'” already exists — use another name, or click “Edit” on it in the library to overwrite'):('已存在同名模板「'+cn+'」，请改用其它名称，或在模板库对该模板点「编辑」后覆盖'));
-    return;
-  }
+  const overwriteId=(res.overwrite&&canOverwrite)?curTemplateId:null;
   const canvas=JSON.parse(buildJSON());
   const preview=tplPreviewOfCanvas();
   const meta={name:res.name,nameEn:res.nameEn,desc:res.desc};
@@ -229,14 +247,15 @@ async function saveCanvasAsTemplate(){
 }
 async function renameTemplate(id){
   const mf=await loadTplManifest();const e=(mf.templates||[]).find(t=>t.id===id);if(!e)return;
-  const res=await tplDialog({title:lang==='en'?'✎ Rename template':'✎ 重命名模板',name:e.name,nameEn:e.nameEn,desc:e.desc,okText:lang==='en'?'Rename':'重命名'});
+  // 重名校验（排除自身）放在「重命名」点击处：中/英名与其它模板重复则阻止并保持对话框打开。
+  const res=await tplDialog({title:lang==='en'?'✎ Rename template':'✎ 重命名模板',name:e.name,nameEn:e.nameEn,desc:e.desc,okText:lang==='en'?'Rename':'重命名',
+    validate:(r)=>{
+      const clash=tplNameClash(mf.templates,r.name,r.nameEn,id);
+      if(!clash)return null;
+      const cn=(lang==='en'?(clash.nameEn||clash.name):clash.name)||clash.id;
+      return lang==='en'?('A template named “'+cn+'” already exists (name / English name must be unique) — use another name'):('已存在同名模板「'+cn+'」（中/英文名均不可重复），请改用其它名称');
+    }});
   if(!res)return;
-  const clash=tplNameClash(mf.templates,res.name,res.nameEn,id);   // 重名校验（排除自身）
-  if(clash){
-    const cn=(lang==='en'?(clash.nameEn||clash.name):clash.name)||clash.id;
-    flashHint(lang==='en'?('A template named “'+cn+'” already exists — use another name'):('已存在同名模板「'+cn+'」，请改用其它名称'));
-    return;
-  }
   try{
     const r=await fetch(TPL_API+'/'+encodeURIComponent(id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({template:{name:res.name,nameEn:res.nameEn,desc:res.desc}})});
     if(!r.ok)throw new Error('HTTP '+r.status);
