@@ -1068,6 +1068,18 @@ function dataKey(f){ return lang==='en' ? (f.keyEn||f.key) : f.key; }
 // 英文名为必填项（见字段校验）；为防内部报错，缺失时暂兜底中文名。字段卡片显示仍走 dataKey（中文标签）。
 function fieldSigKey(f){ return (f&&(f.keyEn||f.key))||''; }
 function fieldSig(n,f){ return n.id+'.'+fieldSigKey(f); }
+// 数据字段名称校验：同一节点内「中文名」「英文名」各自必填且不可重复（中、英分开判定，故允许同一字段中英文同名，如 P(kW)）。
+// 返回与 n.data 等长的数组，每项 {emptyZh,emptyEn,dupZh,dupEn}。
+function fieldNameIssues(n){
+  const data=(n&&n.data)||[];
+  const zhCount={},enCount={};
+  data.forEach(f=>{const zh=String(f.key||'').trim(),en=String(f.keyEn||'').trim();
+    if(zh)zhCount[zh]=(zhCount[zh]||0)+1; if(en)enCount[en]=(enCount[en]||0)+1;});
+  return data.map(f=>{const zh=String(f.key||'').trim(),en=String(f.keyEn||'').trim();
+    return {emptyZh:!zh,emptyEn:!en,dupZh:!!zh&&zhCount[zh]>1,dupEn:!!en&&enCount[en]>1};});
+}
+function fieldNameOk(s){ return s&&!s.emptyZh&&!s.emptyEn&&!s.dupZh&&!s.dupEn; }
+function nodeHasFieldNameError(n){ return fieldNameIssues(n).some(s=>!fieldNameOk(s)); }
 // 文本框 + 变量节点：都用 _textBox 包围盒（命中/对齐/缩放等几何逻辑一致）
 function usesTextBox(t){ return t==='text'||t==='variable'; }
 // 注：status / online 已彻底移除，节点的可用信号 = 仅其「已绑定数据字段」
@@ -2676,10 +2688,15 @@ function drawFieldChips(n,s){
   if(n.hideFields||!showFieldChips||!n.data||n.data.length===0)return;
   ctx.shadowBlur=0;
   const isSel=selNode===n.id;
+  const _iss=fieldNameIssues(n);   // 字段名校验：空名/同节点重名
   n.data.forEach((f,i)=>{
     if(f.hidden)return;
+    const _s=_iss[i]||{}, _bad=!!(_s.emptyZh||_s.emptyEn||_s.dupZh||_s.dupEn);
+    // 预览/运行态：不合法字段不展示给终端用户（半成品/信号键冲突字段不入图）
+    if(previewMode&&_bad){ f._chipBox=null; return; }
     const pos=fieldChipPos(n,i);
-    const txt=fieldChipText(f);
+    // 编辑态下不合法字段显示醒目告警文案（替代丑陋的空「: 」），提示运营端修正
+    const txt=_bad ? ('⚠ '+(((_s.emptyZh||_s.emptyEn)?((dataKey(f)||'未命名')+'·缺名'):(dataKey(f)+'·重名')))) : fieldChipText(f);
     ctx.font=pos.cfs+"px -apple-system,'Microsoft YaHei',sans-serif";ctx.textAlign='left';
     const tw=ctx.measureText(txt).width;
     const padX=7/zoom, padY=4/zoom, rr=5/zoom;   // 屏幕固定（随 1/zoom）
@@ -2698,18 +2715,25 @@ function drawFieldChips(n,s){
     }
     // 背景板
     const chipSel=selChips.has(n.id+'#'+i);
-    ctx.fillStyle=chipSel?'rgba(40,70,110,0.92)':'rgba(10,22,40,0.82)';
-    ctx.strokeStyle=chipSel?'#ffcc44':(isSel?'rgba(77,208,255,0.7)':'rgba(120,150,180,0.3)');ctx.lineWidth=(chipSel?1.8:1.2)/zoom;
+    ctx.fillStyle=_bad?'rgba(60,20,24,0.85)':(chipSel?'rgba(40,70,110,0.92)':'rgba(10,22,40,0.82)');
+    ctx.strokeStyle=_bad?'#ff6b6b':(chipSel?'#ffcc44':(isSel?'rgba(77,208,255,0.7)':'rgba(120,150,180,0.3)'));ctx.lineWidth=(_bad?1.6:(chipSel?1.8:1.2))/zoom;
+    if(_bad)ctx.setLineDash([4/zoom,3/zoom]);
     ctx.beginPath();
     if(ctx.roundRect)ctx.roundRect(bx,by,bw,bh,rr);else ctx.rect(bx,by,bw,bh);
     ctx.fill();ctx.stroke();
-    // 文字：字段名浅色，值强调色
-    const k=dataKey(f), kw=ctx.measureText(k+': ').width;
-    ctx.fillStyle='#9fc0dd';ctx.fillText(k+': ',bx+padX,pos.y);
-    const _hv=(f.dv!=null&&f.dv!=='');         // 有值(含 0)→强调色显示；无值→留空
-    const v=_hv?f.dv:'';
-    ctx.fillStyle=_hv?'#4dd0ff':'#6b8299';
-    ctx.fillText(''+v,bx+padX+kw,pos.y);
+    if(_bad)ctx.setLineDash([]);
+    if(_bad){
+      // 不合法字段：整条红色告警文案
+      ctx.fillStyle='#ff9a9a';ctx.fillText(txt,bx+padX,pos.y);
+    }else{
+      // 文字：字段名浅色，值强调色
+      const k=dataKey(f), kw=ctx.measureText(k+': ').width;
+      ctx.fillStyle='#9fc0dd';ctx.fillText(k+': ',bx+padX,pos.y);
+      const _hv=(f.dv!=null&&f.dv!=='');         // 有值(含 0)→强调色显示；无值→留空
+      const v=_hv?f.dv:'';
+      ctx.fillStyle=_hv?'#4dd0ff':'#6b8299';
+      ctx.fillText(''+v,bx+padX+kw,pos.y);
+    }
     f._chipBox={x:bx,y:by,w:bw,h:bh};
   });
 }
@@ -3027,11 +3051,16 @@ function clearEdgeColor(){if(!selEdge)return;delete selEdge.lineColor;document.g
 function renderDFs(n){const c=document.getElementById('dfields');c.className='dfgrid';
   // 列头 + 所有字段单元格放在「同一个 CSS grid」里，列宽由浏览器统一计算 → 列名与数据行精确对齐、绝不错位
   let html='<span class="dh dh-zh" data-i18n="中文名">中文名</span><span class="dh dh-en" data-i18n="英文名">英文名</span><span class="dh dh-val" data-i18n="默认值">默认值</span><span class="dh dh-act" data-i18n="绑定">绑定</span>';
+  const _issues=fieldNameIssues(n);
   (n.data||[]).forEach((f,i)=>{
     const dvVal=(f.dv==null||f.dv==='')?'':String(f.dv);   // 原始值；下方统一用 tplEsc 转义
     const bound=!!(f.bind&&f.bind.field);
-    html+='<input class="df-zh-in'+(String(f.key||'').trim()?'':' df-invalid')+'" value="'+tplEsc(f.key||'')+'" placeholder="中文字段名(必填)" title="中文字段名（必填）" oninput="updDF('+i+',\'key\',this.value,this)">'+
-      '<input class="df-en-in'+(String(f.keyEn||'').trim()?'':' df-invalid')+'" value="'+tplEsc(f.keyEn||'')+'" placeholder="英文名(必填)" title="英文名（必填·作端到端信号键）" oninput="updDF('+i+',\'keyEn\',this.value,this)">'+
+    const iss=_issues[i]||{};
+    const zhBad=iss.emptyZh||iss.dupZh, enBad=iss.emptyEn||iss.dupEn;
+    const zhTip=iss.dupZh?'中文名重复（同节点内需唯一）':'中文字段名（必填）';
+    const enTip=iss.dupEn?'英文名重复（同节点内需唯一·作信号键会冲突）':'英文名（必填·作端到端信号键）';
+    html+='<input class="df-zh-in'+(zhBad?' df-invalid':'')+'" value="'+tplEsc(f.key||'')+'" placeholder="中文字段名(必填)" title="'+zhTip+'" oninput="updDF('+i+',\'key\',this.value,this)">'+
+      '<input class="df-en-in'+(enBad?' df-invalid':'')+'" value="'+tplEsc(f.keyEn||'')+'" placeholder="英文名(必填)" title="'+enTip+'" oninput="updDF('+i+',\'keyEn\',this.value,this)">'+
       '<input class="df-val-in" value="'+tplEsc(dvVal)+'" placeholder="--" title="默认值（可留空）" oninput="updDFVal('+i+',this.value)">'+
       '<span class="df-acts">'+
         '<button class="df-bind'+(bound?' bound':'')+'" onclick="openFieldBind('+i+')" title="'+(bound?'已绑定后台字段，点击修改':'绑定后台字段')+'">🔗</button>'+
@@ -3057,7 +3086,11 @@ function renderDFs(n){const c=document.getElementById('dfields');c.className='df
 function addDF(){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.data=n.data||[];
   // 文本框 / 变量节点：只允许绑定一个字段
   if(usesTextBox(n.type)&&n.data.length>=1){flashHint(n.type==='variable'?'变量只能绑定一个值字段':'文本框只能绑定一个数据字段');return;}
-  const def=NODE_DEFAULTS[n.type]||{data:[]};const used=n.data.map(f=>f.key);const next=def.data.find(k=>!used.includes(k))||'字段'+(n.data.length+1);n.data.push({key:next,keyEn:(DATA_LABEL_EN[next]||next),dv:''});renderDFs(n);}
+  // 已有字段名不完整/重复时，先修正再加新字段（避免堆积非法字段）
+  if(nodeHasFieldNameError(n)){flashHint(lang==='en'?'Fix existing field names (required & unique) before adding':'请先补全/修正现有字段的中英文名（必填且不可重复），再添加新字段');return;}
+  // 新增一条「空」字段：中文名/英文名都留空由用户填写（必填校验会即时标红），不做默认填充
+  n.data.push({key:'',keyEn:'',dv:''});renderDFs(n);
+  const zhs=document.querySelectorAll('#dfields .df-zh-in');const last=zhs[zhs.length-1];if(last)last.focus();}
 
 // ───── 后台数据绑定 UI ─────
 // 节点级「设备类型 + 设备实例」下拉（该节点字段的默认来源）
@@ -3101,8 +3134,10 @@ function fieldBindSummary(n,f){
 function openFieldBind(i){
   const n=nodes.find(x=>x.id===selNode);if(!n)return;
   const f=(n.data||[])[i];if(!f)return;
-  // 字段中英文名必填：缺任一则不允许绑定到节点（英文名是端到端信号键，缺失将无法生成/匹配信号）
-  if(!String(f.key||'').trim()||!String(f.keyEn||'').trim()){flashHint(lang==='en'?'Fill both Chinese & English field names before binding':'请先填写该字段的中文名和英文名，方可绑定');return;}
+  // 字段中英文名必填且同节点内唯一：不合法则不允许绑定到节点（英文名是端到端信号键，缺失/重复将无法生成或冲突）
+  const _iss=fieldNameIssues(n)[i]||{};
+  if(_iss.emptyZh||_iss.emptyEn){flashHint(lang==='en'?'Fill both Chinese & English field names before binding':'请先填写该字段的中文名和英文名，方可绑定');return;}
+  if(_iss.dupZh||_iss.dupEn){flashHint(lang==='en'?'Field name duplicated in this node — make it unique before binding':'该字段名在本节点内重复（中/英文名需唯一），请先修正再绑定');return;}
   closeFieldBind();
   const b=f.bind||{};
   const ov=document.createElement('div');ov.id='fb-overlay';ov.onclick=e=>{if(e.target===ov)closeFieldBind();};
@@ -3377,8 +3412,17 @@ function alignSel(mode){
 }
 function rmDF(i){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.data.splice(i,1);renderDFs(n);}
 function updDF(i,prop,v,el){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.data[i][prop]=v;
-  // 中英文名必填：即时标红（不整体重渲染，避免输入时丢焦点）
-  if(el&&(prop==='key'||prop==='keyEn'))el.classList.toggle('df-invalid',!String(v).trim());
+  // 中英文名必填且同节点内唯一：即时标红（改一个名字可能影响其它行的重复状态，故整节点重算；仅 toggle class 不重建 DOM，避免丢焦点）
+  if(prop==='key'||prop==='keyEn')refreshFieldNameValidity(n);
+}
+// 按 fieldNameIssues 重刷所有字段行的红框（DOM 顺序与 n.data 一一对应）
+function refreshFieldNameValidity(n){
+  const iss=fieldNameIssues(n);
+  const zhs=document.querySelectorAll('#dfields .df-zh-in'), ens=document.querySelectorAll('#dfields .df-en-in');
+  iss.forEach((s,i)=>{
+    if(zhs[i])zhs[i].classList.toggle('df-invalid',s.emptyZh||s.dupZh);
+    if(ens[i])ens[i].classList.toggle('df-invalid',s.emptyEn||s.dupEn);
+  });
 }
 function updDFVal(i,v){const n=nodes.find(x=>x.id===selNode);if(!n||!n.data[i])return;n.data[i].dv=v.trim();_pathCacheSig='';}
 
@@ -3917,15 +3961,29 @@ function missingFieldNameReport(){
   });
   return miss;
 }
+// 导出前校验：同一节点内「中文名」或「英文名」重复的数据字段（英文名重复=信号键冲突，属严重问题，阻断导出）
+function duplicateFieldNameReport(){
+  const dups=[];
+  nodes.forEach(n=>{
+    if(n.type==='anchor')return;
+    const iss=fieldNameIssues(n);
+    iss.forEach((s,i)=>{
+      if(s.dupZh||s.dupEn)dups.push({node:n.id,label:nodeLabel(n)||n.id,idx:i+1,
+        reason:(s.dupZh&&s.dupEn)?'中文名、英文名均重复':(s.dupZh?('中文名重复：'+n.data[i].key):('英文名重复：'+n.data[i].keyEn))});
+    });
+  });
+  return dups;
+}
 // 在 JSON 面板顶部渲染导出校验横幅：ID 重复/为空 + 字段缺中英文名（红·硬性·阻断导出）+ 字段未绑定（黄·风险·仍可导出）
 function renderBindRisk(){
   const el=document.getElementById('jbind-risk');if(!el)return;
   const {dups,emptyCount}=duplicateIdReport();
   const nameMiss=missingFieldNameReport();
+  const nameDup=duplicateFieldNameReport();
   const miss=unboundBindingReport();
-  if(!dups.length&&!emptyCount&&!nameMiss.length&&!miss.length){el.style.display='none';el.innerHTML='';return;}
-  // 有 ID 冲突 / 字段缺名 → 整条横幅切成红色（严重·阻断导出）；否则保持黄色（风险·仍可导出）
-  const severe=!!(dups.length||emptyCount||nameMiss.length);
+  if(!dups.length&&!emptyCount&&!nameMiss.length&&!nameDup.length&&!miss.length){el.style.display='none';el.innerHTML='';return;}
+  // 有 ID 冲突 / 字段缺名 / 字段重名 → 整条横幅切成红色（严重·阻断导出）；否则保持黄色（风险·仍可导出）
+  const severe=!!(dups.length||emptyCount||nameMiss.length||nameDup.length);
   el.style.borderColor=severe?'#ff6b6b':'';
   el.style.background=severe?'rgba(255,107,107,.12)':'';
   let html='';
@@ -3941,6 +3999,12 @@ function renderBindRisk(){
       '<div style="color:#ff6b6b"><b>✕ '+nameMiss.length+' 个数据字段缺中文名或英文名：英文名是端到端信号键，已阻止导出，请先补全：</b>'+
       '<div style="margin-top:5px;max-height:160px;overflow:auto;font-size:12px;line-height:1.5">'+items+'</div></div>';
   }
+  if(nameDup.length){
+    const items=nameDup.map(m=>'· '+tplEsc(m.label+' ('+m.node+') · 第'+m.idx+'个字段：'+m.reason)).join('<br>');
+    html+=(html?'<div style="height:8px"></div>':'')+
+      '<div style="color:#ff6b6b"><b>✕ '+nameDup.length+' 个数据字段名在同节点内重复：中/英文名需唯一（英文名重复会造成信号键冲突），已阻止导出，请先修正：</b>'+
+      '<div style="margin-top:5px;max-height:160px;overflow:auto;font-size:12px;line-height:1.5">'+items+'</div></div>';
+  }
   if(miss.length){
     const items=miss.map(m=>'· '+tplEsc(m.label+' ('+m.node+') → '+m.key+'：'+m.reason)).join('<br>');
     html+=(html?'<div style="height:8px"></div>':'')+
@@ -3951,9 +4015,10 @@ function renderBindRisk(){
 }
 function refreshJSON(){document.getElementById('jout').textContent=buildJSON();renderBindRisk();}
 function showJSON(){document.getElementById('jout').textContent=buildJSON();renderBindRisk();document.getElementById('jpanel').classList.add('show');
-  const {dups,emptyCount}=duplicateIdReport();const nameMiss=missingFieldNameReport();const miss=unboundBindingReport();
+  const {dups,emptyCount}=duplicateIdReport();const nameMiss=missingFieldNameReport();const nameDup=duplicateFieldNameReport();const miss=unboundBindingReport();
   if(dups.length||emptyCount)flashHint(lang==='en'?'⚠ Duplicate/empty node IDs — fix before use':'✕ 存在重复/为空的节点 ID，会造成信号键冲突，请先修正');
   else if(nameMiss.length)flashHint(lang==='en'?('✕ '+nameMiss.length+' field(s) missing zh/en name — fix before export'):('✕ 有 '+nameMiss.length+' 个数据字段缺中文名或英文名，请先补全（英文名作信号键）'));
+  else if(nameDup.length)flashHint(lang==='en'?('✕ '+nameDup.length+' duplicate field name(s) — fix before export'):('✕ 有 '+nameDup.length+' 个数据字段名在同节点内重复，请先修正（英文名重复会冲突）'));
   else if(miss.length)flashHint(lang==='en'?('Warning: '+miss.length+' field(s) not bound — export allowed'):('⚠ 有 '+miss.length+' 个数据字段未绑定后台字段（仍可导出）'));
 }
 function hideJSON(){document.getElementById('jpanel').classList.remove('show');}
@@ -3969,6 +4034,12 @@ function blockExportForIds(){
   if(nameMiss.length){
     renderBindRisk();
     flashHint(lang==='en'?('Export blocked: '+nameMiss.length+' field(s) missing zh/en name — fill first'):('✕ 有 '+nameMiss.length+' 个数据字段缺中文名或英文名，已阻止导出，请先补全'));
+    return true;
+  }
+  const nameDup=duplicateFieldNameReport();
+  if(nameDup.length){
+    renderBindRisk();
+    flashHint(lang==='en'?('Export blocked: '+nameDup.length+' duplicate field name(s) in a node — fix first'):('✕ 有 '+nameDup.length+' 个数据字段名在同节点内重复，已阻止导出，请先修正'));
     return true;
   }
   return false;
@@ -4271,8 +4342,9 @@ function collectSignals(){
   const out=[],seen=new Set();
   const add=(name,label)=>{if(name&&!seen.has(name)){seen.add(name);out.push({name,label:label||name});}};
   nodes.forEach(n=>{
-    // 节点的可用信号 = 仅它「已绑定的数据字段」；不再凭空附带 status / online
-    (n.data||[]).forEach(f=>{if(fieldSigKey(f))add(fieldSig(n,f),nodeLabel(n)+' · '+(f.key||fieldSigKey(f)));});
+    // 节点的可用信号 = 仅它「合法的数据字段」；不合法(空名/同节点重名)字段不作为可用信号，避免选到半成品或重名冲突键
+    const iss=fieldNameIssues(n);
+    (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i]))add(fieldSig(n,f),nodeLabel(n)+' · '+(f.key||fieldSigKey(f)));});
   });
   (customSignals||[]).forEach(s=>add(s.name,s.label||s.name));
   return out;
@@ -4281,8 +4353,9 @@ function collectSignals(){
 function buildCtx(values){
   const ctx={};
   nodes.forEach(n=>{
-    // 仅以节点「已绑定数据字段」的默认值入栈；status / online 已移除，不再凭空注入
-    (n.data||[]).forEach(f=>{if(fieldSigKey(f))ctx[fieldSig(n,f)]=f.dv;});
+    // 仅以节点「合法数据字段」的默认值入栈；不合法(空名/同节点重名)字段不参与求值，避免重名键相互覆盖
+    const iss=fieldNameIssues(n);
+    (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i]))ctx[fieldSig(n,f)]=f.dv;});
   });
   (customSignals||[]).forEach(s=>{if(s.name!=null&&s.sample!==undefined)ctx[s.name]=s.sample;});
   if(values)Object.keys(values).forEach(k=>{ctx[k]=values[k];});
