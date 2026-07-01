@@ -162,12 +162,80 @@ TopoRuntime.mergeSignals({...});  // 增量合并（= topo:merge）
 | **跨域** | 方式 A 需 CORS；不便配置时用方式 B（iframe postMessage） |
 | **频率** | 渲染按动画帧自动重绘，后端按业务需要的刷新率推送即可（常见 1–5s） |
 
-> 信号名「有哪些」由当前画布决定。后端可在联调前向运营端要一份导出的**画布 JSON**，据 `nodes[].id` + `nodes[].data[].key` + 顶层 `signals[].name` 枚举出全部应推送的键。
+> 信号名「有哪些」由当前画布决定。后端可在联调前向运营端要一份导出的**画布 JSON**，据 `nodes[].id` + `nodes[].data[].key.en` + 顶层 `signals[].key.en` 枚举出全部应推送的键；更省事的做法是直接读导出 JSON 里的 `dataBindings[]`（见下节），它已把「每个信号键 ↔ 后台哪台设备的哪个字段」列成清单。
 
 ---
 
-## 8. 与其它文档的关系
+## 8. 数据绑定清单 `dataBindings` —— 后台取数依据
+
+> 上面几节讲的是「实时数据 JSON 长什么样」；本节讲「后台怎么知道每个信号键的值该从哪取」。运营端在画布上给字段/全局信号绑定后台字段后，导出的**画布 JSON** 里会带一个顶层数组 `dataBindings[]`。**后端只看这一个数组，就能把每个实时信号键映射到具体设备的具体字段。**
+
+### 8.1 一句话
+
+`dataBindings[]` 里每一条 = 一个要推送的信号键（`signal`）+ 它对应的后台数据源（`source`：哪台设备、哪个字段）。后端照着「取 `source` → 以 `signal` 为键输出」即可拼出第 1 节那份扁平实时 JSON。
+
+### 8.2 单条结构
+
+```jsonc
+// 节点字段绑定
+{
+  "signal": "bms_1.SOC(%)",   // ★ 后端要输出的实时数据键（= 节点id.字段英文名）
+  "node": "bms_1",            // 所属节点 id（全局信号为 null）
+  "label": "SOC(%)",          // 中文名，仅供人读/排错，不是键
+  "source": {                 // ★ 后台数据源：从这里取值
+    "deviceType": "BCU",                                 // 后台设备类型
+    "deviceId":   "e072699f1f8d427b9d81daf4e32b26fc",    // 后台设备实例 id
+    "field":      "AuxDataLogs.SystemSOC",               // 后台字段路径 = location.field
+    "deviceName": "Rack"                                 // 可选，由 deviceId 反查，便于人读
+  }
+}
+
+// 全局信号绑定：node=null，signal 无节点前缀
+{
+  "signal": "mode",
+  "node": null,
+  "label": "运行模式",
+  "source": { "deviceType": "EMS", "deviceId": "...", "field": "RunLogs.Mode" }
+}
+```
+
+### 8.3 字段说明
+
+| 字段 | 含义 | 后端怎么用 |
+|---|---|---|
+| `signal` | 实时数据键 | **输出实时 JSON 时用它作 key**，与第 2 节命名规则完全一致（节点字段=`节点id.英文字段名`；全局=`英文名`）|
+| `node` | 所属节点 id；全局信号为 `null` | 参考信息，可用于分组 |
+| `label` | 中文名 | 仅供人读/排错，**不要**当键用 |
+| `source.deviceType` | 后台设备类型（如 `BCU`/`PCS`/`EMS`）| 定位设备用 |
+| `source.deviceId` | 后台设备实例 id | 定位到具体那台设备 |
+| `source.field` | 后台字段路径，形如 `location.field` | **取值字段**；以**最后一个点**分隔：左=`location`、右=`field`（如 `AuxDataLogs.SystemSOC` → location=`AuxDataLogs`、field=`SystemSOC`）|
+| `source.deviceName` | 设备名（可选）| 排错用 |
+
+### 8.4 取数 → 输出 的对应关系
+
+```
+对 dataBindings[] 里每一条：
+  用 source.deviceType + source.deviceId 定位设备实例
+     → 读该实例的 source.field（location.field）当前值 v
+     → 放进实时 JSON： { [signal]: v }
+汇总所有条目 → 就是第 1 节那份扁平 { 信号:值 } 快照
+```
+
+例：`{ "signal":"bms_1.SOC(%)", "source":{ "deviceType":"BCU","deviceId":"e072…","field":"AuxDataLogs.SystemSOC" } }`
+→ 后端读 BCU 实例 `e072…` 的 `AuxDataLogs.SystemSOC` = 55
+→ 输出 `{ "bms_1.SOC(%)": 55 }`。
+
+### 8.5 注意事项
+
+- **只有绑定过的字段/信号才在 `dataBindings` 里**。画布上未绑定后台字段的数据字段不会生成记录（运营端导出时会黄色提示「未绑定」，但仍允许导出）——这类键后端无源可推，卡片会显示空。
+- **来源已显式化**：即便某字段在画布上设为「跟随节点设备」，导出时 `source.deviceType/deviceId` 也已写全，后端无需再做任何推断。
+- **键必须逐字对齐**：`signal` 与画布里的 `节点id`、字段英文名逐字一致（含大小写、括号如 `(kW)`/`(%)`）；对不上的键前端静默丢弃、不更新卡片。
+- `dataBindings` 与实时数据「同源不同用」：`dataBindings` 是**配置期**的映射清单（后端据此建采集/映射），实时 JSON 是**运行期**每帧推送的值；后端最终推的仍是第 1 节那份扁平对象。
+
+---
+
+## 9. 与其它文档的关系
 
 - 信号如何驱动**显隐/流向规则**（条件树结构、运算符表）：见 [`Readme.md` 第 5 节「规则结构参考」](../Readme.md)。
-- **画布 JSON**（拓扑+规则）的结构：见 [`Readme.md` 第 6 节](../Readme.md)。
+- **画布 JSON**（拓扑+规则+`dataBindings`）的完整字段：见 [`docs/product-requirements.md` 第 8 章](product-requirements.md) 与 [`Readme.md` 第 6 节](../Readme.md)。
 - **模板**的增删改查接口（与实时数据无关）：见 [`docs/template-api.md`](template-api.md)。
