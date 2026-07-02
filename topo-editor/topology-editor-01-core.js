@@ -33,6 +33,9 @@ function etLabel(k){ const e=ET[k]; return lang==='en'?(e.labelEn||e.label):e.la
    增删改图标 = 直接增删改 icons/ 下的图片（dev-server / build 会自动扫描登记并同步清单），无需改动代码。
    清单里的 file-less 元素（如文本框/变量节点等纯绘制元素）不需要图片。 ───── */
 const ICON_BASE='icons/';              // 图标文件目录（相对 topo.html）
+// 图标库写接口（上传/重命名/替换/删除 → 落盘 icons/ + index.json）；dev-server / 生产 server 均提供。
+// 如需对接父平台后端，可在加载本脚本前设置 window.TOPO_ICON_API 覆盖（支持绝对 URL）。
+const ICON_API=(typeof window!=='undefined'&&window.TOPO_ICON_API)||'api/icons';
 const ICON_FILE={};                    // type → 图片文件名（导出元素库清单 / iconFileName 用）
 const ICON_GROUP_ORDER=['电源侧','储能设备','母线/主干线','电气设备','计量与负载','开关元件','辅助系统','无源元件','辅助元素'];
 let _iconBust=0;                       // 图片缓存版本号：每次「重扫图标」+1，绕过浏览器缓存

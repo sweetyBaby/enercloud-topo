@@ -126,7 +126,7 @@ def build_icon_manifest(icons_dir: Path) -> dict:
             custom_devices.append(dev)
     if custom_devices:
         groups.append({
-            "title": "自定义图标", "title_en": "Custom Icons", "color": "#42a5f5", "tab": "device",
+            "title": "自定义图标", "title_en": "Custom Icons", "color": "#42a5f5", "tab": "custom",
             "devices": custom_devices,
         })
     out = dict(curated)

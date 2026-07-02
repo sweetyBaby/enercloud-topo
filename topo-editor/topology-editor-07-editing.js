@@ -1023,7 +1023,7 @@ dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');if(e.dataTransfer.files[0])readFile(e.dataTransfer.files[0]);});
 function onFile(e){if(e.target.files[0])readFile(e.target.files[0]);}
 function readFile(file){const r=new FileReader();r.onload=ev=>{pendingDataURL=ev.target.result;const p=document.getElementById('upv');p.src=pendingDataURL;p.style.display='block';if(!document.getElementById('un').value)document.getElementById('un').value=file.name.replace(/\.[^.]+$/,'');};r.readAsDataURL(file);}
-function confirmUp(){
+async function confirmUp(){
   if(!pendingDataURL){alert(lang==='en'?'Please select a file':'请先选择文件');return;}
   const zhEl=document.getElementById('un'),enEl=document.getElementById('un-en');
   const zh=zhEl.value.trim(), en=enEl.value.trim();
@@ -1031,16 +1031,128 @@ function confirmUp(){
   if(!zh||!en){alert(lang==='en'?'Please fill both Chinese and English names':'请同时填写中文和英文名称');return;}
   const safe=en.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
   const tk='custom_'+(safe||('icon'+Date.now()));
-  const img=new Image();img.src=pendingDataURL;
+  // ★ 持久化：图片落盘到服务器 icons/ 目录 + 登记 index.json，刷新页面不丢失；成功后重扫图标库动态生效
+  const dataURL=pendingDataURL;
+  try{
+    const r=await fetch(ICON_API,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:tk,labelZh:zh,labelEn:en,dataURL})});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok&&j.ok){
+      closeUp();
+      activeTab='custom';
+      await reloadIconLibrary();
+      if(document.getElementById('iconmgr-overlay').classList.contains('show'))renderIconManager();
+      flashHint(lang==='en'?'Icon saved to library':'图标已保存到图标库');
+      return;
+    }
+    console.warn('icon upload api failed',j);
+  }catch(err){ console.warn('icon upload api unreachable',err); }
+  // 兜底：无写接口（纯静态托管）时退回「仅本次会话」内存图标
+  const img=new Image();img.src=dataURL;
   img.onload=()=>{
     CUSTOM_ICONS[tk]=img;IMGS[tk]=img;NODE_DEFAULTS[tk]={data:[]};
     CUSTOM_LABELS[tk]={zh,en};
-    addCustomToSidebar(tk,zh,en,pendingDataURL);
+    addCustomToSidebar(tk,zh,en,dataURL);
     const sel=document.getElementById('p-type');const o=document.createElement('option');o.value=tk;o.textContent=zh+' / '+en;sel.appendChild(o);
     closeUp();
+    flashHint(lang==='en'?'No icon API — icon kept for this session only':'未连接图标服务，图标仅本次会话可用');
   };
 }
 function closeUp(){document.getElementById('uo').classList.remove('show');document.getElementById('upv').style.display='none';document.getElementById('upv').src='';document.getElementById('un').value='';document.getElementById('un-en').value='';document.getElementById('un').classList.remove('invalid');document.getElementById('un-en').classList.remove('invalid');document.getElementById('fi').value='';pendingDataURL=null;}
+
+// ══════════════════════════════════════════════
+// 图标库管理：增 / 删 / 改（重命名、替换图片）图标 → 服务端落盘 icons/ + index.json，
+// 每次操作后 reloadIconLibrary() 重扫，左栏 / 属性面板下拉 / 画布即时生效，无需刷新页面。
+// ══════════════════════════════════════════════
+let _mgrReplaceType=null;   // 「替换图片」时暂存目标图标 type，等待文件选择回调
+async function iconApiCall(method,type,body){
+  const u=type?(ICON_API+'/'+encodeURIComponent(type)):ICON_API;
+  const r=await fetch(u,{method,headers:body?{'Content-Type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));
+  return j;
+}
+function openIconManager(){
+  document.getElementById('iconmgr-overlay').classList.add('show');
+  document.getElementById('iconmgr-title').textContent=lang==='en'?'🗂 Icon Library Manager':'🗂 图标库管理';
+  document.getElementById('iconmgr-add').textContent=lang==='en'?'＋ Add Icon':'＋ 新增图标';
+  document.getElementById('iconmgr-hint').textContent=lang==='en'
+    ?'Changes are saved to the server icons/ folder and manifest, then the library is rescanned — no page refresh needed.'
+    :'增删改会保存到服务器 icons/ 目录并同步清单，操作后自动重扫图标库，左栏与画布即时生效，刷新页面不丢失。';
+  renderIconManager();
+}
+function closeIconManager(){document.getElementById('iconmgr-overlay').classList.remove('show');}
+function renderIconManager(){
+  const list=document.getElementById('iconmgr-list');list.innerHTML='';
+  const en=lang==='en';
+  const bust=_iconBust?('?v='+_iconBust):'';
+  let total=0;
+  DEVICE_GROUPS.forEach(g=>{
+    const devs=(g.devices||[]).filter(d=>d.file);   // 纯绘制元素（文本框/变量/占位点）无图片，不在此管理
+    if(!devs.length)return;
+    total+=devs.length;
+    const h=document.createElement('div');h.className='im-group';
+    h.textContent=(en?(g.title_en||g.title):g.title)+'（'+devs.length+'）';
+    list.appendChild(h);
+    devs.forEach(d=>{
+      const row=document.createElement('div');row.className='im-row';
+      const img=document.createElement('img');img.className='im-icon';img.src=ICON_BASE+d.file+bust;img.alt=d.type;
+      const tp=document.createElement('div');tp.className='im-type';tp.textContent=d.type;tp.title=(en?'File: ':'文件：')+d.file;
+      const zhI=document.createElement('input');zhI.value=d.label||'';zhI.placeholder=en?'Chinese name':'中文名称';
+      const enI=document.createElement('input');enI.value=d.label_en||'';enI.placeholder=en?'English name':'英文名称';
+      const save=document.createElement('button');save.className='im-btn';save.textContent=en?'💾 Save':'💾 保存';
+      save.title=en?'Save Chinese/English labels':'保存中/英文名称';
+      save.onclick=()=>iconMgrRename(d.type,zhI.value.trim(),enI.value.trim());
+      const rep=document.createElement('button');rep.className='im-btn';rep.textContent=en?'🔄 Replace':'🔄 替换';
+      rep.title=en?'Replace the image file':'替换图标图片';
+      rep.onclick=()=>{_mgrReplaceType=d.type;document.getElementById('im-fi').click();};
+      const del=document.createElement('button');del.className='im-btn im-del';del.textContent=en?'🗑 Delete':'🗑 删除';
+      del.title=en?'Delete this icon from the library':'从图标库删除该图标';
+      del.onclick=()=>iconMgrDelete(d.type,en?(d.label_en||d.label):(d.label||d.label_en));
+      row.appendChild(img);row.appendChild(tp);row.appendChild(zhI);row.appendChild(enI);
+      row.appendChild(save);row.appendChild(rep);row.appendChild(del);
+      list.appendChild(row);
+    });
+  });
+  if(!total){
+    const empty=document.createElement('div');empty.className='im-empty';
+    empty.textContent=en?'No icons in the library yet. Click "Add Icon" to upload.':'图标库暂无图标，点击「新增图标」上传。';
+    list.appendChild(empty);
+  }
+}
+async function iconMgrRename(type,zh,enName){
+  if(!zh||!enName){alert(lang==='en'?'Please fill both Chinese and English names':'请同时填写中文和英文名称');return;}
+  try{
+    await iconApiCall('PUT',type,{labelZh:zh,labelEn:enName});
+    await reloadIconLibrary();renderIconManager();
+    flashHint(lang==='en'?'Icon renamed':'图标名称已保存');
+  }catch(err){alert((lang==='en'?'Save failed: ':'保存失败：')+err.message);}
+}
+async function iconMgrDelete(type,label){
+  const ok=await uiConfirm(lang==='en'
+    ?('Delete icon "'+(label||type)+'" from the library? Elements using it will show a placeholder.')
+    :('确定从图标库删除「'+(label||type)+'」？画布中正在使用该图标的元素将显示占位框。'),true);
+  if(!ok)return;
+  try{
+    await iconApiCall('DELETE',type);
+    await reloadIconLibrary();renderIconManager();
+    flashHint(lang==='en'?'Icon deleted':'图标已删除');
+  }catch(err){alert((lang==='en'?'Delete failed: ':'删除失败：')+err.message);}
+}
+function onIconMgrFile(e){
+  const f=e.target.files[0];e.target.value='';
+  if(!f||!_mgrReplaceType)return;
+  const type=_mgrReplaceType;_mgrReplaceType=null;
+  const r=new FileReader();
+  r.onload=async ev=>{
+    try{
+      await iconApiCall('PUT',type,{dataURL:ev.target.result});
+      await reloadIconLibrary();renderIconManager();
+      flashHint(lang==='en'?'Icon image replaced':'图标图片已替换');
+    }catch(err){alert((lang==='en'?'Replace failed: ':'替换失败：')+err.message);}
+  };
+  r.readAsDataURL(f);
+}
 
 // 取某类型的图标 dataURL
 function iconSrcOf(t){

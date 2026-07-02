@@ -232,7 +232,7 @@
         <div class="pr"><label>旋转 <span id="p-rot-v">0</span>°</label>
           <div class="pr-inline"><input type="range" id="p-rot" min="0" max="359" value="0" oninput="applyNP()"><button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="resetRotation()" data-i18n="归零">归零</button></div></div>
         <div class="pr"><label id="p-fs-label">标签字号 <span id="p-fs-v">14</span>px</label>
-          <div class="pr-inline"><input type="range" id="p-fs" min="10" max="48" value="14" oninput="applyNP()"></div></div>
+          <div class="pr-inline"><input type="range" id="p-fs" min="10" max="120" value="14" oninput="applyNP()"></div></div>
         <div class="pr"><label id="p-fc-label" data-i18n="标签颜色">标签颜色</label>
           <div class="pr-inline"><input type="color" id="p-fc" value="#e8f4ff" oninput="applyNP()">
           <input type="text" id="p-fc-hex" style="flex:1" oninput="syncColor('p-fc',this.value)"></div></div>
@@ -265,7 +265,7 @@
           <div class="psep"></div>
           <div class="phint" data-i18n="值(value)字体：">值(value)字体：</div>
           <div class="pr"><label>值字号 <span id="p-val-fs-v">16</span>px</label>
-            <div class="pr-inline"><input type="range" id="p-val-fs" min="10" max="48" value="16" oninput="applyVarStyle()"></div></div>
+            <div class="pr-inline"><input type="range" id="p-val-fs" min="10" max="120" value="16" oninput="applyVarStyle()"></div></div>
           <div class="pr"><label data-i18n="值颜色">值颜色</label>
             <div class="pr-inline"><input type="color" id="p-val-color" value="#4dd0ff" oninput="applyVarStyle()">
             <input type="text" id="p-val-color-hex" style="flex:1" oninput="syncVarColor(this.value)"></div></div>
@@ -445,6 +445,18 @@
   <div id="ua"><button class="tb grn" id="ub-ok" onclick="confirmUp()">✓ 添加</button>
     <button class="tb red" id="ub-cancel" onclick="closeUp()">✕ 取消</button></div>
 </div></div>
+
+<!-- 图标库管理：增 / 删 / 改图标，落盘 icons/ + index.json，操作后自动重扫动态生效 -->
+<div id="iconmgr-overlay"><div id="iconmgr-box">
+  <div id="iconmgr-head">
+    <h4 id="iconmgr-title">🗂 图标库管理</h4>
+    <button class="tb grn" id="iconmgr-add" onclick="document.getElementById('uo').classList.add('show')">＋ 新增图标</button>
+    <button id="iconmgr-close" onclick="closeIconManager()" aria-label="关闭" title="关闭">✕</button>
+  </div>
+  <div id="iconmgr-hint">增删改会保存到服务器 icons/ 目录并同步清单，操作后自动重扫图标库，左栏与画布即时生效，刷新页面不丢失。</div>
+  <div id="iconmgr-list"></div>
+</div></div>
+<input type="file" id="im-fi" accept="image/png,image/svg+xml,image/jpeg,image/gif,image/webp" style="display:none" onchange="onIconMgrFile(event)">
 
 <!-- 自定义确认弹框 -->
 <div id="confirm-overlay"><div id="confirm-box">

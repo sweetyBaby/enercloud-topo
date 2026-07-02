@@ -10,3 +10,6 @@ services:
       # 模板持久化：保存/编辑/删除都落在宿主机 ./data/templates，
       # 重建镜像、升级容器都不会丢；备份该目录即备份全部用户模板。
       - ./data/templates:/data/templates
+      # 图标库持久化：上传/重命名/替换/删除的图标（图片 + index.json）落在宿主机 ./data/icons，
+      # 重建镜像、升级容器都不会丢；备份该目录即备份全部自定义图标。
+      - ./data/icons:/data/icons

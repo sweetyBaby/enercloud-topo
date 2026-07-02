@@ -34,16 +34,23 @@ function buildSidebar(){
   const tools=document.getElementById('side-acc-tools');
   if(activeTab==='custom'){
     if(tools)tools.style.display='none';
-    // 自定义类：上传按钮 + 已上传图标
+    // 自定义类：上传 / 图标库管理入口 + 图标库里 tab=custom 的元素（持久化） + 本会话内存图标（无写接口时的兜底）
     const c=document.createElement('div');c.className='ni-custom';
     c.innerHTML='<span>📁</span> '+(lang==='en'?'Upload Icon':'上传自定义图标');
     c.onclick=()=>document.getElementById('uo').classList.add('show');sb.appendChild(c);
-    if(customIcons.length===0){
+    const m=document.createElement('div');m.className='ni-custom';
+    m.innerHTML='<span>🗂</span> '+(lang==='en'?'Manage Icon Library':'图标库管理');
+    m.title=lang==='en'?'Add / rename / replace / delete icons; saved to the server library':'增删改图标：保存到服务器图标库，刷新不丢失';
+    m.onclick=()=>openIconManager();sb.appendChild(m);
+    const groups=sidebarGroupsFor('custom');
+    const sessionOnly=customIcons.filter(ci=>!IMGS[ci.type]);   // 已持久化的走图标库渲染，避免重复
+    if(groups.every(g=>!g.devices.length)&&sessionOnly.length===0){
       const tip=document.createElement('div');tip.style.cssText='padding:14px;font-size:12px;color:var(--ui-text2);line-height:1.6';
       tip.textContent=lang==='en'?'No custom icons yet. Click above to upload.':'还没有自定义图标，点击上方上传。';
       sb.appendChild(tip);
     }
-    customIcons.forEach(ci=>sb.appendChild(makeNI(ci.type,ci.zh,ci.en,'custom',ci.url)));
+    groups.forEach(g=>g.devices.forEach(d=>sb.appendChild(makeNI(d.type,d.label,d.label_en,d.badge))));
+    sessionOnly.forEach(ci=>sb.appendChild(makeNI(ci.type,ci.zh,ci.en,'custom',ci.url)));
     return;
   }
   // 其它 tab：按 tab 过滤分组

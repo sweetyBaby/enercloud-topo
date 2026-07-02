@@ -305,7 +305,7 @@ state.nodes.forEach(n => {
 | **生产（可写）** | `npm run build` 后 `npm start`（`node scripts/server.js`） | ✅ 写 `templates/` |
 | 纯静态托管（如 Nginx 直接挂 `dist/`） | 部署 `dist/` | ❌ 仅能读；保存会回退为「下载 JSON」 |
 
-生产服务器 `scripts/server.js`：静态资源默认取 `dist/`（压缩、无热重载），模板的**读和写都指向项目根的 `templates/` 目录**（版本受控、持久，`build` 重建 `dist/` 不会清空已保存模板）。可用环境变量覆盖：`PORT`（默认 3009）、`HOST`（默认 0.0.0.0）、`STATIC_ROOT`、`TEMPLATES_DIR`（建议在容器部署时挂载为持久卷）。
+生产服务器 `scripts/server.js`：静态资源默认取 `dist/`（压缩、无热重载），模板的**读和写都指向项目根的 `templates/` 目录**（版本受控、持久，`build` 重建 `dist/` 不会清空已保存模板）；图标读取/写入可通过 `ICONS_DIR` 指向独立目录。可用环境变量覆盖：`PORT`（默认 3009）、`HOST`（默认 0.0.0.0）、`STATIC_ROOT`、`TEMPLATES_DIR`、`ICONS_DIR`（建议在容器部署时分别把 templates 和 icons 挂载为持久卷）。
 
 > **对接父平台后端**：若模板由平台自有后端管理，可在加载 `topology-editor.js` 前设置 `window.TOPO_TPL_BASE`（读取列表/模板的基路径）与 `window.TOPO_TPL_API`（写接口，支持绝对 URL），前端即改走该后端；后端只需实现与 `/api/templates` 相同的 `GET/POST/PUT/DELETE` 契约。
 

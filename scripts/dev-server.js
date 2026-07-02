@@ -3,6 +3,7 @@ const http = require('http');
 const path = require('path');
 const url = require('url');
 const { createTemplateApi } = require('./template-store');
+const { createIconApi } = require('./icon-store');
 
 const root = path.resolve(__dirname, '..');
 const startPort = Number(process.env.PORT || 5173);
@@ -99,7 +100,7 @@ function buildIconManifest() {
     else customDevices.push(dev);
   });
   if (customDevices.length) {
-    groups.push({ title: '自定义图标', title_en: 'Custom Icons', color: '#42a5f5', tab: 'device', devices: customDevices });
+    groups.push({ title: '自定义图标', title_en: 'Custom Icons', color: '#42a5f5', tab: 'custom', devices: customDevices });
   }
   return Object.assign({}, curated, { groups });
 }
@@ -160,10 +161,15 @@ function serveFile(req, res) {
 
 // ───── 模板读写 API：保存/编辑/重命名/删除自动落盘到 templates/（dev 与生产共用 template-store） ─────
 const templateApi = createTemplateApi({ dir: tplDir, log, warn });
+// ───── 图标库读写 API：上传/重命名/替换/删除自动落盘到 icons/ + index.json（dev 与生产共用 icon-store） ─────
+const iconApi = createIconApi({ dir: iconsDir, log, warn });
 
 function createServer() {
   return http.createServer((req, res) => {
     const pathname = url.parse(req.url).pathname || '/';
+    if (iconApi.matches(pathname)) {
+      return iconApi.handle(req, res, pathname);
+    }
     if (pathname === '/icons/index.json') {
       return send(res, 200, JSON.stringify(buildIconManifest(), null, 2), types['.json']);
     }

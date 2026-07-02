@@ -30,7 +30,7 @@ docker load -i /home/bms/base_docker/data/myapp/front/enercloud-topo-1.0.tar
 若误贴到文件最后（`networks:` 之后），会报
 `networks.topo additional properties 'image', 'volumes', ... not allowed`。
 
-不映射宿主端口（`expose` 仅内网可见），模板持久化到宿主机目录：
+不映射宿主端口（`expose` 仅内网可见），模板和图标都持久化到宿主机目录：
 
 ```yaml
   # ================= 拓扑编辑器 =================
@@ -40,10 +40,13 @@ docker load -i /home/bms/base_docker/data/myapp/front/enercloud-topo-1.0.tar
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
+      TEMPLATES_DIR: /data/templates
+      ICONS_DIR: /data/icons
     expose:
       - "3009"
     volumes:
       - ./data/myapp/topo/templates:/data/templates   # 用户模板持久化，备份此目录即可
+      - ./data/myapp/topo/icons:/data/icons           # 图标库持久化，备份此目录即可
     networks:
       - backend
     healthcheck:
@@ -110,7 +113,7 @@ scp -P 8119 enercloud-topo-1.1.tar bms@223.107.76.50:/home/bms/
 ```
 
 服务器：`docker load` 后把 compose 里的 tag 改成 1.1，`docker compose up -d topo`。
-用户已保存的模板在宿主机目录里，升级不受影响（首启种子拷贝仅在目录为空时执行）。
+用户已保存的模板和上传/维护的图标都在宿主机目录里，升级不受影响（首启种子拷贝仅在目录为空时执行）。
 
 ## 7. 常见报错排查
 
@@ -123,3 +126,4 @@ scp -P 8119 enercloud-topo-1.1.tar bms@223.107.76.50:/home/bms/
 | 访问 `/topo/` 白屏、JS 404 | nginx 里 `location ^~ /topo/` 的 `^~` 被去掉，静态文件被末尾的正则 location 劫持到 energy-dashboard |
 | 保存大模板报 413 | `location ^~ /topo/` 里缺 `client_max_body_size 20m` |
 | 输入 `/topo.html` 跳转后端口丢失 | `location = /topo.html` 里缺 `absolute_redirect off;` |
+| 容器重建/升级后自定义图标丢失 | compose 没挂载 `/data/icons` 或未设置 `ICONS_DIR=/data/icons`；按第 3 节添加 `./data/myapp/topo/icons:/data/icons`，并备份该目录 |

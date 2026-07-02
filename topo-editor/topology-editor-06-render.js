@@ -480,7 +480,8 @@ function drawBoxSelectionChrome(n,b,rot){
 // 文本框元素渲染
 function drawTextNode(n){
   const isSel=selNode===n.id;
-  const fs=(n.fontSize||18)*(n.scale||1);
+  // 字号随 1/zoom：屏幕字号恒定，与设备图标/节点标签的显示策略一致（拖入画布时所见即字号）
+  const fs=(n.fontSize||18)*(n.scale||1)/zoom;
   const txt=textNodeDisplay(n);
   ctx.save();
   const rot=(n.rotation||0)*Math.PI/180;
@@ -488,10 +489,10 @@ function drawTextNode(n){
   ctx.font='bold '+fs+"px -apple-system,'Microsoft YaHei',sans-serif";ctx.textAlign='center';ctx.textBaseline='middle';
   const lines=txt.split('\n');
   let maxW=0;lines.forEach(l=>{maxW=Math.max(maxW,ctx.measureText(l).width);});
-  const padX=(n.padX!=null?n.padX:10), padY=(n.padY!=null?n.padY:6);
+  const padX=(n.padX!=null?n.padX:10)/zoom, padY=(n.padY!=null?n.padY:6)/zoom;
   const lh=fs*1.3, totalH=lines.length*lh;
   n._textBox={x:n.x-maxW/2-padX,y:n.y-totalH/2-padY,w:maxW+padX*2,h:totalH+padY*2};
-  const b=n._textBox, rr=(n.radius!=null?n.radius:6);
+  const b=n._textBox, rr=(n.radius!=null?n.radius:6)/zoom;
   if(!n.hideLabel){ drawBoxBg(n,b,rr); drawBoxBorder(n,b,rr); }
   if(isSel) drawBoxSelectionChrome(n,b,rot);
   if(!n.hideLabel){
@@ -519,8 +520,9 @@ function variableValue(n){
 function drawVariableNode(n){
   const isSel=selNode===n.id;
   const sc=n.scale||1;
-  const lfs=(n.fontSize||16)*sc;                  // label 字号
-  const vfs=(n.valFontSize||n.fontSize||16)*sc;   // value 字号
+  // 字号随 1/zoom：屏幕字号恒定（与设备图标/节点标签一致）
+  const lfs=(n.fontSize||16)*sc/zoom;                  // label 字号
+  const vfs=(n.valFontSize||n.fontSize||16)*sc/zoom;   // value 字号
   const labelTxt=nodeLabel(n)||'';
   const valTxt=variableValue(n);
   const layout=(n.varLayout==='v')?'v':'h';
@@ -532,7 +534,7 @@ function drawVariableNode(n){
   ctx.textBaseline='middle';
   ctx.font=lFont;const lw=labelTxt?ctx.measureText(labelTxt).width:0;
   ctx.font=vFont;const vw=valTxt?ctx.measureText(valTxt).width:0;
-  const padX=(n.padX!=null?n.padX:10), padY=(n.padY!=null?n.padY:6);
+  const padX=(n.padX!=null?n.padX:10)/zoom, padY=(n.padY!=null?n.padY:6)/zoom;
   const both=!!(labelTxt&&valTxt);
   let contentW,contentH;
   if(layout==='h'){
@@ -545,7 +547,7 @@ function drawVariableNode(n){
     n._varGap=vgap;
   }
   n._textBox={x:n.x-contentW/2-padX,y:n.y-contentH/2-padY,w:contentW+padX*2,h:contentH+padY*2};
-  const b=n._textBox, rr=(n.radius!=null?n.radius:6);
+  const b=n._textBox, rr=(n.radius!=null?n.radius:6)/zoom;
   if(!n.hideLabel){ drawBoxBg(n,b,rr); drawBoxBorder(n,b,rr); }
   if(isSel) drawBoxSelectionChrome(n,b,rot);
   if(!n.hideLabel){

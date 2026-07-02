@@ -9,6 +9,7 @@ const http = require('http');
 const path = require('path');
 const url = require('url');
 const { createTemplateApi, send } = require('./template-store');
+const { createIconApi } = require('./icon-store');
 
 const projectRoot = path.resolve(__dirname, '..');
 const port = Number(process.env.PORT || 3009);
@@ -97,7 +98,7 @@ function buildIconManifest() {
     else customDevices.push(dev);
   });
   if (customDevices.length) {
-    groups.push({ title: '自定义图标', title_en: 'Custom Icons', color: '#42a5f5', tab: 'device', devices: customDevices });
+    groups.push({ title: '自定义图标', title_en: 'Custom Icons', color: '#42a5f5', tab: 'custom', devices: customDevices });
   }
   return Object.assign({}, curated, { groups });
 }
@@ -121,6 +122,7 @@ function buildDicManifest() {
 }
 
 const templateApi = createTemplateApi({ dir: tplDir, log, warn });
+const iconApi = createIconApi({ dir: iconsDir, log, warn });
 
 function inside(baseDir, file) {
   const rel = path.relative(baseDir, file);
@@ -142,8 +144,9 @@ function serveStatic(res, baseDir, pathname, indexFallback) {
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(url.parse(req.url).pathname || '/');
 
-  // 1) 模板写/列表 API
+  // 1) 模板写/列表 API + 图标库写 API
   if (templateApi.matches(pathname)) return templateApi.handle(req, res, pathname);
+  if (iconApi.matches(pathname)) return iconApi.handle(req, res, pathname);
 
   // 2) 图标清单：扫描 icons/ 动态生成；图标文件也从同一目录读取，避免 dist 与根目录不同步
   if (pathname === '/icons/index.json') {
