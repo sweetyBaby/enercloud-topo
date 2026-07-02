@@ -49,9 +49,9 @@ export interface ResolvedState {
 }
 
 /**
- * ⚠️ buildContext/resolveDynamic 面向导出文档格式（f.value / 英文键优先）。
- * 前端 dashboard 请勿直接使用它们——lib/topo/rule-engine.ts 的外壳保留了三处历史差异
- * （中文键、.status/.online、旧 signals 格式），直接换用会改变显隐判定。
+ * ⚠️ buildContext/resolveDynamic 面向**导出文档格式**（静态值在 f.value、信号键英文名优先）。
+ * 前端 dashboard 的 rule-engine.ts 直接消费它们（2026-07-02 起语义已完全收敛）；
+ * 编辑器内部画布是另一种形态（字段值在 f.dv），走 09-rules 自己的 collectSignals/buildCtx，勿混用。
  * evalCond/cmpOp 为纯条件树求值，各宿主通用。
  */
 export function _num(x: unknown): number

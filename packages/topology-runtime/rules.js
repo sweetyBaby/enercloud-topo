@@ -11,8 +11,8 @@
  * ⚠️ 适用数据形态：buildContext/resolveDynamic 面向**导出文档格式**（字段 key 为 {zh,en} 或
  *   字符串、静态值在 f.value、信号键英文名优先）。两个现存宿主都有自己的上下文适配层，勿混用：
  *   · 编辑器内部画布：字段值在 f.dv（见 topology-editor-09-rules 的 collectSignals/buildCtx）；
- *   · 前端 dashboard：lib/topo/rule-engine.ts 自带 buildContext（中文键优先 + .status/.online，
- *     三处历史差异见其头注释），只从本包取 evalCond/cmpOp。
+ *   · 前端 dashboard：lib/topo/rule-engine.ts 直接消费本包 buildContext/resolveDynamic
+ *     （2026-07-02 起语义完全收敛，仅适配返回结构）。
  *   evalCond/cmpOp 是纯条件树求值，对所有宿主通用。
  *
  * 用法：
