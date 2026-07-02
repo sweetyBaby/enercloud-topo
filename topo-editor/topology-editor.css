@@ -294,15 +294,32 @@ canvas{display:block;cursor:default}
 /* ── 图标库管理弹窗（z-index 低于上传弹窗 #uo，管理面板内点「新增」可叠加打开上传框） ── */
 #iconmgr-overlay{display:none;position:fixed;inset:0;background:rgba(4,10,20,.78);z-index:58;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
 #iconmgr-overlay.show{display:flex}
-#iconmgr-box{width:min(780px,94vw);max-height:84vh;display:flex;flex-direction:column;background:var(--ui-bg);border:1px solid var(--ui-border);border-radius:12px;overflow:hidden;box-shadow:0 18px 60px rgba(0,0,0,.5)}
+/* 固定高度：两个 tab 切换时弹框大小恒定，列表内部滚动，避免闪动/跳动 */
+#iconmgr-box{width:min(860px,94vw);height:min(760px,86vh);display:flex;flex-direction:column;background:var(--ui-bg);border:1px solid var(--ui-border);border-radius:12px;overflow:hidden;box-shadow:0 18px 60px rgba(0,0,0,.5)}
 #iconmgr-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--ui-border);flex-shrink:0}
 #iconmgr-head h4{color:var(--ui-accent);font-size:15px;font-weight:bold;flex:1;margin:0}
 #iconmgr-close{border:none;background:transparent;color:var(--ui-text2);font-size:18px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:6px}
 #iconmgr-close:hover{background:var(--ui-hover);color:var(--ui-text)}
-#iconmgr-hint{font-size:12px;color:var(--ui-text2);padding:8px 16px 0;line-height:1.6;flex-shrink:0}
-#iconmgr-list{flex:1;overflow-y:auto;padding:10px 16px 14px;display:flex;flex-direction:column;gap:6px}
+/* 子tab栏（tab 即区标题）：图标管理 / 分组管理 + 右侧当前 tab 的「新增」按钮 */
+#iconmgr-tabs{display:flex;align-items:flex-end;gap:6px;padding:10px 16px 0;flex-shrink:0;border-bottom:1px solid var(--ui-border)}
+.im-tab{flex:0 0 auto;background:transparent;border:none;color:var(--ui-text2);font-family:inherit;font-size:13px;font-weight:600;padding:8px 16px;cursor:pointer;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px}
+.im-tab:hover{color:var(--ui-text)}
+.im-tab.active{color:var(--ui-accent);border-bottom-color:var(--ui-accent)}
+#iconmgr-addbtn{margin-left:auto;margin-bottom:6px;font-size:12px;padding:5px 12px}
+/* 顶部内联新增行 */
+.im-addrow{display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--ui-accent) 10%,transparent);border:1px dashed var(--ui-accent);border-radius:8px;padding:8px 10px;flex-wrap:wrap;margin-bottom:4px}
+.im-addrow input{flex:1;min-width:90px;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:6px 8px;border-radius:5px;outline:none}
+.im-addrow input:focus{border-color:var(--ui-accent)}
+/* 校验不通过：红框高亮 + 行内红字（就近提示，替代原生 alert 弹框） */
+.im-invalid,.im-invalid:focus{border-color:#ff6a5a!important;box-shadow:0 0 0 2px rgba(255,106,90,.22)}
+.im-err{flex-basis:100%;width:100%;order:99;font-size:11.5px;color:#ff8a7a;padding:2px 2px 0;line-height:1.4}
+/* 新增项高亮：滚动到视图后短暂闪一下，便于查看验证 */
+@keyframes im-flash-kf{0%{background:color-mix(in srgb,var(--ui-accent) 42%,transparent);border-color:var(--ui-accent)}100%{}}
+.im-flash{animation:im-flash-kf 1.8s ease}
+#iconmgr-list{flex:1;overflow-y:auto;padding:12px 16px 14px;display:flex;flex-direction:column;gap:6px}
 .im-group{font-size:12px;font-weight:700;color:var(--ui-accent);margin:8px 0 2px;letter-spacing:.5px}
-.im-row{display:flex;align-items:center;gap:8px;background:var(--ui-bg2);border:1px solid var(--ui-border);border-radius:8px;padding:6px 8px}
+.im-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--ui-bg2);border:1px solid var(--ui-border);border-radius:8px;padding:6px 8px;transition:border-color .12s}
+.im-row:hover,.im-grow:hover{border-color:color-mix(in srgb,var(--ui-accent) 45%,var(--ui-border))}
 .im-icon{width:34px;height:34px;object-fit:contain;background:var(--ui-input-bg,#060e1a);border-radius:6px;padding:3px;flex-shrink:0}
 .im-type{flex:0 0 108px;font-size:11px;color:var(--ui-text2);word-break:break-all;line-height:1.3}
 .im-row input{flex:1;min-width:0;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:5px 7px;border-radius:5px;outline:none}
@@ -315,9 +332,8 @@ canvas{display:block;cursor:default}
 .im-empty{color:var(--ui-text2);font-size:12px;padding:16px;text-align:center;opacity:.85}
 .im-gsel{flex:0 0 118px;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:5px 6px;border-radius:5px;outline:none}
 .im-gsel:focus{border-color:var(--ui-accent)}
-/* 分组管理区 */
-.im-groupmgr{border:1px solid var(--ui-border);border-radius:8px;padding:8px 10px;margin-bottom:6px;background:color-mix(in srgb,var(--ui-bg2) 60%,transparent)}
-.im-grow{display:flex;align-items:center;gap:8px;padding:4px 0}
+/* 分组管理行（与图标行同款卡片样式） */
+.im-grow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--ui-bg2);border:1px solid var(--ui-border);border-radius:8px;padding:6px 8px;transition:border-color .12s}
 .im-dot{flex:0 0 12px;width:12px;height:12px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
 .im-grow input{flex:1;min-width:0;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:5px 7px;border-radius:5px;outline:none}
 .im-grow input:focus{border-color:var(--ui-accent)}

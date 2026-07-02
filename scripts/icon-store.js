@@ -40,12 +40,30 @@ function readBody(req) {
     req.on('error', reject);
   });
 }
+// SVG 消毒：图标以同源方式落盘 icons/ 并可被直接访问，SVG 属活动内容，需去除脚本类向量，
+//   避免存储型 XSS（去 <script>/<foreignObject>、on* 事件属性、javascript: 协议、外链实体）。
+function sanitizeSvg(buf) {
+  let s = buf.toString('utf8');
+  s = s.replace(/<\s*script[\s\S]*?<\s*\/\s*script\s*>/gi, '');
+  s = s.replace(/<\s*script\b[^>]*\/?\s*>/gi, '');
+  s = s.replace(/<\s*foreignObject[\s\S]*?<\s*\/\s*foreignObject\s*>/gi, '');
+  s = s.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '');
+  s = s.replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '');
+  s = s.replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '');
+  s = s.replace(/(href|xlink:href)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '');
+  s = s.replace(/javascript:/gi, 'blocked:');
+  return Buffer.from(s, 'utf8');
+}
 function parseDataURL(s) {
   const m = /^data:([a-z0-9.+/-]+);base64,([A-Za-z0-9+/=\s]+)$/i.exec(String(s || ''));
   if (!m) return null;
   const ext = EXT_BY_MIME[m[1].toLowerCase()];
   if (!ext) return null;
-  try { return { ext, buf: Buffer.from(m[2], 'base64') }; } catch (err) { return null; }
+  try {
+    let buf = Buffer.from(m[2], 'base64');
+    if (ext === 'svg') buf = sanitizeSvg(buf);
+    return { ext, buf };
+  } catch (err) { return null; }
 }
 function listImageFiles(dir) {
   try { return fs.readdirSync(dir).filter((f) => IMG_EXT.has(path.extname(f).toLowerCase())); }
@@ -64,7 +82,8 @@ function hasType(idx, type) { return allDevices(idx).some((d) => d.type === type
 function ungroupedGroup(idx) {
   idx.groups = idx.groups || [];
   let g = idx.groups.find((x) => x && x.title === UNGROUPED_TITLE);
-  if (!g) { g = { title: UNGROUPED_TITLE, title_en: UNGROUPED_EN, color: '#8aa8c4', tab: 'device', devices: [] }; idx.groups.push(g); }
+  // 新建时放到最前：管理面板按清单顺序渲染，「未分组」(新增/未归类图标默认落此)即显示在最上面，便于查看验证
+  if (!g) { g = { title: UNGROUPED_TITLE, title_en: UNGROUPED_EN, color: '#8aa8c4', tab: 'device', devices: [] }; idx.groups.unshift(g); }
   g.devices = g.devices || [];
   return g;
 }
@@ -163,7 +182,8 @@ function createIconApi(opts) {
         t = base; let n = 2; while (hasType(idx, t)) t = base + '_' + (n++);
       }
       const file = writeImage(t, img, null);
-      targetGroup(idx, String(body.group || '').trim()).devices.push({ type: t, label: zh, label_en: en, badge: t, file });
+      // 新增图标放到目标分组最前，便于在管理面板顶部立即看到（不用滚到底）
+      targetGroup(idx, String(body.group || '').trim()).devices.unshift({ type: t, label: zh, label_en: en, badge: t, file });
       persist(idx);
       log(`Icon saved: ${t} → icons/${file}`);
       return sendJSON(res, 200, { ok: true, type: t, file });
@@ -212,16 +232,29 @@ function createIconApi(opts) {
     return sendJSON(res, 405, { ok: false, error: 'method not allowed' });
   }
 
+  // 分组中/英文名各自唯一（排除自身分组对象）；命中返回错误消息，否则 null
+  function groupNameError(idx, zh, en, selfGroup) {
+    if (!zh) return 'title required';
+    for (const g of (idx.groups || [])) {
+      if (g === selfGroup) continue;
+      if ((g.title || '') === zh) return 'duplicate group name: ' + zh;
+      if (en && (g.title_en || '') === en) return 'duplicate group English name: ' + en;
+    }
+    return null;
+  }
+
   async function handleGroups(req, res, rest, method) {
     const title = decodeURIComponent(rest).trim();
     // POST /api/icon-groups → 新增分组：{title, title_en?, color?, tab?}
     if (method === 'POST' && !rest) {
       const body = await readBody(req);
       const t = String(body.title || '').trim();
-      if (!t) return sendJSON(res, 400, { ok: false, error: 'title required' });
+      const ten = String(body.title_en || '').trim() || t;
       const idx = load();
-      if (findGroup(idx, t)) return sendJSON(res, 409, { ok: false, error: 'duplicate group name: ' + t });
-      idx.groups.push({ title: t, title_en: String(body.title_en || '').trim() || t, color: body.color || '#8aa8c4', tab: body.tab || 'device', devices: [] });
+      const gErr = groupNameError(idx, t, ten, null);
+      if (gErr) return sendJSON(res, (gErr === 'title required' ? 400 : 409), { ok: false, error: gErr });
+      // 新增分组放到列表最前，便于在管理面板顶部立即看到
+      idx.groups.unshift({ title: t, title_en: ten, color: body.color || '#8aa8c4', tab: body.tab || 'device', devices: [] });
       persist(idx);
       log(`Icon group created: ${t}`);
       return sendJSON(res, 200, { ok: true, title: t });
@@ -233,10 +266,11 @@ function createIconApi(opts) {
       const g = findGroup(idx, title);
       if (!g) return sendJSON(res, 404, { ok: false, error: 'not found' });
       const nt = body.title != null ? String(body.title).trim() : g.title;
-      if (!nt) return sendJSON(res, 400, { ok: false, error: 'title required' });
-      if (nt !== g.title && findGroup(idx, nt)) return sendJSON(res, 409, { ok: false, error: 'duplicate group name: ' + nt });
+      const nten = body.title_en != null ? (String(body.title_en).trim() || nt) : (g.title_en || nt);
+      const gErr = groupNameError(idx, nt, nten, g);
+      if (gErr) return sendJSON(res, (gErr === 'title required' ? 400 : 409), { ok: false, error: gErr });
       g.title = nt;
-      if (body.title_en != null) g.title_en = String(body.title_en).trim() || nt;
+      g.title_en = nten;
       if (body.color != null) g.color = body.color;
       persist(idx);
       log(`Icon group updated: ${title} → ${nt}`);

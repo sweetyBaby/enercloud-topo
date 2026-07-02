@@ -91,11 +91,14 @@ function serveStatic(res, baseDir, pathname, indexFallback) {
 }
 
 const server = http.createServer((req, res) => {
-  let pathname = decodeURIComponent(url.parse(req.url).pathname || '/');
+  const rawPath = url.parse(req.url).pathname || '/';
+  let pathname = decodeURIComponent(rawPath);
 
   // 1) 模板写/列表 API + 图标库写 API
-  if (templateApi.matches(pathname)) return templateApi.handle(req, res, pathname);
-  if (iconApi.matches(pathname)) return iconApi.handle(req, res, pathname);
+  //   注意：给 API 传「未解码」的原始路径，与 dev-server 一致——store 内部只 decodeURIComponent 一次，
+  //   避免生产环境二次解码，使含 % 等字符的分组名在 dev / 生产表现不一致。
+  if (templateApi.matches(pathname)) return templateApi.handle(req, res, rawPath);
+  if (iconApi.matches(pathname)) return iconApi.handle(req, res, rawPath);
 
   // 2) 图标清单：扫描 icons/ 动态生成；图标文件也从同一目录读取，避免 dist 与根目录不同步
   if (pathname === '/icons/index.json') {

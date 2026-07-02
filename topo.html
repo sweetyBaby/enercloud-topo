@@ -51,13 +51,13 @@
           <div class="mi" onclick="flashHint(saveDraftNow()?'草稿已保存':'草稿保存失败');closeMenus()" data-i18n="💾 保存草稿">💾 保存草稿</div>
           <div class="mi" onclick="restoreDraftManual();closeMenus()" data-i18n="↺ 恢复草稿">↺ 恢复草稿</div>
           <div class="mi" onclick="clearDraft();closeMenus()" data-i18n="🧹 清除草稿">🧹 清除草稿</div>
-          <div class="mi" onclick="openIconManager();closeMenus()" data-i18n="🗂 图标库管理">🗂 图标库管理</div>
           <div class="mi" onclick="dlAllIconsZip();closeMenus()" data-i18n="🗂 导出元素库包 (ZIP)">🗂 导出元素库包 (ZIP)</div>
         </div>
       </div>
       <button class="tb" id="btn-signals" onclick="toggleSignalPanel()" title="信号：管理全局信号（中英文名/默认值/后台绑定）、注入测试数据、批量样例 JSON" data-i18n="⚡ 信号">⚡ 信号</button>
       <button class="tb" id="btn-rules" onclick="toggleRulePanel()" title="规则：总览全部显隐/图标/流向规则，切换运行视图预览（规则在画布上始终实时生效）" data-i18n="📏 规则">📏 规则</button>
       <button class="tb" id="btn-runview" onclick="toggleRunView()" title="预览效果：按规则彻底隐藏不该显示的元素/连线，并应用数据驱动流向，查看整个图的运行效果" data-i18n="▶ 预览效果">▶ 预览效果</button>
+      <button class="tb" id="btn-iconlib" onclick="openIconManager()" title="图标库管理：管理全部图标与分组（增删改，落盘 icons/）" data-i18n="🗂 图标库">🗂 图标库</button>
     </div>
   </div>
   <!-- 暂时不做中英文切换 -->
@@ -455,14 +455,17 @@
 <div id="iconmgr-overlay"><div id="iconmgr-box">
   <div id="iconmgr-head">
     <h4 id="iconmgr-title">🗂 图标库管理</h4>
-    <button class="tb grn" id="iconmgr-add" onclick="openUploadDialog()">＋ 新增图标</button>
-    <button class="tb" id="iconmgr-addgroup" onclick="iconMgrAddGroup()">＋ 新增分组</button>
     <button id="iconmgr-close" onclick="closeIconManager()" aria-label="关闭" title="关闭">✕</button>
   </div>
-  <div id="iconmgr-hint">增删改会保存到服务器 icons/ 目录并同步清单，操作后自动重扫图标库，左栏与画布即时生效，刷新页面不丢失。手动放入 icons/ 的图片自动进入「未分组」。</div>
+  <div id="iconmgr-tabs">
+    <button class="im-tab" id="im-tab-icons" onclick="setIconMgrTab('icons')">图标管理</button>
+    <button class="im-tab" id="im-tab-groups" onclick="setIconMgrTab('groups')">分组管理</button>
+    <button class="tb grn" id="iconmgr-addbtn" onclick="iconMgrToggleAdd()">＋ 新增图标</button>
+  </div>
   <div id="iconmgr-list"></div>
 </div></div>
 <input type="file" id="im-fi" accept="image/png,image/svg+xml,image/jpeg,image/gif,image/webp" style="display:none" onchange="onIconMgrFile(event)">
+<input type="file" id="im-add-fi" accept="image/png,image/svg+xml,image/jpeg,image/gif,image/webp" style="display:none" onchange="onIconAddFile(event)">
 
 <!-- 自定义确认弹框 -->
 <div id="confirm-overlay"><div id="confirm-box">

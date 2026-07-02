@@ -149,8 +149,15 @@ function notifyReload() {
 
 let timer = null;
 function scheduleReload(file) {
-  const rel = path.relative(root, file);
-  if (!rel || rel.startsWith('dist') || rel.startsWith('.git') || rel.includes('node_modules')) return;
+  const rel = path.relative(root, file).split(path.sep).join('/');
+  if (!rel || rel.startsWith('..')) return;
+  if (rel.startsWith('dist') || rel.startsWith('.git') || rel.includes('node_modules')) return;
+  // ★ 忽略「应用自身的落盘写入」：icons/(图标库写接口)、templates/(模板写接口)、.dev-server.log(本服务日志)。
+  //   这些写入由编辑器操作触发、页面已动态重扫（reloadIconLibrary / 模板清单重新拉取），
+  //   若让它们触发整页热重载，会把用户正开着的弹框（如图标库管理）无故刷掉。
+  //   手动改 icons/ 图片仍可用左栏「🔄 重扫图标库」即时生效，无需整页刷新。
+  // 注意 Windows 的 fs.watch 会对目录本身发事件（rel 恰为 'icons'，无斜杠），用 rel+'/' 统一匹配目录及其内容
+  if (rel === '.dev-server.log' || (rel + '/').startsWith('icons/') || (rel + '/').startsWith('templates/')) return;
   clearTimeout(timer);
   timer = setTimeout(notifyReload, 80);
 }

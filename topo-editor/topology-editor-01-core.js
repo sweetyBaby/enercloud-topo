@@ -48,8 +48,10 @@ async function loadIconLibrary(){
   }catch(err){ console.error('加载图标库 '+ICON_BASE+'index.json 失败：',err); }
   const groups=(manifest&&Array.isArray(manifest.groups))?manifest.groups:[];
   // 由清单构建分组结构（替代旧的硬编码 DEVICE_GROUPS）
-  DEVICE_GROUPS=groups.map(g=>({
-    title:g.title, title_en:g.title_en||g.title, color:g.color||'#42a5f5', tab:g.tab||'device',
+  // _ord = 清单(index.json)原始顺序：左栏会按 ICON_GROUP_ORDER 重排（常用优先），
+  //   但图标库管理面板改用 _ord 还原「服务端顺序」，从而让新增分组(服务端 unshift 到最前)显示在最上面。
+  DEVICE_GROUPS=groups.map((g,gi)=>({
+    title:g.title, title_en:g.title_en||g.title, color:g.color||'#42a5f5', tab:g.tab||'device', _ord:gi,
     devices:(g.devices||[]).map(d=>{
       const dev={type:d.type, label:d.label||d.type, label_en:d.label_en||d.label||d.type, badge:d.badge||d.type};
       if(d.file){ dev.file=d.file; ICON_FILE[d.type]=d.file; }
@@ -60,6 +62,13 @@ async function loadIconLibrary(){
   }));
   // 分类顺序：常用优先；自动扫描出的「自定义图标」等未列入顺序的分组排在最后
   DEVICE_GROUPS.sort((a,b)=>{const ia=ICON_GROUP_ORDER.indexOf(a.title),ib=ICON_GROUP_ORDER.indexOf(b.title);return (ia<0?999:ia)-(ib<0?999:ib);});
+  // 清理已从图标库移除(删除/重命名/替换文件)的类型缓存：否则 IMGS 里的旧 Image 会让画布/导出继续用到已删除的图标。
+  //   会话内存图标(CUSTOM_ICONS，无写接口时的兜底)不在清单里，需保留。
+  const liveTypes=new Set();
+  DEVICE_GROUPS.forEach(g=>g.devices.forEach(d=>{if(d.file)liveTypes.add(d.type);}));
+  Object.keys(IMGS).forEach(t=>{if(!liveTypes.has(t)&&!CUSTOM_ICONS[t])delete IMGS[t];});
+  Object.keys(IMG_DATA).forEach(t=>{if(!liveTypes.has(t)&&!CUSTOM_ICONS[t])delete IMG_DATA[t];});
+  Object.keys(ICON_FILE).forEach(t=>{if(!liveTypes.has(t))delete ICON_FILE[t];});
   // 预加载图片到 IMGS（drawImage 用）；同时把 IMG_DATA[type] 记为图片 URL（iconSrcOf / 上传预览用）
   const tasks=[];
   const bust=_iconBust?('?v='+_iconBust):'';   // 重新扫描时给图片 URL 加版本号，强制绕过浏览器缓存（替换同名图片即生效）

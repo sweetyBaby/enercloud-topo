@@ -1117,44 +1117,138 @@ function populateGroupSelect(el,selected){
 }
 // 打开上传对话框（新增图标）：先填充分组下拉（默认「未分组」）
 function openUploadDialog(){populateGroupSelect(document.getElementById('un-group'),'未分组');document.getElementById('uo').classList.add('show');}
+// ── 可视化校验（替代原生 alert）：不合法字段红框高亮 + 该字段所在行内的红字提示（就近显示，语义明确） ──
+function _imRowOf(el){return el&&el.closest('.im-addrow,.im-row,.im-grow');}
+// 清除某字段所在行的校验态（红框 + 行内错误文字）
+function _imClear(){[].forEach.call(arguments,i=>{if(!i)return;i.classList.remove('im-invalid');const row=_imRowOf(i);const e=row&&row.querySelector('.im-err');if(e)e.remove();});}
+// 在字段所在行显示错误：字段红框 + 行内红字（行 flex-wrap，错误另起一行紧贴字段）
+function _imInvalid(inputs,msg){
+  const input=inputs[0];if(!input)return;
+  input.classList.add('im-invalid');
+  const row=_imRowOf(input);
+  if(row){let e=row.querySelector('.im-err');if(!e){e=document.createElement('div');e.className='im-err';row.appendChild(e);}e.textContent=msg;}
+  else flashHint(msg);
+  try{input.focus();}catch(_){}
+}
+// 行级错误（无特定字段，如「未选择图片」）：在该行末尾显示红字
+function _imRowErr(row,msg){if(!row)return flashHint(msg);const o=row.querySelector('.im-err');if(o)o.remove();const e=document.createElement('div');e.className='im-err';e.textContent=msg;row.appendChild(e);}
+// 图标中/英文名校验：各自必填 + 全库唯一（排除自身 type）。通过返回 {zh,en}，否则就近提示并返回 null
+function validateIconNames(zhI,enI,selfType){
+  _imClear(zhI,enI);
+  const zh=zhI.value.trim(),en=enI.value.trim();
+  if(!zh)return _imInvalid([zhI],lang==='en'?'Chinese name is required':'请填写中文名称'),null;
+  if(!en)return _imInvalid([enI],lang==='en'?'English name is required':'请填写英文名称'),null;
+  for(const g of DEVICE_GROUPS)for(const d of (g.devices||[])){
+    if(d.type===selfType)continue;
+    if((d.label||'')===zh)return _imInvalid([zhI],(lang==='en'?('Chinese name "'+zh+'" already exists'):('中文名称「'+zh+'」已被占用，请换一个'))),null;
+    if((d.label_en||'')===en)return _imInvalid([enI],(lang==='en'?('English name "'+en+'" already exists'):('英文名称「'+en+'」已被占用，请换一个'))),null;
+  }
+  return {zh,en};
+}
+// 分组中/英文名校验：各自必填 + 全库唯一（排除自身分组）。通过返回 {zh,en}，否则就近提示并返回 null
+function validateGroupNames(zhI,enI,selfTitle){
+  _imClear(zhI,enI);
+  const zh=zhI.value.trim(),en=enI.value.trim();
+  if(!zh)return _imInvalid([zhI],lang==='en'?'Group name is required':'请填写分组中文名称'),null;
+  if(!en)return _imInvalid([enI],lang==='en'?'Group English name is required':'请填写分组英文名称'),null;
+  for(const g of DEVICE_GROUPS){
+    if(g.title===selfTitle)continue;
+    if(g.title===zh)return _imInvalid([zhI],(lang==='en'?('Group name "'+zh+'" already exists'):('分组中文名「'+zh+'」已存在，请换一个'))),null;
+    if((g.title_en||'')===en)return _imInvalid([enI],(lang==='en'?('Group English name "'+en+'" already exists'):('分组英文名「'+en+'」已存在，请换一个'))),null;
+  }
+  return {zh,en};
+}
+let _iconMgrTab='icons';    // 当前子tab：'icons' 图标管理 / 'groups' 分组管理
+let _iconMgrAdding=false;    // 是否在当前tab顶部展开「新增」行
+let _iconMgrFlash=null;      // 刚新增的项 {type} 或 {title}：渲染后滚动到并高亮
+let _iconMgrFlashEl=null;    // 本次渲染命中的高亮行元素（渲染末尾滚动）
+// 图标库管理面板的分组顺序（不用左栏的 ICON_GROUP_ORDER 排序，改用清单原始顺序 _ord，
+// 使「新增分组」(服务端 unshift 到最前)显示在最上面）。ungroupedFirst=true 时「未分组」再置顶。
+function iconMgrGroups(ungroupedFirst){
+  const gs=DEVICE_GROUPS.slice().sort((a,b)=>(a._ord||0)-(b._ord||0));
+  if(ungroupedFirst){const i=gs.findIndex(g=>g.title==='未分组');if(i>0)gs.unshift(gs.splice(i,1)[0]);}
+  return gs;
+}
 function openIconManager(){
   document.getElementById('iconmgr-overlay').classList.add('show');
-  const en=lang==='en';
-  document.getElementById('iconmgr-title').textContent=en?'🗂 Icon Library Manager':'🗂 图标库管理';
-  document.getElementById('iconmgr-add').textContent=en?'＋ Add Icon':'＋ 新增图标';
-  document.getElementById('iconmgr-addgroup').textContent=en?'＋ Add Group':'＋ 新增分组';
-  document.getElementById('iconmgr-hint').textContent=en
-    ?'Changes are saved to the server icons/ folder and manifest, then rescanned live — no page refresh. Images dropped into icons/ manually appear under "Ungrouped".'
-    :'增删改会保存到服务器 icons/ 目录并同步清单，操作后自动重扫图标库，左栏与画布即时生效，刷新页面不丢失。手动放入 icons/ 的图片自动进入「未分组」。';
+  document.getElementById('iconmgr-title').textContent=lang==='en'?'🗂 Icon Library Manager':'🗂 图标库管理';
+  _iconMgrAdding=false;_addIconDataURL=null;
   renderIconManager();
 }
 function closeIconManager(){document.getElementById('iconmgr-overlay').classList.remove('show');}
+function setIconMgrTab(t){_iconMgrTab=t;_iconMgrAdding=false;_addIconDataURL=null;renderIconManager();}
+// 「新增分组」内联行（分组管理tab顶部；无冗余标签文字）
+function buildAddGroupRow(en){
+  const row=document.createElement('div');row.className='im-addrow';
+  const zh=_imInput(en?'Group name (Chinese)':'分组名称（中文）');
+  const eni=_imInput(en?'English name':'分组名称（English）');
+  row.append(zh,eni,
+    _imBtn('tb grn',en?'✓ Save':'✓ 保存',()=>submitAddGroup(zh,eni)),
+    _imBtn('tb',en?'Cancel':'取消',()=>{_iconMgrAdding=false;renderIconManager();}));
+  setTimeout(()=>zh.focus(),30);
+  return row;
+}
+// 「新增图标」内联行（图标管理tab顶部；无冗余标签文字）
+function buildAddIconRow(en){
+  const row=document.createElement('div');row.className='im-addrow';
+  const prev=document.createElement('img');prev.id='im-add-prev';prev.className='im-icon';
+  if(_addIconDataURL){prev.src=_addIconDataURL;}else{prev.style.visibility='hidden';}
+  const zh=_imInput(en?'Chinese name':'中文名称');
+  const eni=_imInput(en?'English name':'英文名称');
+  const gsel=document.createElement('select');gsel.className='im-gsel';populateGroupSelect(gsel,'未分组');
+  row.append(
+    _imBtn('tb',en?'🖼 Choose':'🖼 选择图片',()=>document.getElementById('im-add-fi').click()),
+    prev,zh,eni,gsel,
+    _imBtn('tb grn',en?'✓ Save':'✓ 保存',()=>submitAddIcon(zh,eni,gsel.value)),
+    _imBtn('tb',en?'Cancel':'取消',()=>{_iconMgrAdding=false;_addIconDataURL=null;renderIconManager();}));
+  setTimeout(()=>zh.focus(),30);
+  return row;
+}
+// 「新增」按钮（tab 行右侧）：展开/收起当前 tab 的顶部内联新增行
+function iconMgrToggleAdd(){_iconMgrAdding=!_iconMgrAdding;_addIconDataURL=null;renderIconManager();}
 function renderIconManager(){
-  const list=document.getElementById('iconmgr-list');list.innerHTML='';
   const en=lang==='en';
+  // tab 即区标题（标题栏只保留弹框名），右侧为当前 tab 的「新增」按钮
+  const ti=document.getElementById('im-tab-icons'),tg=document.getElementById('im-tab-groups');
+  ti.textContent=en?'Icons':'图标管理';tg.textContent=en?'Groups':'分组管理';
+  ti.classList.toggle('active',_iconMgrTab==='icons');tg.classList.toggle('active',_iconMgrTab==='groups');
+  const addBtn=document.getElementById('iconmgr-addbtn');
+  addBtn.textContent=_iconMgrTab==='groups'?(en?'＋ Add Group':'＋ 新增分组'):(en?'＋ Add Icon':'＋ 新增图标');
+  const list=document.getElementById('iconmgr-list');list.innerHTML='';
   const bust=_iconBust?('?v='+_iconBust):'';
-  // ── 分组管理区：每个分组可改名(中/英)、删除（组内图标移到「未分组」） ──
-  const gsec=document.createElement('div');gsec.className='im-groupmgr';
-  const gh=document.createElement('div');gh.className='im-group';gh.textContent=en?'Groups':'分组管理';gsec.appendChild(gh);
-  DEVICE_GROUPS.forEach(g=>{
+  _iconMgrFlashEl=null;
+  // 顶部内联新增行
+  if(_iconMgrAdding)list.appendChild(_iconMgrTab==='groups'?buildAddGroupRow(en):buildAddIconRow(en));
+  // 主体
+  if(_iconMgrTab==='groups')renderGroupRows(list,en);
+  else renderIconRows(list,en,bust);
+  // 新增项：滚动到并短暂高亮，便于立即查看验证（即便所属分组不在最上面）
+  if(_iconMgrFlashEl){const el=_iconMgrFlashEl;requestAnimationFrame(()=>{try{el.scrollIntoView({block:'center'});}catch(_){}el.classList.add('im-flash');});}
+  _iconMgrFlash=null;
+}
+// 分组行：改名(中/英) / 删除（组内图标移到「未分组」）。按清单顺序（新增分组在最上面）
+function renderGroupRows(list,en){
+  iconMgrGroups(false).forEach(g=>{
     const row=document.createElement('div');row.className='im-grow';
+    if(_iconMgrFlash&&_iconMgrFlash.title===g.title)_iconMgrFlashEl=row;
     const dot=document.createElement('span');dot.className='im-dot';dot.style.background=g.color||'#8aa8c4';
-    const zhI=document.createElement('input');zhI.value=g.title||'';zhI.placeholder=en?'Group name':'分组名称';
-    const enI=document.createElement('input');enI.value=g.title_en||'';enI.placeholder=en?'English name':'英文名称';
+    const zhI=document.createElement('input');zhI.value=g.title||'';zhI.placeholder=en?'Group name':'分组名称';zhI.addEventListener('input',()=>_imClear(zhI));
+    const enI=document.createElement('input');enI.value=g.title_en||'';enI.placeholder=en?'English name':'英文名称';enI.addEventListener('input',()=>_imClear(enI));
     const cnt=document.createElement('span');cnt.className='im-gcount';cnt.textContent='×'+((g.devices||[]).length);
     const save=document.createElement('button');save.className='im-btn';save.textContent=en?'💾 Save':'💾 保存';
-    save.onclick=()=>iconMgrRenameGroup(g.title,zhI.value.trim(),enI.value.trim());
+    save.onclick=()=>iconMgrRenameGroup(g.title,zhI,enI);
     const del=document.createElement('button');del.className='im-btn im-del';del.textContent=en?'🗑 Delete':'🗑 删除';
     del.disabled=(g.title==='未分组');
     del.title=en?'Delete group (icons move to Ungrouped)':'删除分组（组内图标移到未分组）';
     del.onclick=()=>iconMgrDeleteGroup(g.title);
-    row.appendChild(dot);row.appendChild(zhI);row.appendChild(enI);row.appendChild(cnt);row.appendChild(save);row.appendChild(del);
-    gsec.appendChild(row);
+    row.append(dot,zhI,enI,cnt,save,del);
+    list.appendChild(row);
   });
-  list.appendChild(gsec);
-  // ── 图标区：按分组列出「有图片」的图标（纯绘制元素文本框/变量/占位点无图片，不在此管理） ──
+}
+// 图标行：按分组列出「有图片」的图标（纯绘制元素文本框/变量/占位点无图片，不在此管理）
+function renderIconRows(list,en,bust){
   let total=0;
-  DEVICE_GROUPS.forEach(g=>{
+  iconMgrGroups(true).forEach(g=>{
     const devs=(g.devices||[]).filter(d=>d.file);
     if(!devs.length)return;
     total+=devs.length;
@@ -1163,60 +1257,67 @@ function renderIconManager(){
     list.appendChild(h);
     devs.forEach(d=>{
       const row=document.createElement('div');row.className='im-row';
+      if(_iconMgrFlash&&_iconMgrFlash.type===d.type)_iconMgrFlashEl=row;
       const img=document.createElement('img');img.className='im-icon';img.src=ICON_BASE+d.file+bust;img.alt=d.type;
       const tp=document.createElement('div');tp.className='im-type';tp.textContent=d.type;tp.title=(en?'File: ':'文件：')+d.file;
-      const zhI=document.createElement('input');zhI.value=d.label||'';zhI.placeholder=en?'Chinese name':'中文名称';
-      const enI=document.createElement('input');enI.value=d.label_en||'';enI.placeholder=en?'English name':'英文名称';
+      const zhI=document.createElement('input');zhI.value=d.label||'';zhI.placeholder=en?'Chinese name':'中文名称';zhI.addEventListener('input',()=>_imClear(zhI));
+      const enI=document.createElement('input');enI.value=d.label_en||'';enI.placeholder=en?'English name':'英文名称';enI.addEventListener('input',()=>_imClear(enI));
       const gsel=document.createElement('select');gsel.className='im-gsel';populateGroupSelect(gsel,g.title);
       gsel.title=en?'Move to group':'移动到分组';
       gsel.onchange=()=>iconMgrMove(d.type,gsel.value);
       const save=document.createElement('button');save.className='im-btn';save.textContent=en?'💾 Save':'💾 保存';
       save.title=en?'Save Chinese/English labels':'保存中/英文名称';
-      save.onclick=()=>iconMgrRename(d.type,zhI.value.trim(),enI.value.trim());
+      save.onclick=()=>iconMgrRename(d.type,zhI,enI);
       const rep=document.createElement('button');rep.className='im-btn';rep.textContent=en?'🔄 Replace':'🔄 替换';
       rep.title=en?'Replace the image file':'替换图标图片';
       rep.onclick=()=>{_mgrReplaceType=d.type;document.getElementById('im-fi').click();};
       const del=document.createElement('button');del.className='im-btn im-del';del.textContent=en?'🗑 Delete':'🗑 删除';
       del.title=en?'Delete this icon from the library':'从图标库删除该图标';
       del.onclick=()=>iconMgrDelete(d.type,en?(d.label_en||d.label):(d.label||d.label_en));
-      row.appendChild(img);row.appendChild(tp);row.appendChild(zhI);row.appendChild(enI);
-      row.appendChild(gsel);row.appendChild(save);row.appendChild(rep);row.appendChild(del);
+      row.append(img,tp,zhI,enI,gsel,save,rep,del);
       list.appendChild(row);
     });
   });
   if(!total){
     const empty=document.createElement('div');empty.className='im-empty';
-    empty.textContent=en?'No image icons yet. Click "Add Icon" to upload.':'图标库暂无图片图标，点击「新增图标」上传。';
+    empty.textContent=en?'No image icons yet. Click "Add Icon".':'图标库暂无图片图标，点击「新增图标」。';
     list.appendChild(empty);
   }
 }
-async function iconMgrRename(type,zh,enName){
-  if(!zh||!enName){alert(lang==='en'?'Please fill both Chinese and English names':'请同时填写中文和英文名称');return;}
-  const dup=iconNameConflict(zh,enName,type);
-  if(dup){alert(dup);return;}
+async function iconMgrRename(type,zhI,enI){
+  const v=validateIconNames(zhI,enI,type);
+  if(!v)return;
   try{
-    await iconApiCall('PUT',type,{labelZh:zh,labelEn:enName});
+    await iconApiCall('PUT',type,{labelZh:v.zh,labelEn:v.en});
     await reloadIconLibrary();renderIconManager();
     flashHint(lang==='en'?'Icon renamed':'图标名称已保存');
-  }catch(err){alert((lang==='en'?'Save failed: ':'保存失败：')+err.message);}
+  }catch(err){flashHint((lang==='en'?'Save failed: ':'保存失败：')+err.message);}
 }
 async function iconMgrMove(type,group){
   try{
     await iconApiCall('PUT',type,{group});
     await reloadIconLibrary();renderIconManager();
     flashHint(lang==='en'?'Moved to '+group:'已移动到「'+group+'」');
-  }catch(err){alert((lang==='en'?'Move failed: ':'移动失败：')+err.message);}
+  }catch(err){flashHint((lang==='en'?'Move failed: ':'移动失败：')+err.message);}
 }
 async function iconMgrDelete(type,label){
+  // 拦截：该图标被当前画布元素使用时，删除会让这些元素失去图标（变占位孤儿）。禁止删除，引导改用「替换」。
+  const used=(nodes||[]).filter(n=>n.type===type||(Array.isArray(n.iconRules)&&n.iconRules.some(r=>r&&r.icon===type)));
+  if(used.length){
+    flashHint(lang==='en'
+      ?('Cannot delete: used by '+used.length+' canvas element(s). Use "Replace" to change its image.')
+      :('无法删除：该图标正被画布中 '+used.length+' 个元素使用。如需更换图案请点「替换」。'));
+    return;
+  }
   const ok=await uiConfirm(lang==='en'
-    ?('Delete icon "'+(label||type)+'" from the library? Elements using it will show a placeholder.')
-    :('确定从图标库删除「'+(label||type)+'」？画布中正在使用该图标的元素将显示占位框。'),true);
+    ?('Delete icon "'+(label||type)+'" from the library?')
+    :('确定从图标库删除「'+(label||type)+'」？'),true);
   if(!ok)return;
   try{
     await iconApiCall('DELETE',type);
     await reloadIconLibrary();renderIconManager();
     flashHint(lang==='en'?'Icon deleted':'图标已删除');
-  }catch(err){alert((lang==='en'?'Delete failed: ':'删除失败：')+err.message);}
+  }catch(err){flashHint((lang==='en'?'Delete failed: ':'删除失败：')+err.message);}
 }
 function onIconMgrFile(e){
   const f=e.target.files[0];e.target.value='';
@@ -1228,33 +1329,60 @@ function onIconMgrFile(e){
       await iconApiCall('PUT',type,{dataURL:ev.target.result});
       await reloadIconLibrary();renderIconManager();
       flashHint(lang==='en'?'Icon image replaced':'图标图片已替换');
-    }catch(err){alert((lang==='en'?'Replace failed: ':'替换失败：')+err.message);}
+    }catch(err){flashHint((lang==='en'?'Replace failed: ':'替换失败：')+err.message);}
   };
   r.readAsDataURL(f);
 }
-// ── 分组：新增 / 重命名 / 删除 ──
-async function iconMgrAddGroup(){
-  const v=await uiPrompt(lang==='en'?'New icon group':'新增图标分组',[
-    {key:'zh',label:lang==='en'?'Group name':'分组名称（中文）',placeholder:lang==='en'?'e.g. Renewables':'如：新能源'},
-    {key:'en',label:lang==='en'?'English name':'分组名称（English）',placeholder:'e.g. Renewables'},
-  ]);
+// ── 新增图标 / 新增分组：内联表单（在管理面板内，不弹独立遮罩对话框，管理面板全程不关闭/不被盖住） ──
+let _addIconDataURL=null;
+// 注意：函数名带 im 前缀，避免与 09-rules.js 的 _mkBtn(签名不同)在共享全局作用域下冲突
+// 输入即清除该字段的校验态（红框 + 行内红字）——「必填/为空」提示实时消失，不必等到再次保存
+function _imInput(ph){const i=document.createElement('input');i.placeholder=ph||'';i.addEventListener('input',()=>_imClear(i));return i;}
+function _imBtn(cls,txt,fn){const b=document.createElement('button');b.className=cls;b.textContent=txt;b.onclick=fn;return b;}
+function onIconAddFile(e){
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    _addIconDataURL=ev.target.result;
+    const prev=document.getElementById('im-add-prev');if(prev){prev.src=_addIconDataURL;prev.style.visibility='visible';}
+    // 选好图片后，实时清除「请先选择图标图片」的行内提示
+    const row=prev&&prev.closest('.im-addrow');const e2=row&&row.querySelector('.im-err');if(e2)e2.remove();
+  };
+  r.readAsDataURL(f);
+}
+async function submitAddIcon(zhI,enI,group){
+  if(!_addIconDataURL){_imRowErr(_imRowOf(zhI),lang==='en'?'Please choose an image first':'请先选择图标图片');return;}
+  const v=validateIconNames(zhI,enI,null);
   if(!v)return;
-  if(!v.zh){alert(lang==='en'?'Group name required':'请填写分组名称');return;}
-  if(DEVICE_GROUPS.some(g=>g.title===v.zh)){alert((lang==='en'?'Duplicate group name: ':'分组名称重复：')+v.zh);return;}
+  const safe=v.en.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
+  const tk='custom_'+(safe||('icon'+Date.now()));
   try{
-    await iconGroupApiCall('POST',null,{title:v.zh,title_en:v.en||v.zh});
+    const res=await iconApiCall('POST',null,{type:tk,labelZh:v.zh,labelEn:v.en,dataURL:_addIconDataURL,group});
+    // 用服务端返回的真实 type 高亮（type 冲突时服务端会改名，避免高亮失配）
+    _iconMgrAdding=false;_addIconDataURL=null;_iconMgrFlash={type:(res&&res.type)||tk};
+    await reloadIconLibrary();renderIconManager();
+    flashHint(lang==='en'?'Icon added':'图标已新增');
+  }catch(err){flashHint((lang==='en'?'Add failed: ':'新增失败：')+err.message);}
+}
+async function submitAddGroup(zhI,enI){
+  const v=validateGroupNames(zhI,enI,null);
+  if(!v)return;
+  try{
+    await iconGroupApiCall('POST',null,{title:v.zh,title_en:v.en});
+    _iconMgrAdding=false;_iconMgrFlash={title:v.zh};   // 新增后滚动到并高亮该分组
     await reloadIconLibrary();renderIconManager();
     flashHint(lang==='en'?'Group added':'分组已新增');
-  }catch(err){alert((lang==='en'?'Add group failed: ':'新增分组失败：')+err.message);}
+  }catch(err){flashHint((lang==='en'?'Add group failed: ':'新增分组失败：')+err.message);}
 }
-async function iconMgrRenameGroup(oldTitle,zh,en){
-  if(!zh){alert(lang==='en'?'Group name required':'请填写分组名称');return;}
-  if(zh!==oldTitle&&DEVICE_GROUPS.some(g=>g.title===zh)){alert((lang==='en'?'Duplicate group name: ':'分组名称重复：')+zh);return;}
+// ── 分组：重命名 / 删除 ──
+async function iconMgrRenameGroup(oldTitle,zhI,enI){
+  const v=validateGroupNames(zhI,enI,oldTitle);
+  if(!v)return;
   try{
-    await iconGroupApiCall('PUT',oldTitle,{title:zh,title_en:en||zh});
+    await iconGroupApiCall('PUT',oldTitle,{title:v.zh,title_en:v.en});
     await reloadIconLibrary();renderIconManager();
     flashHint(lang==='en'?'Group saved':'分组已保存');
-  }catch(err){alert((lang==='en'?'Save group failed: ':'保存分组失败：')+err.message);}
+  }catch(err){flashHint((lang==='en'?'Save group failed: ':'保存分组失败：')+err.message);}
 }
 async function iconMgrDeleteGroup(title){
   const ok=await uiConfirm(lang==='en'
@@ -1265,7 +1393,7 @@ async function iconMgrDeleteGroup(title){
     await iconGroupApiCall('DELETE',title);
     await reloadIconLibrary();renderIconManager();
     flashHint(lang==='en'?'Group deleted':'分组已删除');
-  }catch(err){alert((lang==='en'?'Delete group failed: ':'删除分组失败：')+err.message);}
+  }catch(err){flashHint((lang==='en'?'Delete group failed: ':'删除分组失败：')+err.message);}
 }
 
 // 取某类型的图标 dataURL
