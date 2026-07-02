@@ -114,18 +114,17 @@ def build_icon_manifest(icons_dir: Path) -> dict:
             groups.append(ng)
     extras = sorted(f for f in existing if f not in referenced)
     # 未登记的图片（手动丢进 icons/ 的）→ 统一归入「未分组」；与 icon-store.js 的 reconcile 行为一致。
+    #「未分组」是系统保留分组：始终存在（即使为空）、不可改名/删除。
     known_types = {d["type"] for g in groups for d in g.get("devices", [])}
-    ungrouped = []
+    ug = next((g for g in groups if g.get("title") == "未分组"), None)
+    if ug is None:
+        ug = {"title": "未分组", "title_en": "Ungrouped", "color": "#8aa8c4", "tab": "device", "devices": []}
+        groups.append(ug)
     for f in extras:
         stem = Path(f).stem
         if stem in known_types:  # 与已有类型同名，跳过避免重复
             continue
-        ungrouped.append({"type": stem, "label": stem, "label_en": stem, "badge": stem, "file": f})
-    if ungrouped:
-        groups.append({
-            "title": "未分组", "title_en": "Ungrouped", "color": "#8aa8c4", "tab": "device",
-            "devices": ungrouped,
-        })
+        ug["devices"].append({"type": stem, "label": stem, "label_en": stem, "badge": stem, "file": f})
     out = dict(curated)
     out["groups"] = groups
     return out

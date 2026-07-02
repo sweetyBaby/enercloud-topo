@@ -40,18 +40,29 @@ function readBody(req) {
     req.on('error', reject);
   });
 }
+// 先解码数字/十六进制字符实体，避免 `java&#x73;cript:` 之类实体编码绕过消毒
+function decodeCharRefs(s) {
+  return s
+    .replace(/&#x([0-9a-f]+);?/gi, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch (e) { return ''; } })
+    .replace(/&#(\d+);?/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch (e) { return ''; } });
+}
 // SVG 消毒：图标以同源方式落盘 icons/ 并可被直接访问，SVG 属活动内容，需去除脚本类向量，
-//   避免存储型 XSS（去 <script>/<foreignObject>、on* 事件属性、javascript: 协议、外链实体）。
+//   避免存储型 XSS（去 <script>/<foreignObject>、on* 事件属性、javascript: 协议——含实体编码/空白混淆）。
+//   正则消毒属纵深防御，非完备 XML 解析；对内部运营工具足够。
 function sanitizeSvg(buf) {
   let s = buf.toString('utf8');
+  s = decodeCharRefs(s);                                  // ① 解码字符实体，暴露被隐藏的标签/协议
   s = s.replace(/<\s*script[\s\S]*?<\s*\/\s*script\s*>/gi, '');
   s = s.replace(/<\s*script\b[^>]*\/?\s*>/gi, '');
   s = s.replace(/<\s*foreignObject[\s\S]*?<\s*\/\s*foreignObject\s*>/gi, '');
-  s = s.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '');
+  s = s.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '');        // ② 去 on* 事件属性
   s = s.replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '');
   s = s.replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '');
-  s = s.replace(/(href|xlink:href)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '');
-  s = s.replace(/javascript:/gi, 'blocked:');
+  // ③ 中和 javascript: / vbscript: / data:text/html 协议（容忍字符间空白与控制符混淆）
+  const scheme = (name) => new RegExp(name.split('').join('[\\s\\u0000-\\u001f]*') + '[\\s\\u0000-\\u001f]*:', 'gi');
+  s = s.replace(scheme('javascript'), 'blocked:');
+  s = s.replace(scheme('vbscript'), 'blocked:');
+  s = s.replace(/data\s*:\s*text\/html/gi, 'blocked:');
   return Buffer.from(s, 'utf8');
 }
 function parseDataURL(s) {
@@ -84,11 +95,14 @@ function ungroupedGroup(idx) {
   let g = idx.groups.find((x) => x && x.title === UNGROUPED_TITLE);
   // 新建时放到最前：管理面板按清单顺序渲染，「未分组」(新增/未归类图标默认落此)即显示在最上面，便于查看验证
   if (!g) { g = { title: UNGROUPED_TITLE, title_en: UNGROUPED_EN, color: '#8aa8c4', tab: 'device', devices: [] }; idx.groups.unshift(g); }
+  // 系统保留分组：UI 禁止改这些字段，故在此规范化，兼容/自愈旧数据里错误的 title_en / tab
+  g.title_en = UNGROUPED_EN; g.tab = 'device'; if (!g.color) g.color = '#8aa8c4';
   g.devices = g.devices || [];
   return g;
 }
 // 把「扫描目录」与「index.json 登记」合并成完整清单：
-//  · 剔除引用了已删除图片的登记项；· 未被任何登记项引用的图片 → 归入「未分组」；· 去掉空的「未分组」。
+//  · 剔除引用了已删除图片的登记项；· 未被任何登记项引用的图片 → 归入「未分组」。
+//  · 「未分组」是保留的系统分组：默认常驻(即使为空也保留)，不可改名/删除，作为未归类图标的稳定归属。
 // 结果即前端看到的完整图标库；写操作先 reconcile 再改，保证扫描出的图标也可编辑（source of truth）。
 function reconcile(idx, dir) {
   idx.groups = idx.groups || [];
@@ -106,8 +120,7 @@ function reconcile(idx, dir) {
       g.devices.push({ type: stem, label: stem, label_en: stem, badge: stem, file: f });
     });
   }
-  // 去掉空的「未分组」（其它空分组是用户新建的，保留）
-  idx.groups = idx.groups.filter((g) => g.title !== UNGROUPED_TITLE || (g.devices && g.devices.length));
+  ungroupedGroup(idx); // 始终确保「未分组」存在（系统保留分组，常驻）
   return idx;
 }
 function buildManifest(dir) { return reconcile(readIndexRaw(dir), dir); }
@@ -261,10 +274,12 @@ function createIconApi(opts) {
     }
     // PUT /api/icon-groups/:title → 重命名 / 改颜色 / 改英文名：{title?, title_en?, color?}
     if (method === 'PUT' && title) {
+      if (title === UNGROUPED_TITLE) return sendJSON(res, 400, { ok: false, error: 'cannot rename the ungrouped bucket' });
       const body = await readBody(req);
       const idx = load();
       const g = findGroup(idx, title);
       if (!g) return sendJSON(res, 404, { ok: false, error: 'not found' });
+      if (body.title != null && String(body.title).trim() === UNGROUPED_TITLE) return sendJSON(res, 400, { ok: false, error: 'name reserved for the ungrouped bucket' });
       const nt = body.title != null ? String(body.title).trim() : g.title;
       const nten = body.title_en != null ? (String(body.title_en).trim() || nt) : (g.title_en || nt);
       const gErr = groupNameError(idx, nt, nten, g);

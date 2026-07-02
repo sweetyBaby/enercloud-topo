@@ -431,9 +431,9 @@
 <div id="uo"><div id="ub"><h4 id="ub-title">📁 上传自定义图标</h4>
   <img id="upv" src="" alt="预览"/>
   <div id="dz" onclick="document.getElementById('fi').click()">
-    <div class="ic">🖼</div><p id="dz-p1">点击选择 PNG / SVG 文件</p>
+    <div class="ic">🖼</div><p id="dz-p1">点击选择图片（PNG / JPG / SVG / GIF / WEBP）</p>
     <p id="dz-p2" style="color:var(--ui-text2);opacity:.7;margin-top:4px">建议 100×100 透明背景</p></div>
-  <input type="file" id="fi" accept="image/png,image/svg+xml,image/jpeg" style="display:none" onchange="onFile(event)">
+  <input type="file" id="fi" accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp" style="display:none" onchange="onFile(event)">
   <input type="file" id="fi-json" accept="application/json,.json" style="display:none" onchange="onImportJSON(event)">
   <div class="uf">
     <label class="uf-label"><span class="df-tag df-zh">中</span> <span id="uf-zh-label">中文名称</span> <span class="req" id="uf-zh-req">*必填</span></label>

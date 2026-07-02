@@ -1036,8 +1036,25 @@ const dz=document.getElementById('dz');
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
 dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');if(e.dataTransfer.files[0])readFile(e.dataTransfer.files[0]);});
-function onFile(e){if(e.target.files[0])readFile(e.target.files[0]);}
-function readFile(file){const r=new FileReader();r.onload=ev=>{pendingDataURL=ev.target.result;const p=document.getElementById('upv');p.src=pendingDataURL;p.style.display='block';if(!document.getElementById('un').value)document.getElementById('un').value=file.name.replace(/\.[^.]+$/,'');};r.readAsDataURL(file);}
+// ── 图标图片格式校验：仅支持 PNG / JPG(JPEG) / SVG / GIF / WEBP，与服务端 icon-store 一致 ──
+const ICON_ALLOWED_MIME=['image/png','image/jpeg','image/jpg','image/svg+xml','image/gif','image/webp'];
+const ICON_ALLOWED_EXT=['png','jpg','jpeg','svg','gif','webp'];
+const ICON_ALLOWED_HINT='PNG / JPG / SVG / GIF / WEBP';
+// 校验所选文件是否为受支持的图片：有 MIME 用 MIME 精确判定；个别 svg 无 MIME 时用扩展名兜底。
+// 通过返回 true；否则可视化提示（toast）并返回 false。
+function checkIconFile(file){
+  if(!file)return false;
+  const mime=(file.type||'').toLowerCase();
+  const ext=((file.name||'').split('.').pop()||'').toLowerCase();
+  const ok = mime ? ICON_ALLOWED_MIME.includes(mime) : ICON_ALLOWED_EXT.includes(ext);
+  if(!ok){
+    flashHint(lang==='en'?('Unsupported file format. Allowed images: '+ICON_ALLOWED_HINT):('不支持的文件格式，仅支持图片：'+ICON_ALLOWED_HINT));
+    return false;
+  }
+  return true;
+}
+function onFile(e){if(e.target.files[0]&&!checkIconFile(e.target.files[0])){e.target.value='';return;}if(e.target.files[0])readFile(e.target.files[0]);}
+function readFile(file){if(!checkIconFile(file))return;const r=new FileReader();r.onload=ev=>{pendingDataURL=ev.target.result;const p=document.getElementById('upv');p.src=pendingDataURL;p.style.display='block';if(!document.getElementById('un').value)document.getElementById('un').value=file.name.replace(/\.[^.]+$/,'');};r.readAsDataURL(file);}
 async function confirmUp(){
   if(!pendingDataURL){alert(lang==='en'?'Please select a file':'请先选择文件');return;}
   const zhEl=document.getElementById('un'),enEl=document.getElementById('un-en');
@@ -1229,18 +1246,26 @@ function renderIconManager(){
 // 分组行：改名(中/英) / 删除（组内图标移到「未分组」）。按清单顺序（新增分组在最上面）
 function renderGroupRows(list,en){
   iconMgrGroups(false).forEach(g=>{
-    const row=document.createElement('div');row.className='im-grow';
+    const sys=(g.title==='未分组');   // 系统保留分组：常驻、不可改名/删除
+    const row=document.createElement('div');row.className='im-grow'+(sys?' im-grow-sys':'');
     if(_iconMgrFlash&&_iconMgrFlash.title===g.title)_iconMgrFlashEl=row;
     const dot=document.createElement('span');dot.className='im-dot';dot.style.background=g.color||'#8aa8c4';
-    const zhI=document.createElement('input');zhI.value=g.title||'';zhI.placeholder=en?'Group name':'分组名称';zhI.addEventListener('input',()=>_imClear(zhI));
-    const enI=document.createElement('input');enI.value=g.title_en||'';enI.placeholder=en?'English name':'英文名称';enI.addEventListener('input',()=>_imClear(enI));
+    const zhI=document.createElement('input');zhI.value=g.title||'';zhI.placeholder=en?'Group name':'分组名称';
+    const enI=document.createElement('input');enI.value=g.title_en||'';enI.placeholder=en?'English name':'英文名称';
     const cnt=document.createElement('span');cnt.className='im-gcount';cnt.textContent='×'+((g.devices||[]).length);
     const save=document.createElement('button');save.className='im-btn';save.textContent=en?'💾 Save':'💾 保存';
-    save.onclick=()=>iconMgrRenameGroup(g.title,zhI,enI);
     const del=document.createElement('button');del.className='im-btn im-del';del.textContent=en?'🗑 Delete':'🗑 删除';
-    del.disabled=(g.title==='未分组');
     del.title=en?'Delete group (icons move to Ungrouped)':'删除分组（组内图标移到未分组）';
-    del.onclick=()=>iconMgrDeleteGroup(g.title);
+    if(sys){
+      // 「未分组」为系统保留分组：禁止改名/删除
+      zhI.disabled=enI.disabled=save.disabled=del.disabled=true;
+      zhI.title=enI.title=save.title=del.title=en?'Reserved system group (cannot be renamed or deleted)':'系统保留分组，不可改名/删除';
+    }else{
+      zhI.addEventListener('input',()=>_imClear(zhI));
+      enI.addEventListener('input',()=>_imClear(enI));
+      save.onclick=()=>iconMgrRenameGroup(g.title,zhI,enI);
+      del.onclick=()=>iconMgrDeleteGroup(g.title);
+    }
     row.append(dot,zhI,enI,cnt,save,del);
     list.appendChild(row);
   });
@@ -1322,6 +1347,7 @@ async function iconMgrDelete(type,label){
 function onIconMgrFile(e){
   const f=e.target.files[0];e.target.value='';
   if(!f||!_mgrReplaceType)return;
+  if(!checkIconFile(f)){_mgrReplaceType=null;return;}
   const type=_mgrReplaceType;_mgrReplaceType=null;
   const r=new FileReader();
   r.onload=async ev=>{
@@ -1341,6 +1367,7 @@ function _imInput(ph){const i=document.createElement('input');i.placeholder=ph||
 function _imBtn(cls,txt,fn){const b=document.createElement('button');b.className=cls;b.textContent=txt;b.onclick=fn;return b;}
 function onIconAddFile(e){
   const f=e.target.files[0];e.target.value='';if(!f)return;
+  if(!checkIconFile(f))return;
   const r=new FileReader();
   r.onload=ev=>{
     _addIconDataURL=ev.target.result;

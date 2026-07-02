@@ -46,7 +46,10 @@ async function loadIconLibrary(){
     if(res.ok) manifest=await res.json();
     else console.error('加载图标库失败：HTTP '+res.status+' '+ICON_BASE+'index.json');
   }catch(err){ console.error('加载图标库 '+ICON_BASE+'index.json 失败：',err); }
-  const groups=(manifest&&Array.isArray(manifest.groups))?manifest.groups:[];
+  // 清单拉取失败/无效：保留上一次成功加载的图标库（不重建分组、不清缓存），
+  //   避免瞬时网络失败把画布上已加载的图标全刷成占位。下次成功重扫再更新。
+  if(!(manifest&&Array.isArray(manifest.groups))) return;
+  const groups=manifest.groups;
   // 由清单构建分组结构（替代旧的硬编码 DEVICE_GROUPS）
   // _ord = 清单(index.json)原始顺序：左栏会按 ICON_GROUP_ORDER 重排（常用优先），
   //   但图标库管理面板改用 _ord 还原「服务端顺序」，从而让新增分组(服务端 unshift 到最前)显示在最上面。

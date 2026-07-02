@@ -48,8 +48,8 @@ function buildSidebar(){
     sessionOnly.forEach(ci=>sb.appendChild(makeNI(ci.type,ci.zh,ci.en,'custom',ci.url)));
     return;
   }
-  // 其它 tab：按 tab 过滤分组
-  const groups=sidebarGroupsFor(activeTab);
+  // 其它 tab：按 tab 过滤分组；跳过空分组（如常驻的空「未分组」、用户新建但未放图标的组——左栏无可拖拽项不必显示）
+  const groups=sidebarGroupsFor(activeTab).filter(g=>(g.devices||[]).length>0);
   ensureSidebarDefault(activeTab,groups);
   if(tools)tools.style.display=(groups.length>1)?'flex':'none';
   groups.forEach(g=>{

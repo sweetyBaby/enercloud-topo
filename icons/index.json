@@ -109,6 +109,27 @@
             "SOC(%)",
             "温度(℃)"
           ]
+        },
+        {
+          "type": "bms_discharge",
+          "label": "bms_discharge",
+          "label_en": "bms_discharge",
+          "badge": "bms_discharge",
+          "file": "bms_discharge.png"
+        },
+        {
+          "type": "bms_standby",
+          "label": "bms_standby",
+          "label_en": "bms_standby",
+          "badge": "bms_standby",
+          "file": "bms_standby.png"
+        },
+        {
+          "type": "bms_charge",
+          "label": "bms_charge",
+          "label_en": "bms_charge",
+          "badge": "bms_charge",
+          "file": "bms_charge.png"
         }
       ]
     },
@@ -475,29 +496,7 @@
       "title_en": "Ungrouped",
       "color": "#8aa8c4",
       "tab": "device",
-      "devices": [
-        {
-          "type": "bms_charge",
-          "label": "bms_charge",
-          "label_en": "bms_charge",
-          "badge": "bms_charge",
-          "file": "bms_charge.png"
-        },
-        {
-          "type": "bms_discharge",
-          "label": "bms_discharge",
-          "label_en": "bms_discharge",
-          "badge": "bms_discharge",
-          "file": "bms_discharge.png"
-        },
-        {
-          "type": "bms_standby",
-          "label": "bms_standby",
-          "label_en": "bms_standby",
-          "badge": "bms_standby",
-          "file": "bms_standby.png"
-        }
-      ]
+      "devices": []
     }
   ]
 }
