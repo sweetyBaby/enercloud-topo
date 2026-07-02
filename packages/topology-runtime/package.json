@@ -1,0 +1,25 @@
+{
+  "name": "@enercloud/topology-runtime",
+  "version": "0.1.0",
+  "description": "储能拓扑 headless 核心：几何/端口/正交布线/规则求值。编辑器（topo.html）与前端自研渲染器共同消费的单一事实源。",
+  "license": "UNLICENSED",
+  "main": "topology-runtime.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./topology-runtime.js"
+    },
+    "./rules": {
+      "types": "./rules.d.ts",
+      "default": "./rules.js"
+    }
+  },
+  "files": [
+    "topology-runtime.js",
+    "rules.js",
+    "index.d.ts",
+    "rules.d.ts",
+    "README.md"
+  ]
+}

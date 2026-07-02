@@ -1,3 +1,56 @@
+// ═════════ 拓扑核心接线层 + 编辑器交互几何 ═════════
+// 几何/端口/布线算法已抽到 packages/topology-runtime（headless 单一事实源，
+// 与前端渲染器共同消费）。本文件负责：
+//   1) 用编辑器全局状态实例化 runtime（TR），并把常用函数落回全局名（其余分段照旧裸调用）；
+//   2) 保留纯编辑器交互几何（命中测试 / 吸附 / 拖放建节点等）。
+// ⚠️ 布线/几何算法请改 packages/topology-runtime/topology-runtime.js，不要在编辑器里 fork。
+let _dragging=false, _dragIds=new Set();   // 拖拽状态（03-input 写、runtime 经 env 读）
+const TR = createTopoRuntime({
+  getNodes: ()=>nodes,
+  getEdges: ()=>edges,
+  setEdges: (v)=>{ edges=v; },
+  getZoom: ()=>zoom,
+  getLang: ()=>lang,
+  getConfig: ()=>({busMergeGap, busAggregation, routeStyle, busOffsets, busShareTrunk, ET}),
+  // 编辑器的视口自适应尺寸基准：min(canvas.w,canvas.h)/zoom/600（与原 nsz 逐字等价）
+  sizeUnit: ()=>Math.min(canvas.width,canvas.height)/zoom/600,
+  isDragging: ()=>_dragging,
+  dragIds: ()=>_dragIds,
+});
+// ── 落回全局名（分段脚本沿用原函数名裸调用）──
+const nodeLabel=TR.nodeLabel, dataKey=TR.dataKey, nsz=TR.nsz, nodeBox=TR.nodeBox,
+      anchorPoint=TR.anchorPoint, clamp=TR.clamp, isLinearBusNode=TR.isLinearBusNode,
+      linearBusSpan=TR.linearBusSpan, linearBusPort=TR.linearBusPort,
+      nodePortPoint=TR.nodePortPoint, nearestNodePort=TR.nearestNodePort,
+      directionalNodePort=TR.directionalNodePort, edgeAnchorPoint=TR.edgeAnchorPoint,
+      portSide=TR.portSide, segRectHit=TR.segRectHit, pathHitsNodes=TR.pathHitsNodes,
+      segBoxClip=TR.segBoxClip, ptInBox=TR.ptInBox, clipEnds=TR.clipEnds,
+      sideOf=TR.sideOf, approachSide=TR.approachSide,
+      topoSig=TR.topoSig, invalidatePathCache=TR.invalidatePathCache,
+      invalidateRouting=TR.invalidateRouting, buildObstacleGrid=TR.buildObstacleGrid,
+      routeOrtho=TR.routeOrtho, orthogonalize=TR.orthogonalize, edgePathRaw=TR.edgePathRaw,
+      channelRoute=TR.channelRoute, alignJunctions=TR.alignJunctions,
+      straightVariants=TR.straightVariants, optimizeChannel=TR.optimizeChannel,
+      buildCorridorVariants=TR.buildCorridorVariants, recomputeAllPaths=TR.recomputeAllPaths,
+      detourRoute=TR.detourRoute, applyBusMerge=TR.applyBusMerge,
+      shareNearbyTrunks=TR.shareNearbyTrunks, dedupe=TR.dedupe, simplifyPath=TR.simplifyPath,
+      computeSmartEdge=TR.computeSmartEdge, edgePath=TR.edgePath, edgeAt=TR.edgeAt,
+      segsCross=TR.segsCross, pathsCross=TR.pathsCross,
+      _pathLen=TR._pathLen, _pathBends=TR._pathBends,
+      _pathDetourPenalty=TR._pathDetourPenalty, _pathScore=TR._pathScore,
+      _dedupCollinear=TR._dedupCollinear, _countCross=TR._countCross,
+      markOccupied=TR.markOccupied;
+// 接线自检：包导出与别名清单是两处手工同步的清单——加载期断言,防止包改名/漏导出后
+// 别名静默绑定 undefined、直到低频路径被点到才炸。
+[['createTopoRuntime 实例', {nodeLabel,dataKey,nsz,nodeBox,anchorPoint,edgePath,edgePathRaw,channelRoute,
+  recomputeAllPaths,applyBusMerge,straightVariants,detourRoute,dedupe,simplifyPath,computeSmartEdge,edgeAt,
+  segsCross,pathsCross,clipEnds,edgeAnchorPoint,nodePortPoint,nearestNodePort,directionalNodePort,
+  invalidateRouting,invalidatePathCache,_pathScore,_countCross}],
+].forEach(([label,fns])=>Object.entries(fns).forEach(([k,v])=>{
+  if(typeof v!=='function')throw new Error('topology-runtime 接线断言失败:'+label+' 缺少函数「'+k+'」');
+}));
+
+// ═════════ 编辑器交互几何（命中测试 / 吸附 / 建节点）═════════
 function onDragStart(e,t){window._dt=t;e.dataTransfer.setData('text/plain',t);}
 cwrap.addEventListener('dragover',e=>e.preventDefault());
 cwrap.addEventListener('drop',e=>{e.preventDefault();const t=window._dt;if(!t)return;const r=canvas.getBoundingClientRect();const[wx,wy]=toWorld(e.clientX-r.left,e.clientY-r.top);addNode(t,wx,wy);window._dt=null;});
@@ -29,9 +82,6 @@ function addNode(type,x,y){
     data:(def.data||[]).map(k=>({key:k,keyEn:(DATA_LABEL_EN[k]||k),dv:''}))});
   snapshot();selectNode(id);
 }
-// 获取节点当前语言标签
-function nodeLabel(n){ return lang==='en' ? (n.labelEn||n.labelZh||n.id) : (n.labelZh||n.label||n.id); }
-function dataKey(f){ return lang==='en' ? (f.keyEn||f.key) : f.key; }
 // 字段的「信号键段」：端到端统一用【英文名】作信号标识（规则条件/导出/实时数据契约都用它）。
 // 英文名为必填项（见字段校验）；为防内部报错，缺失时暂兜底中文名。字段卡片显示仍走 dataKey（中文标签）。
 function fieldSigKey(f){ return (f&&(f.keyEn||f.key))||''; }
@@ -55,43 +105,7 @@ function nodeHasFieldNameError(n){ return fieldNameIssues(n).some(s=>!fieldNameO
 function usesTextBox(t){ return t==='text'||t==='variable'; }
 // 注：status / online 已彻底移除，节点的可用信号 = 仅其「已绑定数据字段」
 
-function nsz(typeOrNode){
-  const type=typeof typeOrNode==='string'?typeOrNode:typeOrNode.type;
-  const scale=typeof typeOrNode==='string'?1:(typeOrNode.scale||1);
-  const base=Math.min(canvas.width,canvas.height)/zoom;
-  const s={grid:80,pcs:66,bms:66,meter:56,meter2:60,load:66,solar:74,transformer:64,switch:60,generator:68,cabinet:64,highvolt:60,ems:64,aircon:60,fire:58,sensor:58,busbar:70,charger:60,h2_storage:64,
-    // 开关元件：默认偏大，统一缩小为更紧凑的尺寸
-    cb_closed:44,switch_open:44,disconnector:44,contactor:44,fuse:44,iso_g:44,lbs_g:44,disc_v_g:44,
-    trunk_ac:70,trunk_dc:70,tie_line:66,
-    anchor:26}[type]||62;
-  return s*(base/600)*scale;
-}
 function nodeAt(wx,wy){for(let i=nodes.length-1;i>=0;i--){const n=nodes[i];if(usesTextBox(n.type)){const b=n._textBox;if(b&&wx>=b.x&&wx<=b.x+b.w&&wy>=b.y&&wy<=b.y+b.h)return n;continue;}const s=nsz(n);if(n.type==='anchor'){const vcy=n.y-s*0.22, hit=Math.max(s*0.5, 11/zoom);if(Math.abs(wx-n.x)<hit&&Math.abs(wy-vcy)<hit)return n;continue;}if(Math.abs(wx-n.x)<s*.55&&Math.abs(wy-n.y)<s*.5)return n;}return null;}
-// 返回节点边界上的锚点（从中心朝目标方向，落在图标外缘）
-// 节点的视觉包围盒（图标实际绘制区域，中心略偏上）
-function nodeBox(n){
-  const s=nsz(n);
-  // 图标绘制 y 从 n.y - s*0.72 到 n.y + s*0.28，视觉中心在 n.y - s*0.22
-  const cx=n.x, cy=n.y - s*0.22;
-  const hw=s*0.50, hh=s*0.50;
-  return {cx,cy,hw,hh,left:cx-hw,right:cx+hw,top:cy-hh,bottom:cy+hh};
-}
-function isLinearBusNode(n){
-  return !!(n&&['busbar','trunk_ac','trunk_dc','tie_line'].includes(n.type));
-}
-function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
-function linearBusSpan(n){
-  const b=nodeBox(n), s=nsz(n);
-  // 母线/主干线图标主体是横向线段，不是完整方盒；连接点应落在线段上。
-  const half=s*0.42;
-  return {y:b.cy,left:b.cx-half,right:b.cx+half,cx:b.cx};
-}
-function linearBusPort(n, wx){
-  const sp=linearBusSpan(n);
-  const x=clamp(wx,sp.left,sp.right);
-  const ratio=(sp.right===sp.left)?0.5:(x-sp.left)/(sp.right-sp.left);
-  return {name:'line:'+ratio.toFixed(3),point:[x,sp.y],dist:0};
-}
 function nodeSnapBox(n){
   if(usesTextBox(n.type)&&n._textBox)return n._textBox;
   const b=nodeBox(n), s=nsz(n), lfs=(n.fontSize||14);
@@ -110,52 +124,6 @@ function nodeSnapBox(n){
     });
   }
   return out;
-}
-function nodePortPoint(n, port){
-  const b=nodeBox(n);
-  if(isLinearBusNode(n)){
-    if(typeof port==='string'&&port.startsWith('line:')){
-      const sp=linearBusSpan(n), r=clamp(parseFloat(port.slice(5)),0,1);
-      return [sp.left+(sp.right-sp.left)*(isFinite(r)?r:0.5),sp.y];
-    }
-    if(port==='left'||port==='right'||port==='top'||port==='bottom'||port==='center'){
-      const sp=linearBusSpan(n);
-      if(port==='left')return [sp.left,sp.y];
-      if(port==='right')return [sp.right,sp.y];
-      return [sp.cx,sp.y];
-    }
-  }
-  switch(port){
-    case 'top': return [b.cx,b.top];
-    case 'right': return [b.right,b.cy];
-    case 'bottom': return [b.cx,b.bottom];
-    case 'left': return [b.left,b.cy];
-    case 'center': return [b.cx,b.cy];
-    default: return null;
-  }
-}
-function nearestNodePort(n, wx, wy){
-  if(isLinearBusNode(n)){
-    const p=linearBusPort(n,wx);
-    p.dist=Math.hypot(wx-p.point[0],wy-p.point[1]);
-    return p;
-  }
-  const ports=['top','right','bottom','left'];
-  let best=null,bd=Infinity;
-  ports.forEach(name=>{
-    const p=nodePortPoint(n,name);
-    const d=Math.hypot(wx-p[0],wy-p[1]);
-    if(d<bd){bd=d;best={name,point:p,dist:d};}
-  });
-  return best;
-}
-function directionalNodePort(n, wx, wy){
-  if(isLinearBusNode(n))return linearBusPort(n,wx);
-  const b=nodeBox(n);
-  const dx=wx-b.cx,dy=wy-b.cy,adx=Math.abs(dx),ady=Math.abs(dy);
-  if(ady>adx*0.8)return {name:dy<0?'top':'bottom',point:nodePortPoint(n,dy<0?'top':'bottom'),dist:0};
-  if(adx>ady*0.8)return {name:dx<0?'left':'right',point:nodePortPoint(n,dx<0?'left':'right'),dist:0};
-  return nearestNodePort(n,wx,wy);
 }
 function edgeSnapAt(wx,wy,excludeId){
   const direct=nodeAt(wx,wy);
@@ -234,99 +202,4 @@ function autoAttachLooseEdgeEnds(e){
     else simplifyWaypoints(e);
   }
   return changed;
-}
-// 从节点视觉中心朝目标方向，求与包围盒边界的交点（连线起止贴边，不进图标内部）
-function anchorPoint(n, tx, ty){
-  const bx=nodeBox(n);
-  const dx=tx-bx.cx, dy=ty-bx.cy;
-  if(dx===0&&dy===0) return [bx.cx,bx.cy];
-  const sx=dx===0?Infinity:bx.hw/Math.abs(dx);
-  const sy=dy===0?Infinity:bx.hh/Math.abs(dy);
-  const t=Math.min(sx,sy);
-  return [bx.cx+dx*t, bx.cy+dy*t];
-}
-function edgeAnchorPoint(n, tx, ty, port){
-  const explicit=nodePortPoint(n,port);
-  if(explicit)return explicit;
-  const inferred=directionalNodePort(n,tx,ty);
-  return inferred?inferred.point:anchorPoint(n,tx,ty);
-}
-// 矩形与线段是否相交（用于碰撞检测，基于视觉盒）
-function segRectHit(x1,y1,x2,y2,n,pad){
-  const bx=nodeBox(n);
-  const minX=bx.left-pad, maxX=bx.right+pad, minY=bx.top-pad, maxY=bx.bottom+pad;
-  function inside(x,y){return x>=minX&&x<=maxX&&y>=minY&&y<=maxY;}
-  if(inside(x1,y1)||inside(x2,y2)) return true;
-  function segSeg(ax,ay,bx2,by,cx,cy,dx,dy){
-    const d=(bx2-ax)*(dy-cy)-(by-ay)*(dx-cx);if(Math.abs(d)<1e-9)return false;
-    const t=((cx-ax)*(dy-cy)-(cy-ay)*(dx-cx))/d;
-    const u=((cx-ax)*(by-ay)-(cy-ay)*(bx2-ax))/d;
-    return t>=0&&t<=1&&u>=0&&u<=1;
-  }
-  return segSeg(x1,y1,x2,y2,minX,minY,maxX,minY)||segSeg(x1,y1,x2,y2,maxX,minY,maxX,maxY)||
-         segSeg(x1,y1,x2,y2,maxX,maxY,minX,maxY)||segSeg(x1,y1,x2,y2,minX,maxY,minX,minY);
-}
-// 路径是否穿过其他节点
-function pathHitsNodes(pts, fromId, toId){
-  for(const n of nodes){
-    if(n.id===fromId||n.id===toId) continue;
-    for(let i=0;i<pts.length-1;i++)
-      if(segRectHit(pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1],n,6)) return true;
-  }
-  return false;
-}
-// 线段与轴对齐矩形求交（返回离 p1 最近的交点参数 t，无交返回 null）
-function segBoxClip(p1,p2,box){
-  const x1=p1[0],y1=p1[1],x2=p2[0],y2=p2[1];
-  const dx=x2-x1,dy=y2-y1;
-  let tmin=0,tmax=1;
-  const edges=[[-dx,x1-box.left],[dx,box.right-x1],[-dy,y1-box.top],[dy,box.bottom-y1]];
-  for(const[p,q]of edges){
-    if(Math.abs(p)<1e-9){ if(q<0)return null; }
-    else{ const t=q/p; if(p<0){ if(t>tmax)return null; if(t>tmin)tmin=t; } else { if(t<tmin)return null; if(t<tmax)tmax=t; } }
-  }
-  return {tmin,tmax};
-}
-function ptInBox(p,box){ return p[0]>=box.left&&p[0]<=box.right&&p[1]>=box.top&&p[1]<=box.bottom; }
-// 把折线两端裁剪到节点视觉盒边界（彻底移除盒内点，连线只到设备边缘）
-function clipEnds(pts,a,b,e){
-  const ba=nodeBox(a), bb=nodeBox(b);
-  pts=pts.map(p=>p.slice());
-  // ── 头部：找路径离开 a 盒的那一段，在盒边界处截断（沿该段方向，保持轴对齐）──
-  let hi=0;
-  while(hi<pts.length-1 && ptInBox(pts[hi+1],ba)) hi++;
-  // pts[hi] 在盒内或盒上, pts[hi+1] 在盒外
-  if(hi<pts.length-1){
-    const p=pts[hi],q=pts[hi+1];
-    const r=segBoxClip(p,q,ba);
-    let cp=p;
-    if(r){ const t=r.tmax; cp=[p[0]+(q[0]-p[0])*t, p[1]+(q[1]-p[1])*t]; }
-    pts=pts.slice(hi); pts[0]=cp;
-  }
-  // ── 尾部：同理 ──
-  let ti=pts.length-1;
-  while(ti>0 && ptInBox(pts[ti-1],bb)) ti--;
-  if(ti>0){
-    const p=pts[ti],q=pts[ti-1];
-    const r=segBoxClip(p,q,bb);
-    let cp=p;
-    if(r){ const t=r.tmax; cp=[p[0]+(q[0]-p[0])*t, p[1]+(q[1]-p[1])*t]; }
-    pts=pts.slice(0,ti+1); pts[pts.length-1]=cp;
-  }
-  if(pts.length>=2){
-    pts[0]=edgeAnchorPoint(a,pts[1][0],pts[1][1],e&&e.fromPort);
-    pts[pts.length-1]=edgeAnchorPoint(b,pts[pts.length-2][0],pts[pts.length-2][1],e&&e.toPort);
-  }
-  // ── 兜底：若首/尾段仍是斜的，插入拐点矫正为 L ──
-  if(pts.length>=2){
-    const p0=pts[0],p1=pts[1];
-    if(Math.abs(p0[0]-p1[0])>0.5&&Math.abs(p0[1]-p1[1])>0.5)
-      pts.splice(1,0,[p1[0],p0[1]]);
-  }
-  if(pts.length>=2){
-    const i=pts.length-1,q0=pts[i],q1=pts[i-1];
-    if(Math.abs(q0[0]-q1[0])>0.5&&Math.abs(q0[1]-q1[1])>0.5)
-      pts.splice(i,0,[q1[0],q0[1]]);
-  }
-  return pts;
 }

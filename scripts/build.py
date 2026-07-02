@@ -68,12 +68,22 @@ outputs = {
     "topo.html": minify_html(read("topo.html")),
     "topo-editor/topology-editor.css": minify_css(read("topo-editor/topology-editor.css")) + "\n",
     "topo-editor/topology-editor-icons.js": minify_js(read("topo-editor/topology-editor-icons.js")) + "\n",
+    # headless 核心包（topo.html 以 <script> 引入，路径与源码一致）
+    "packages/topology-runtime/topology-runtime.js": minify_js(read("packages/topology-runtime/topology-runtime.js")) + "\n",
+    "packages/topology-runtime/rules.js": minify_js(read("packages/topology-runtime/rules.js")) + "\n",
 }
 for part in EDITOR_JS_PARTS:
     outputs["topo-editor/" + part] = minify_js(read("topo-editor/" + part)) + "\n"
 
 for rel, content in outputs.items():
     write(rel, content)
+
+# 护栏：topo.html 里引用的每个本地 js/css 都必须在 outputs 清单里（dev-server 直接服务文件系统，
+#  清单漏项只会在 dist 环境 404 → 编辑器白屏且只在生产构建复现；这里在构建期就拦下）。
+_refs = re.findall(r'(?:src|href)="([^"]+\.(?:js|css))"', outputs["topo.html"])
+_missing = [r for r in _refs if not r.startswith(("http://", "https://", "//")) and r not in outputs]
+if _missing:
+    raise SystemExit(f"BUILD FAIL: topo.html 引用了未纳入 dist 清单的本地资源: {_missing}（更新 outputs/EDITOR_JS_PARTS）")
 
 # 图标库：扫描 icons/ 与 icons/index.json 合并后拷贝到 dist（与 dev-server 行为一致）
 #  · 替换图片（同名）→ 生效；删除图片 → 元素移除；新增未登记图片 → 归入「自定义图标」分组。

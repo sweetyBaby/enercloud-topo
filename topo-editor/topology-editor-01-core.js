@@ -146,8 +146,8 @@ let draftReady=false,draftTimer=null,loadingDraft=false;
 function genId(t){ids[t]=(ids[t]||0)+1;return t+'_'+ids[t];}
 
 function snapshot(){const s=JSON.stringify({nodes,edges,bgColor,routeStyle});history=history.slice(0,histIdx+1);history.push(s);if(history.length>21)history.shift();histIdx=history.length-1;updUR();if(draftReady&&!loadingDraft)scheduleDraftSave();}
-function undo(){if(histIdx<=0)return;histIdx--;const s=JSON.parse(history[histIdx]);nodes=s.nodes;edges=s.edges;if(s.bgColor!==undefined)bgColor=s.bgColor;if(s.routeStyle!==undefined)routeStyle=s.routeStyle;selNode=selEdge=null;selSet.clear();selChips.clear();updateAlignBar();showPanel('none');_pathCacheSig='';updUR();}
-function redo(){if(histIdx>=history.length-1)return;histIdx++;const s=JSON.parse(history[histIdx]);nodes=s.nodes;edges=s.edges;if(s.bgColor!==undefined)bgColor=s.bgColor;if(s.routeStyle!==undefined)routeStyle=s.routeStyle;selNode=selEdge=null;selSet.clear();selChips.clear();updateAlignBar();showPanel('none');_pathCacheSig='';updUR();}
+function undo(){if(histIdx<=0)return;histIdx--;const s=JSON.parse(history[histIdx]);nodes=s.nodes;edges=s.edges;if(s.bgColor!==undefined)bgColor=s.bgColor;if(s.routeStyle!==undefined)routeStyle=s.routeStyle;selNode=selEdge=null;selSet.clear();selChips.clear();updateAlignBar();showPanel('none');invalidateRouting();updUR();}
+function redo(){if(histIdx>=history.length-1)return;histIdx++;const s=JSON.parse(history[histIdx]);nodes=s.nodes;edges=s.edges;if(s.bgColor!==undefined)bgColor=s.bgColor;if(s.routeStyle!==undefined)routeStyle=s.routeStyle;selNode=selEdge=null;selSet.clear();selChips.clear();updateAlignBar();showPanel('none');invalidateRouting();updUR();}
 function updUR(){document.getElementById('btn-undo').disabled=histIdx<=0;document.getElementById('btn-redo').disabled=histIdx>=history.length-1;}
 function scheduleDraftSave(){
   if(loadingDraft)return;
