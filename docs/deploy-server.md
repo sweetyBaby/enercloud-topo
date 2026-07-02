@@ -14,13 +14,13 @@
 ```powershell
 docker build --platform linux/amd64 -t enercloud-topo:1.0 .
 docker save -o enercloud-topo-1.0.tar enercloud-topo:1.0
-scp -P 8119 enercloud-topo-1.0.tar bms@223.107.76.50:/home/bms/
+scp -P 8119 enercloud-topo-1.0.tar bms@223.107.76.50:/home/bms/base_docker/data/myapp/front/
 ```
 
 ## 2. 服务器导入镜像
 
 ```bash
-docker load -i /home/bms/enercloud-topo-1.0.tar
+docker load -i /home/bms/base_docker/data/myapp/front/enercloud-topo-1.0.tar
 ```
 
 ## 3. 现有 docker-compose.yml 追加服务
