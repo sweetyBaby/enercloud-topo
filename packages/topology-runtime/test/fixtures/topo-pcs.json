@@ -1,0 +1,385 @@
+{
+  "schemaVersion": "2.0",
+  "meta": {
+    "app": "储能拓扑编辑器",
+    "generatedAt": "2026-06-17T01:32:12.645Z",
+    "lang": "zh",
+    "libraryRef": {
+      "name": "energy-topology",
+      "version": "2.0.0"
+    },
+    "canvas": {
+      "bgColor": "#0a1f40",
+      "zoom": 1,
+      "panX": 16.6,
+      "panY": 106.4,
+      "grid": {
+        "show": true,
+        "stepPx": 40
+      },
+      "showAnchors": true
+    },
+    "view": {
+      "showEdgeLabels": true,
+      "showFieldChips": true,
+      "globalWidth": 1,
+      "routeStyle": 3,
+      "busMerge": true,
+      "busMergeGap": 16,
+      "busTrunkBold": true,
+      "busStyle": "busbar",
+      "busShareTrunk": false,
+      "busAggregation": true
+    }
+  },
+  "edgeStyles": {
+    "pipe_blue": {
+      "labelZh": "蓝光管道",
+      "labelEn": "Blue Pipe",
+      "color": "#3aa0ff",
+      "width": 2.5,
+      "dash": [],
+      "anim": "pipe",
+      "speed": 0.7
+    },
+    "ac_power": {
+      "labelZh": "交流电力",
+      "labelEn": "AC Power",
+      "color": "#e74c3c",
+      "width": 2.5,
+      "dash": [],
+      "anim": "flow",
+      "speed": 0.5
+    },
+    "dc_power": {
+      "labelZh": "直流电力",
+      "labelEn": "DC Power",
+      "color": "#e67e22",
+      "width": 2.5,
+      "dash": [],
+      "anim": "flow",
+      "speed": 0.5
+    }
+  },
+  "nodes": [
+    {
+      "id": "bus_1",
+      "type": "busbar",
+      "label": {
+        "zh": "交流母线",
+        "en": "AC Busbar"
+      },
+      "position": {
+        "x": 809,
+        "y": 352
+      },
+      "sizeWorld": 112,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#4dd0ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "A相电流(A)",
+            "en": "Ia(A)"
+          },
+          "value": "10",
+          "hidden": false,
+          "offset": {
+            "x": -10,
+            "y": -47
+          }
+        },
+        {
+          "key": {
+            "zh": "B相电流(A)",
+            "en": "Ib(A)"
+          },
+          "value": "8",
+          "hidden": false,
+          "offset": {
+            "x": -10,
+            "y": -47
+          }
+        },
+        {
+          "key": {
+            "zh": "C相电流(A)",
+            "en": "Ic(A)"
+          },
+          "value": "9",
+          "hidden": false,
+          "offset": {
+            "x": -10,
+            "y": -47
+          }
+        },
+        {
+          "key": {
+            "zh": "交流有功(kW)",
+            "en": "AC P(kW)"
+          },
+          "value": "10",
+          "hidden": false,
+          "offset": {
+            "x": -10,
+            "y": -47
+          }
+        },
+        {
+          "key": {
+            "zh": "输出电压(V)",
+            "en": "Uout(V)"
+          },
+          "value": "20",
+          "hidden": false,
+          "offset": {
+            "x": -10,
+            "y": -47
+          }
+        }
+      ],
+      "status": {
+        "zh": "在线",
+        "en": "Online"
+      }
+    },
+    {
+      "id": "sw_ac",
+      "type": "switch",
+      "label": {
+        "zh": "交流断路器",
+        "en": "AC Breaker"
+      },
+      "position": {
+        "x": 606,
+        "y": 352
+      },
+      "sizeWorld": 96,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#ff7a6a",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [],
+      "status": {
+        "zh": "闭合",
+        "en": "Closed"
+      }
+    },
+    {
+      "id": "pcs_1",
+      "type": "pcs",
+      "label": {
+        "zh": "变流器",
+        "en": "PCS"
+      },
+      "position": {
+        "x": 399.7,
+        "y": 227.7
+      },
+      "sizeWorld": 105,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#2ecc71",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "直流功率(kW)",
+            "en": "DC P(kW)"
+          },
+          "value": "10",
+          "hidden": false,
+          "offset": {
+            "x": -103,
+            "y": 121
+          }
+        },
+        {
+          "key": {
+            "zh": "直流电流(A)",
+            "en": "DC I(A)"
+          },
+          "value": "8",
+          "hidden": false,
+          "offset": {
+            "x": -103,
+            "y": 124
+          }
+        },
+        {
+          "key": {
+            "zh": "直流电压(V)",
+            "en": "DC V(V)"
+          },
+          "value": "20",
+          "hidden": false,
+          "offset": {
+            "x": -103,
+            "y": 124
+          }
+        }
+      ],
+      "status": {
+        "zh": "运行",
+        "en": "Running"
+      }
+    },
+    {
+      "id": "sw_dc",
+      "type": "switch",
+      "label": {
+        "zh": "直流断路器",
+        "en": "DC Breaker"
+      },
+      "position": {
+        "x": 606,
+        "y": 142.3
+      },
+      "sizeWorld": 96,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#ff7a6a",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [],
+      "status": {
+        "zh": "闭合",
+        "en": "Closed"
+      }
+    },
+    {
+      "id": "bms_1",
+      "type": "bms",
+      "label": {
+        "zh": "电池",
+        "en": "Battery"
+      },
+      "position": {
+        "x": 806.4,
+        "y": 142.3
+      },
+      "sizeWorld": 105,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#3aa0ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "SOC(%)",
+            "en": "SOC(%)"
+          },
+          "value": 55,
+          "hidden": false,
+          "offset": {
+            "x": -1.3,
+            "y": 25
+          }
+        }
+      ],
+      "status": {
+        "zh": "充电",
+        "en": "Charging"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "bus_1",
+      "to": "sw_ac",
+      "edgeType": "pipe_blue",
+      "edgeTypeLabel": {
+        "zh": "蓝光管道",
+        "en": "Blue Pipe"
+      },
+      "color": "#3aa0ff",
+      "dash": [],
+      "route": "smart",
+      "dir": "forward",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true
+    },
+    {
+      "from": "sw_ac",
+      "to": "pcs_1",
+      "edgeType": "ac_power",
+      "edgeTypeLabel": {
+        "zh": "交流电力",
+        "en": "AC Power"
+      },
+      "color": "#e74c3c",
+      "dash": [],
+      "route": "line",
+      "dir": "forward",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true
+    },
+    {
+      "from": "pcs_1",
+      "to": "sw_dc",
+      "edgeType": "dc_power",
+      "edgeTypeLabel": {
+        "zh": "直流电力",
+        "en": "DC Power"
+      },
+      "color": "#e67e22",
+      "dash": [],
+      "route": "line",
+      "dir": "forward",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true
+    },
+    {
+      "from": "sw_dc",
+      "to": "bms_1",
+      "edgeType": "pipe_blue",
+      "edgeTypeLabel": {
+        "zh": "蓝光管道",
+        "en": "Blue Pipe"
+      },
+      "color": "#3aa0ff",
+      "dash": [],
+      "route": "smart",
+      "dir": "both",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true
+    }
+  ]
+}

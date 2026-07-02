@@ -570,7 +570,7 @@ async function importCanvasJSON(obj){
   }
   // 7) 收尾：清路由缓存，重置历史，提示结果
   showPanel('none');
-  _pathCacheSig='';
+  invalidateRouting();
   updateAlignBar();
   history=[];histIdx=-1;snapshot();
   if(panelOpen)renderSimPanel();

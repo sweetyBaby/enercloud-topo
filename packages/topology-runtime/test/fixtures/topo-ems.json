@@ -1,0 +1,619 @@
+{
+  "schemaVersion": "2.0",
+  "meta": {
+    "app": "储能拓扑编辑器",
+    "generatedAt": "2026-06-17T01:20:17.177Z",
+    "lang": "zh",
+    "libraryRef": {
+      "name": "energy-topology",
+      "version": "2.0.0"
+    },
+    "canvas": {
+      "bgColor": "#0a1f40",
+      "zoom": 0.361,
+      "panX": 10.2,
+      "panY": 265.1,
+      "grid": {
+        "show": true,
+        "stepPx": 40
+      },
+      "showAnchors": true
+    },
+    "view": {
+      "showEdgeLabels": true,
+      "showFieldChips": true,
+      "globalWidth": 1,
+      "routeStyle": 3,
+      "busMerge": true,
+      "busMergeGap": 16,
+      "busTrunkBold": true,
+      "busStyle": "busbar",
+      "busShareTrunk": false,
+      "busAggregation": true
+    }
+  },
+  "edgeStyles": {
+    "ac_power": {
+      "labelZh": "交流电力",
+      "labelEn": "AC Power",
+      "color": "#e74c3c",
+      "width": 2.5,
+      "dash": [],
+      "anim": "flow",
+      "speed": 0.5
+    },
+    "discharge": {
+      "labelZh": "放电中",
+      "labelEn": "Discharging",
+      "color": "#3498db",
+      "width": 2.5,
+      "dash": [],
+      "anim": "flow",
+      "speed": 0.9
+    },
+    "pipe_blue": {
+      "labelZh": "蓝光管道",
+      "labelEn": "Blue Pipe",
+      "color": "#3aa0ff",
+      "width": 2.5,
+      "dash": [],
+      "anim": "pipe",
+      "speed": 0.7
+    }
+  },
+  "nodes": [
+    {
+      "id": "grid_1",
+      "type": "grid",
+      "label": {
+        "zh": "主电网",
+        "en": "Grid"
+      },
+      "position": {
+        "x": 929.2,
+        "y": 861.2
+      },
+      "sizeWorld": 297,
+      "scale": 0.8397491466442988,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#e8f4ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "P(kW)",
+            "en": "P(kW)"
+          },
+          "value": "20",
+          "hidden": false,
+          "offset": {
+            "x": -101,
+            "y": -50
+          }
+        }
+      ],
+      "status": {
+        "zh": "在线",
+        "en": "Online"
+      }
+    },
+    {
+      "id": "meter_1",
+      "type": "meter2",
+      "label": {
+        "zh": "关口表",
+        "en": "Gateway Meter"
+      },
+      "position": {
+        "x": 1592.5,
+        "y": 1186
+      },
+      "sizeWorld": 266,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#e8f4ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "P(kW)",
+            "en": "P(kW)"
+          },
+          "value": "8",
+          "hidden": false,
+          "offset": {
+            "x": -100,
+            "y": 103
+          }
+        }
+      ],
+      "status": {
+        "zh": "在线",
+        "en": "Online"
+      }
+    },
+    {
+      "id": "meter_2",
+      "type": "meter2",
+      "label": {
+        "zh": "并网表",
+        "en": "Grid-tie Meter"
+      },
+      "position": {
+        "x": 1035.4,
+        "y": 1186
+      },
+      "sizeWorld": 266,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#e8f4ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "P(kW)",
+            "en": "P(kW)"
+          },
+          "value": "8",
+          "hidden": false,
+          "offset": {
+            "x": -103,
+            "y": 106
+          }
+        }
+      ],
+      "status": {
+        "zh": "在线",
+        "en": "Online"
+      }
+    },
+    {
+      "id": "load_1",
+      "type": "load",
+      "label": {
+        "zh": "用户负载",
+        "en": "Load"
+      },
+      "position": {
+        "x": 1416.1,
+        "y": 411.4
+      },
+      "sizeWorld": 292,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#e8f4ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "负载功率(kW)",
+            "en": "Load(kW)"
+          },
+          "value": "10",
+          "hidden": false,
+          "offset": {
+            "x": -122,
+            "y": -28
+          }
+        }
+      ],
+      "status": {
+        "zh": "在线",
+        "en": "Online"
+      }
+    },
+    {
+      "id": "bus_1",
+      "type": "busbar",
+      "label": {
+        "zh": "交流母线",
+        "en": "AC Busbar"
+      },
+      "position": {
+        "x": 1409.1,
+        "y": 853.7
+      },
+      "sizeWorld": 310,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#4dd0ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "母线电压(V)",
+            "en": "Bus V(V)"
+          },
+          "value": 782,
+          "hidden": false,
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      ],
+      "status": {
+        "zh": "在线",
+        "en": "Online"
+      }
+    },
+    {
+      "id": "c1",
+      "type": "cabinet",
+      "label": {
+        "zh": "1#柜",
+        "en": "Rack 1"
+      },
+      "position": {
+        "x": 2041.3,
+        "y": 237.7
+      },
+      "sizeWorld": 283,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#3aa0ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "平均温度(℃)",
+            "en": "Temp(℃)"
+          },
+          "value": 25,
+          "hidden": false,
+          "offset": {
+            "x": -17.7,
+            "y": 0
+          }
+        },
+        {
+          "key": {
+            "zh": "SOC(%)",
+            "en": "SOC(%)"
+          },
+          "value": 53,
+          "hidden": false,
+          "offset": {
+            "x": -17.7,
+            "y": 0
+          }
+        }
+      ],
+      "status": {
+        "zh": "并网运行",
+        "en": "Grid-tied"
+      }
+    },
+    {
+      "id": "c2",
+      "type": "cabinet",
+      "label": {
+        "zh": "2#柜",
+        "en": "Rack 2"
+      },
+      "position": {
+        "x": 2041.3,
+        "y": 584.3
+      },
+      "sizeWorld": 283,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#3aa0ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "平均温度(℃)",
+            "en": "Temp(℃)"
+          },
+          "value": 26,
+          "hidden": false,
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "key": {
+            "zh": "SOC(%)",
+            "en": "SOC(%)"
+          },
+          "value": 53,
+          "hidden": false,
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      ],
+      "status": {
+        "zh": "并网运行",
+        "en": "Grid-tied"
+      }
+    },
+    {
+      "id": "c3",
+      "type": "cabinet",
+      "label": {
+        "zh": "3#柜",
+        "en": "Rack 3"
+      },
+      "position": {
+        "x": 2041.3,
+        "y": 930.9
+      },
+      "sizeWorld": 283,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#3aa0ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "平均温度(℃)",
+            "en": "Temp(℃)"
+          },
+          "value": 26,
+          "hidden": false,
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "key": {
+            "zh": "SOC(%)",
+            "en": "SOC(%)"
+          },
+          "value": 53,
+          "hidden": false,
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      ],
+      "status": {
+        "zh": "并网运行",
+        "en": "Grid-tied"
+      }
+    },
+    {
+      "id": "c4",
+      "type": "cabinet",
+      "label": {
+        "zh": "4#柜",
+        "en": "Rack 4"
+      },
+      "position": {
+        "x": 2041.3,
+        "y": 1277.5
+      },
+      "sizeWorld": 283,
+      "scale": 1,
+      "rotation": 0,
+      "fontSize": 14,
+      "fontColor": "#3aa0ff",
+      "display": {
+        "showLabel": true,
+        "showFields": true
+      },
+      "data": [
+        {
+          "key": {
+            "zh": "平均温度(℃)",
+            "en": "Temp(℃)"
+          },
+          "value": 26,
+          "hidden": false,
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "key": {
+            "zh": "SOC(%)",
+            "en": "SOC(%)"
+          },
+          "value": 53,
+          "hidden": false,
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      ],
+      "status": {
+        "zh": "并网运行",
+        "en": "Grid-tied"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "grid_1",
+      "to": "bus_1",
+      "edgeType": "ac_power",
+      "edgeTypeLabel": {
+        "zh": "交流电力",
+        "en": "AC Power"
+      },
+      "color": "#e74c3c",
+      "dash": [],
+      "route": "smart",
+      "dir": "forward",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true
+    },
+    {
+      "from": "meter_1",
+      "to": "bus_1",
+      "edgeType": "ac_power",
+      "edgeTypeLabel": {
+        "zh": "交流电力",
+        "en": "AC Power"
+      },
+      "color": "#e74c3c",
+      "dash": [],
+      "route": "line",
+      "dir": "forward",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true
+    },
+    {
+      "from": "meter_2",
+      "to": "bus_1",
+      "edgeType": "ac_power",
+      "edgeTypeLabel": {
+        "zh": "交流电力",
+        "en": "AC Power"
+      },
+      "color": "#e74c3c",
+      "dash": [],
+      "route": "line",
+      "dir": "forward",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true
+    },
+    {
+      "from": "bus_1",
+      "to": "load_1",
+      "edgeType": "discharge",
+      "edgeTypeLabel": {
+        "zh": "放电中",
+        "en": "Discharging"
+      },
+      "color": "#3498db",
+      "dash": [],
+      "route": "smart",
+      "dir": "forward",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true
+    },
+    {
+      "from": "bus_1",
+      "to": "c2",
+      "edgeType": "pipe_blue",
+      "edgeTypeLabel": {
+        "zh": "蓝光管道",
+        "en": "Blue Pipe"
+      },
+      "color": "#3aa0ff",
+      "dash": [],
+      "route": "line",
+      "dir": "both",
+      "width": 0.7,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true
+    },
+    {
+      "from": "bus_1",
+      "to": "c3",
+      "edgeType": "pipe_blue",
+      "edgeTypeLabel": {
+        "zh": "蓝光管道",
+        "en": "Blue Pipe"
+      },
+      "color": "#3aa0ff",
+      "dash": [],
+      "route": "line",
+      "dir": "both",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true
+    },
+    {
+      "from": "bus_1",
+      "to": "c4",
+      "edgeType": "pipe_blue",
+      "edgeTypeLabel": {
+        "zh": "蓝光管道",
+        "en": "Blue Pipe"
+      },
+      "color": "#3aa0ff",
+      "dash": [],
+      "route": "line",
+      "dir": "both",
+      "width": 0.7,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true
+    },
+    {
+      "from": "bus_1",
+      "to": "c1",
+      "edgeType": "pipe_blue",
+      "edgeTypeLabel": {
+        "zh": "蓝光管道",
+        "en": "Blue Pipe"
+      },
+      "color": "#3aa0ff",
+      "dash": [],
+      "route": "line",
+      "dir": "forward",
+      "width": 1,
+      "label": "",
+      "showLabel": true,
+      "orthoSnap": true,
+      "waypoints": [],
+      "active": true
+    }
+  ]
+}

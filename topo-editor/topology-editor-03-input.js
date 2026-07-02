@@ -34,7 +34,7 @@ function toggleGrid(){showGrid=!showGrid;}
 function toggleEdgeLabels(){showEdgeLabels=!showEdgeLabels;}
 function toggleFieldChips(){showFieldChips=!showFieldChips;}
 function toggleAnchors(){showAnchors=!showAnchors;}
-function toggleBusMerge(){busMerge=!busMerge;_pathCacheSig='';}
+function toggleBusMerge(){busMerge=!busMerge;invalidateRouting();}
 // 完整中英文对照表（界面静态文案）
 const I18N={
   '⚙ 规则与信号':'⚙ Rules & Signals',
@@ -184,8 +184,8 @@ canvas.addEventListener('mousedown',e=>{
     }
   }
   // 汇流主干拖动手柄优先检测
-  if(busMerge&&busShowHandles&&_busTrunks.length){
-    for(const t of _busTrunks){
+  if(busMerge&&busShowHandles&&TR.busTrunks().length){
+    for(const t of TR.busTrunks()){
       if(t._handle&&Math.hypot(wx-t._handle[0],wy-t._handle[1])<8/zoom){
         dragBus={t, startOff:busOffsets[t.bkey]||0, sx:wx, sy:wy};
         canvas.style.cursor='grabbing';return;
@@ -296,7 +296,7 @@ canvas.addEventListener('mousemove',e=>{
     if(e.shiftKey) deg=Math.round(deg/15)*15; // Shift 吸附 15°
     deg=((deg%360)+360)%360;
     dragRotate.n.rotation=Math.round(deg);
-    _pathCacheSig='';
+    invalidateRouting();
     const el=document.getElementById('p-rot');if(el){el.value=dragRotate.n.rotation;const v=document.getElementById('p-rot-v');if(v)v.textContent=dragRotate.n.rotation;}
     _hud={x:dragRotate.cx,y:dragRotate.cy,text:'∠ '+dragRotate.n.rotation+'°'};
     return;
@@ -307,7 +307,7 @@ canvas.addEventListener('mousemove',e=>{
     if(dragResize.isText){dragResize.n.fontSize=Math.max(8,Math.round(dragResize.startFont*ratio));
       if(dragResize.n.type==='variable'&&dragResize.startValFont!=null)dragResize.n.valFontSize=Math.max(8,Math.round(dragResize.startValFont*ratio));}
     else{dragResize.n.scale=Math.max(0.05,Math.min(8, dragResize.startScale*ratio));}
-    _pathCacheSig='';
+    invalidateRouting();
     if(selNode===dragResize.n.id){
       if(dragResize.isText){const el=document.getElementById('p-fs');if(el){el.value=dragResize.n.fontSize;const v=document.getElementById('p-fs-v');if(v)v.textContent=dragResize.n.fontSize;}}
       else{const el=document.getElementById('p-scale');if(el){el.value=Math.round(dragResize.n.scale*100);const v=document.getElementById('p-scale-v');if(v)v.textContent=Math.round(dragResize.n.scale*100);}}
@@ -327,7 +327,7 @@ canvas.addEventListener('mousemove',e=>{
       }
       else n.scale=Math.max(0.05,Math.min(8, snap[id].scale*ratio));
     });
-    _pathCacheSig='';
+    invalidateRouting();
     _hud={x:cx,y:cy,text:Math.round(ratio*100)+'%'};
     return;
   }
@@ -340,7 +340,7 @@ canvas.addEventListener('mousemove',e=>{
     let off=dragBus.startOff+delta;
     if(off<-(Math.max(0,busMergeGap-8)))off=-(Math.max(0,busMergeGap-8)); // 不要穿进节点
     busOffsets[t.bkey]=off;
-    _pathCacheSig='';
+    invalidateRouting();
     return;
   }
   if(rubber){rubber.x1=mouseWX;rubber.y1=mouseWY;return;}
@@ -356,7 +356,7 @@ canvas.addEventListener('mousemove',e=>{
     if(dragEndpoint.e[dragEndpoint.which]!==tgt || dragEndpoint.e[portKey]!==nextPort){
       dragEndpoint.e[dragEndpoint.which]=tgt;
       if(nextPort)dragEndpoint.e[portKey]=nextPort;else delete dragEndpoint.e[portKey];
-      _pathCacheSig='';
+      invalidateRouting();
     }
     canvas.style.cursor=(hv&&hv.id!==otherId)?'grabbing':'no-drop';
     return;
@@ -371,7 +371,7 @@ canvas.addEventListener('mousemove',e=>{
     // 1) 对齐其他节点中心线（横/竖）
     nodes.forEach(o=>{ tryX(o.x); tryY(usesTextBox(o.type)?o.y:(o.y-nsz(o)*0.22)); });
     // 2) 对齐/汇合其他连线：其拐点(同时命中X与Y即汇合为同一点) + 横平竖直段(对齐到同一通道)
-    edges.forEach(oe=>{ if(oe===dragWaypoint.e)return; const pp=_pathCache[oe._cacheKey]||oe._drawPts; if(!pp||pp.length<2)return;
+    edges.forEach(oe=>{ if(oe===dragWaypoint.e)return; const pp=TR.cachedPath(oe)||oe._drawPts; if(!pp||pp.length<2)return;
       pp.forEach(pt=>{ tryX(pt[0]); tryY(pt[1]); });
       for(let i=0;i<pp.length-1;i++){ const a=pp[i],b=pp[i+1];
         if(Math.abs(a[0]-b[0])<1) tryX(a[0]);   // 竖直段 → 对齐 X
@@ -385,7 +385,7 @@ canvas.addEventListener('mousemove',e=>{
     if(gx!=null)alignGuides.push({type:'v',x:gx});
     if(gy!=null)alignGuides.push({type:'h',y:gy});
     dragWaypoint.e.waypoints[dragWaypoint.i]=[px,py];
-    _pathCacheSig='';
+    invalidateRouting();
     return;
   }
   if(dragChipGroup){
@@ -444,15 +444,15 @@ canvas.addEventListener('mouseup',()=>{
     canvas.style.cursor='default';return;
   }
   if(isPanning){isPanning=false;canvas.style.cursor=edgeMode?'crosshair':'default';return;}
-  if(dragRotate){dragRotate=null;_hud=null;_pathCacheSig='';snapshot();canvas.style.cursor='default';return;}
-  if(dragResize){dragResize=null;_hud=null;_pathCacheSig='';snapshot();canvas.style.cursor='default';return;}
-  if(dragGroupScale){dragGroupScale=null;_hud=null;_pathCacheSig='';snapshot();canvas.style.cursor='default';return;}
-  if(dragBus){dragBus=null;_pathCacheSig='';canvas.style.cursor='default';return;}
+  if(dragRotate){dragRotate=null;_hud=null;invalidateRouting();snapshot();canvas.style.cursor='default';return;}
+  if(dragResize){dragResize=null;_hud=null;invalidateRouting();snapshot();canvas.style.cursor='default';return;}
+  if(dragGroupScale){dragGroupScale=null;_hud=null;invalidateRouting();snapshot();canvas.style.cursor='default';return;}
+  if(dragBus){dragBus=null;invalidateRouting();canvas.style.cursor='default';return;}
   if(dragEndpoint){
     const _e=dragEndpoint.e, portKey=dragEndpoint.which+'Port';
     const changed=_e[dragEndpoint.which]!==dragEndpoint.orig || _e[portKey]!==dragEndpoint.origPort;
     if(changed){ delete _e.waypoints; if(_e.route==='manual')_e.route='smart'; }   // 端点变了→旧拐点作废，重新走线
-    dragEndpoint=null;_pathCacheSig='';canvas.style.cursor='default';
+    dragEndpoint=null;invalidateRouting();canvas.style.cursor='default';
     if(changed){snapshot();flashHint('已重连该端');}
     return;
   }
@@ -461,16 +461,16 @@ canvas.addEventListener('mouseup',()=>{
     // 恢复原始路由，不把直线变成折线
     if(_dw.fromCorner && Math.hypot(mouseWX-_dw.sx, mouseWY-_dw.sy)<8/zoom){
       _e.route=_dw.savedRoute; if(_dw.savedWP){_e.waypoints=_dw.savedWP;}else{delete _e.waypoints;}
-      _pathCacheSig='';canvas.style.cursor='default';return;
+      invalidateRouting();canvas.style.cursor='default';return;
     }
     simplifyWaypoints(_e);
     // 把存储拐点同步为「实际渲染后的正交拐点」：强制正交会让线在直角处转弯而非原始点，
     // 不同步就会残留偏离线条的孤立手柄、并越拖越多。同步后手柄恒在线上、抓取即命中。
-    _pathCacheSig=''; const rp=edgePath(_e); if(rp&&rp.length>2){ _e.waypoints=rp.slice(1,-1).map(p=>p.slice()); simplifyWaypoints(_e); autoAttachLooseEdgeEnds(_e); dropOverroutedManualWaypoints(_e); }
-    _pathCacheSig='';snapshot();canvas.style.cursor='default';return;}
+    invalidateRouting(); const rp=edgePath(_e); if(rp&&rp.length>2){ _e.waypoints=rp.slice(1,-1).map(p=>p.slice()); simplifyWaypoints(_e); autoAttachLooseEdgeEnds(_e); dropOverroutedManualWaypoints(_e); }
+    invalidateRouting();snapshot();canvas.style.cursor='default';return;}
   if(dragChipGroup){dragChipGroup=null;snapshot();canvas.style.cursor='default';return;}
   if(dragChip){dragChip=null;snapshot();canvas.style.cursor='default';return;}
-  if(dragNode){suppressNodeActionClick=true;setTimeout(()=>{suppressNodeActionClick=false;},0);_dragging=false;_groupDrag=false;_dragIds=new Set();_pathCacheSig='';alignGuides=[];snapshot();}
+  if(dragNode){suppressNodeActionClick=true;setTimeout(()=>{suppressNodeActionClick=false;},0);_dragging=false;_groupDrag=false;_dragIds=new Set();invalidateRouting();alignGuides=[];snapshot();}
   dragNode=null;canvas.style.cursor=edgeMode?'crosshair':'default';
 });
 canvas.addEventListener('mouseleave',()=>{dragNode=null;isPanning=false;});
@@ -504,7 +504,7 @@ canvas.addEventListener('dblclick',e=>{
       snapshot();
       selEdge.waypoints.splice(wi,1);
       if(selEdge.waypoints.length===0){selEdge.route='straight';delete selEdge.waypoints;}
-      _pathCacheSig='';snapshot();
+      invalidateRouting();snapshot();
       return;
     }
   }

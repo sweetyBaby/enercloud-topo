@@ -5,7 +5,7 @@ function rgba(h,a){const[r,g,b]=hexRgb(h);return`rgba(${r},${g},${b},${a})`;}
 // 汇合/分支「电气节点」：在多条连线交汇于同一点、或某连线端点接入另一条连线处，画一个实心点，
 // 让"两线并为一处""线路在此分支/接入"一目了然（拖动对齐到同一通道、自动汇合后即出现该节点点）。
 function drawJunctionDots(){
-  const paths=[]; edges.forEach(e=>{ if(_dyn.hiddenEdges.has(e))return; const p=_pathCache[e._cacheKey]||e._drawPts; if(p&&p.length>=2) paths.push({e,p,col:(ET[e.et]||ET.ac_power).color}); });
+  const paths=[]; edges.forEach(e=>{ if(_dyn.hiddenEdges.has(e))return; const p=TR.cachedPath(e)||e._drawPts; if(p&&p.length>=2) paths.push({e,p,col:(ET[e.et]||ET.ac_power).color}); });
   if(paths.length<2)return;
   const EPS=4/zoom, dots=[];
   const add=(x,y,col)=>{ for(const d of dots){ if(Math.abs(d.x-x)<EPS&&Math.abs(d.y-y)<EPS)return; } dots.push({x,y,col}); };
@@ -50,9 +50,9 @@ function drawAll(){
   const _interacting=_dragging||dragBus||dragResize||dragGroupScale||dragRotate||dragChip||dragChipGroup||dragWaypoint||dragEndpoint||rubber;
   // 汇流主干：连线本身已共用同一段路径形成主干，无需再画额外母线条（避免残段/近距离平行线/断线）。
   // 仅在需要时绘制一个可拖动微调的中点手柄。
-  if(busMerge&&_busTrunks.length&&!_interacting&&busShowHandles){
+  if(busMerge&&TR.busTrunks().length&&!_interacting&&busShowHandles){
     ctx.save();
-    _busTrunks.forEach(t=>{
+    TR.busTrunks().forEach(t=>{
       const midP=t.horiz?[(t.a+t.b)/2,t.y]:[t.x,(t.a+t.b)/2];
       t._handle=midP;
       ctx.globalAlpha=0.8;ctx.fillStyle='#fff';ctx.strokeStyle=t.color;ctx.lineWidth=2/zoom;

@@ -270,7 +270,7 @@ function applyNP(){
   n.fontSize=parseInt(document.getElementById('p-fs').value);document.getElementById('p-fs-v').textContent=n.fontSize;
   n.scale=parseInt(document.getElementById('p-scale').value)/100;document.getElementById('p-scale-v').textContent=Math.round(n.scale*100);
   n.rotation=parseInt(document.getElementById('p-rot').value);document.getElementById('p-rot-v').textContent=n.rotation;
-  _pathCacheSig='';
+  invalidateRouting();
   n.fontColor=document.getElementById('p-fc').value;document.getElementById('p-fc-hex').value=n.fontColor;
 }
 function syncColor(id,v){if(/^#[0-9a-fA-F]{6}$/.test(v)){document.getElementById(id).value=v;applyNP();}}
@@ -303,7 +303,7 @@ function applyEP(){
   selEdge.hideLabel=!document.getElementById('ep-showlbl').checked;
   selEdge.orthoSnap=document.getElementById('ep-ortho').checked;
   document.getElementById('ep-ortho-row').style.display=(selEdge.route==='manual')?'block':'none';
-  _pathCacheSig='';
+  invalidateRouting();
   const base=ET[selEdge.et]||ET.ac_power,cfg=edgeCfg(selEdge);
   if(!selEdge.lineColor)document.getElementById('ep-color').value=base.color;
   document.getElementById('ep-desc').textContent=base.desc;document.getElementById('ep-desc').style.color=cfg.color;updateEpTypeSwatch();snapshot();
@@ -494,7 +494,7 @@ function openGlobalBind(idx){
   document.getElementById('fb-loc').onchange=()=>fillField('');
   fillLoc(curLoc,curField);
 }
-function clearGlobalBind(idx){const s=(customSignals||[])[idx];if(s)delete s.bind;closeFieldBind();renderCustomSignals();_pathCacheSig='';}
+function clearGlobalBind(idx){const s=(customSignals||[])[idx];if(s)delete s.bind;closeFieldBind();renderCustomSignals();invalidateRouting();}
 function confirmGlobalBind(idx){
   const s=(customSignals||[])[idx];if(!s)return;
   const devSel=document.getElementById('fb-dev'),loc=document.getElementById('fb-loc').value,field=document.getElementById('fb-field').value;
@@ -502,7 +502,7 @@ function confirmGlobalBind(idx){
   if(!loc||!field){flashHint('请选择分类与字段');return;}
   const o=devSel.selectedOptions[0],did=devSel.value,dt=o&&o.getAttribute('data-dt');
   s.bind={field:loc+'.'+field, deviceId:did, deviceType:dt||''};
-  closeFieldBind();renderCustomSignals();_pathCacheSig='';
+  closeFieldBind();renderCustomSignals();invalidateRouting();
 }
 function resetRotation(){const n=nodes.find(x=>x.id===selNode);if(!n)return;snapshot();n.rotation=0;document.getElementById('p-rot').value=0;document.getElementById('p-rot-v').textContent=0;snapshot();}
 function resetFieldPos(){const n=nodes.find(x=>x.id===selNode);if(!n||!n.data)return;snapshot();n.data.forEach(f=>{f.ox=0;f.oy=0;});snapshot();}
@@ -718,7 +718,7 @@ function alignSel(mode){
     const gcy=(Math.min(...ns.map(top))+Math.max(...ns.map(bot)))/2;
     const d=wcy-gcy; ns.forEach(n=>n.y+=d);
   }
-  _pathCacheSig='';snapshot();
+  invalidateRouting();snapshot();
 }
 function rmDF(i){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.data.splice(i,1);renderDFs(n);}
 function updDF(i,prop,v,el){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.data[i][prop]=v;
@@ -734,7 +734,7 @@ function refreshFieldNameValidity(n){
     if(ens[i])ens[i].classList.toggle('df-invalid',s.emptyEn||s.dupEn);
   });
 }
-function updDFVal(i,v){const n=nodes.find(x=>x.id===selNode);if(!n||!n.data[i])return;n.data[i].dv=v.trim();_pathCacheSig='';}
+function updDFVal(i,v){const n=nodes.find(x=>x.id===selNode);if(!n||!n.data[i])return;n.data[i].dv=v.trim();invalidateRouting();}
 
 function toggleEdgeMode(){
   edgeMode=!edgeMode;edgeFrom=null;edgeFromPort=null;
@@ -799,7 +799,7 @@ function pasteClipboard(){
   // 选中新粘贴的元素
   selSet=new Set(newIds);selChips.clear();
   if(newIds.length===1){selectNode(newIds[0]);}else{selNode=selEdge=null;showPanel('none');}
-  updateAlignBar();_pathCacheSig='';snapshot();
+  updateAlignBar();invalidateRouting();snapshot();
   flashHint('已粘贴 '+newIds.length+' 个元素');
 }
 let _hintTimer=null;
@@ -836,19 +836,7 @@ async function clearAll(){
 // 一键自动布局（分层 + 同层均布 + 重心排序，减少交叉）
 // ══════════════════════════════════════════════
 // 一键整理连线：智能选择走线（无障碍走直线，否则正交），并触发汇流合并，减少画面线条
-// 线段相交判定（用于统计连线交叉）
-function segsCross(a,b,c,d){
-  function ccw(p,q,r){return (r[1]-p[1])*(q[0]-p[0]) - (q[1]-p[1])*(r[0]-p[0]);}
-  const d1=ccw(c,d,a),d2=ccw(c,d,b),d3=ccw(a,b,c),d4=ccw(a,b,d);
-  if(((d1>0&&d2<0)||(d1<0&&d2>0))&&((d3>0&&d4<0)||(d3<0&&d4>0)))return true;
-  return false;
-}
-function pathsCross(p1,p2){
-  for(let i=0;i<p1.length-1;i++)for(let j=0;j<p2.length-1;j++){
-    if(segsCross(p1[i],p1[i+1],p2[j],p2[j+1]))return true;
-  }
-  return false;
-}
+// 线段相交判定 segsCross/pathsCross 已抽到 packages/topology-runtime（经 04 接线层落回全局）
 function countCrossings(){
   let n=0;
   const paths=edges.map(e=>edgePath(e)).filter(Boolean);
@@ -863,7 +851,7 @@ function tidyEdges(){
   busMerge=true;
   busAggregation=false;
   applyTidyRouting();
-  _pathCacheSig='';snapshot();
+  invalidateRouting();snapshot();
   flashHint('已整理连线：自动吸附端口 · 最短避障路径（剩余交叉 '+_countCrossRaw()+'）');
 }
 // 一键直线走线：直线优先，遇障碍/交叉自动转最优 L 型正交路线（不改线型/颜色）
@@ -872,7 +860,7 @@ function straightenAllEdges(){
   snapshot();
   busAggregation=false;
   applyTidyRouting();
-  _pathCacheSig='';snapshot();
+  invalidateRouting();snapshot();
   flashHint('已直线走线 · 遇障/交叉转最优L型 · 剩余交叉 '+_countCrossRaw());
 }
 // 在给定节点子集内做分层布局（列=层级、重心排序、中位对齐、叶子对齐），就地设置 x,y（局部坐标）
@@ -992,8 +980,8 @@ function ctxConn(){if(!edgeMode){toggleEdgeMode();}edgeFrom=ctxTgt.id;edgeFromPo
 function ctxDelEdge(){snapshot();edges=edges.filter(e=>e!==ctxTgt);selEdge=null;snapshot();showPanel('none');document.getElementById('ctxmenu').style.display='none';}
 function ctxDel(){if(ctxKind==='node'){selNode=ctxTgt.id;deleteSelected();}else{selEdge=ctxTgt;delEdge();}document.getElementById('ctxmenu').style.display='none';}
 function ctxCopy(){document.getElementById('ctxmenu').style.display='none';if(ctxKind==='node'){selSet.clear();selChips.clear();selectNode(ctxTgt.id);copySelection();pasteClipboard();}}
-function ctxStraight(){document.getElementById('ctxmenu').style.display='none';if(ctxKind==='edge'){snapshot();ctxTgt.route='smart';delete ctxTgt.waypoints;_pathCacheSig='';snapshot();selectEdge(ctxTgt);flashHint('该连线已重置为智能走线（最短·自动避障）');}}
-function ctxLine(){document.getElementById('ctxmenu').style.display='none';if(ctxKind==='edge'){snapshot();ctxTgt.route='line';delete ctxTgt.waypoints;delete ctxTgt.orthoDir;_pathCacheSig='';snapshot();selectEdge(ctxTgt);flashHint('该连线已设为直线（起止直连）');}}
+function ctxStraight(){document.getElementById('ctxmenu').style.display='none';if(ctxKind==='edge'){snapshot();ctxTgt.route='smart';delete ctxTgt.waypoints;invalidateRouting();snapshot();selectEdge(ctxTgt);flashHint('该连线已重置为智能走线（最短·自动避障）');}}
+function ctxLine(){document.getElementById('ctxmenu').style.display='none';if(ctxKind==='edge'){snapshot();ctxTgt.route='line';delete ctxTgt.waypoints;delete ctxTgt.orthoDir;invalidateRouting();snapshot();selectEdge(ctxTgt);flashHint('该连线已设为直线（起止直连）');}}
 
 function closeBgPanel(){const p=document.getElementById('bgpanel'),ov=document.getElementById('bgpanel-overlay');if(p)p.classList.remove('show');if(ov)ov.classList.remove('show');}
 function toggleBgPanel(){

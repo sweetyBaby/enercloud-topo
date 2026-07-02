@@ -479,6 +479,9 @@
 </div></div>
 
 <script src="topo-editor/topology-editor-icons.js"></script>
+<!-- headless 核心（几何/布线/规则单一事实源，与前端渲染器共同消费）：必须先于 01→12 加载 -->
+<script src="packages/topology-runtime/topology-runtime.js"></script>
+<script src="packages/topology-runtime/rules.js"></script>
 <!-- topology-editor 已按逻辑拆分为 01→11 有序片段；顺序即执行顺序，共享同一全局作用域，等价于原单文件，不可乱序 -->
 <script src="topo-editor/topology-editor-01-core.js"></script>
 <script src="topo-editor/topology-editor-02-toolbar.js"></script>

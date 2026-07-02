@@ -281,21 +281,13 @@ function _countCrossRaw(){
   for(let i=0;i<paths.length;i++)for(let j=i+1;j<paths.length;j++){if(pathsCross(paths[i],paths[j]))n++;}
   return n;
 }
-// 基于「实际渲染路径」（含汇流合并）统计交叉——这才是用户看到的结果
-function _countCrossRendered(){
-  _pathCacheSig=''; recomputeAllPaths();
-  const paths=edges.map(e=>_pathCache[e._cacheKey]).filter(Boolean);
-  let n=0;
-  for(let i=0;i<paths.length;i++)for(let j=i+1;j<paths.length;j++){if(pathsCross(paths[i],paths[j]))n++;}
-  return n;
-}
 function applyTidyRouting(){
   // 交给智能路由引擎统一计算：重算端口 · 最短避障 · 少交叉
   resetEdgeRoutingForAutoLayout(edges);
-  _pathCacheSig=''; recomputeAllPaths();
+  invalidateRouting(); recomputeAllPaths();
 }
 function _countCrossRendered(){ return _countCross(); }
-function setRouteStyle(s){ routeStyle=parseInt(s); applyTidyRouting(); _pathCacheSig=''; snapshot();
+function setRouteStyle(s){ routeStyle=parseInt(s); applyTidyRouting(); invalidateRouting(); snapshot();
   document.querySelectorAll('#seg-route .seg-btn').forEach(b=>b.classList.toggle('active',parseInt(b.dataset.rs)===routeStyle));
   flashHint(['','全部正交走线','直连优先','智能(默认)'][routeStyle]+' · 剩余交叉 '+_countCross()); }
 

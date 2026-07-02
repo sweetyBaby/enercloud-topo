@@ -5,39 +5,15 @@ const RULE_OPS=[{v:'>=',t:'≥'},{v:'<=',t:'≤'},{v:'>',t:'>'},{v:'<',t:'<'},{v
   {v:'in',t:'属于'},{v:'between',t:'区间'},{v:'truthy',t:'为真'},{v:'falsy',t:'为假'},{v:'exists',t:'存在'}];
 const RULE_DIRS=[{v:'forward',t:'正向 →'},{v:'reverse',t:'反向 ←'},{v:'both',t:'双向 ↔'},{v:'none',t:'无流向'}];
 const _OPT={'>=':'≥','<=':'≤','>':'>','<':'<','==':'=','!=':'≠','in':'∈','between':'∈区间','truthy':'为真','falsy':'为假','exists':'存在'};
-function _num(x){if(typeof x==='number')return x;if(typeof x==='boolean')return x?1:0;const f=parseFloat(x);return isNaN(f)?NaN:f;}
-function _looseEq(a,b){if(a===b)return true;const na=_num(a),nb=_num(b);if(!isNaN(na)&&!isNaN(nb))return na===nb;return String(a)===String(b);}
-function _toList(rv){if(Array.isArray(rv))return rv;return String(rv==null?'':rv).split(',').map(s=>s.trim()).filter(s=>s!=='');}
+// 规则求值核心（_num/_looseEq/_toList/cmpOp/evalCond）已抽到
+// packages/topology-runtime/rules.js（headless 单一事实源，前端渲染器同源消费），
+// 此处落回原全局名，编辑器预览与线上求值逐字同一套逻辑。
+const _num=TopoRules._num, _looseEq=TopoRules._looseEq, _toList=TopoRules._toList,
+      cmpOp=TopoRules.cmpOp, evalCond=TopoRules.evalCond;
+['_num','_looseEq','_toList','cmpOp','evalCond'].forEach(k=>{
+  if(typeof TopoRules[k]!=='function')throw new Error('topology-runtime/rules 接线断言失败:缺少「'+k+'」');
+});
 function autoNum(v){if(typeof v!=='string')return v;const t=v.trim();if(t==='')return '';if(t==='true')return true;if(t==='false')return false;if(/^-?\d+(\.\d+)?$/.test(t))return parseFloat(t);return v;}
-// 单条件求值
-function cmpOp(lv,op,rv){
-  switch(op){
-    case '==': return _looseEq(lv,rv);
-    case '!=': return !_looseEq(lv,rv);
-    case '>':  return _num(lv)>_num(rv);
-    case '>=': return _num(lv)>=_num(rv);
-    case '<':  return _num(lv)<_num(rv);
-    case '<=': return _num(lv)<=_num(rv);
-    case 'truthy': return !!lv && lv!=='false' && lv!=='0';
-    case 'falsy':  return !lv || lv==='false' || lv==='0';
-    case 'exists': return lv!==undefined && lv!==null && lv!=='';
-    case 'in':     return _toList(rv).some(x=>_looseEq(lv,x));
-    case 'between':{const a=_toList(rv).map(_num);if(a.length<2)return false;return _num(lv)>=Math.min(a[0],a[1])&&_num(lv)<=Math.max(a[0],a[1]);}
-    default: return true;
-  }
-}
-// 条件树求值：null/无条件 → true；支持 all/any/not + 叶子{var,op,val|ref}
-function evalCond(cond, ctx){
-  if(cond==null)return true;
-  if(typeof cond!=='object')return !!cond;
-  if(Array.isArray(cond.all))return cond.all.every(c=>evalCond(c,ctx));
-  if(Array.isArray(cond.any))return cond.any.some(c=>evalCond(c,ctx));
-  if(cond.not!=null)return !evalCond(cond.not,ctx);
-  if(cond.var==null)return true;
-  const lv=ctx[cond.var];
-  const rv=(cond.ref!=null)?ctx[cond.ref]:cond.val;
-  return cmpOp(lv,cond.op||'truthy',rv);
-}
 // 汇总当前画布全部可用信号：节点字段(id.字段) + 自定义全局信号（status/online 已移除）
 function collectSignals(){
   const out=[],seen=new Set();
@@ -469,7 +445,7 @@ function afterRuleChange(ref){
     if(ref===selEdge)refreshEdgeRuleSummary(ref);
   }
   renderRulesList();
-  _pathCacheSig='';
+  invalidateRouting();
 }
 // 规则总览：增/删/改入口（与属性面板共用同一套编辑器与数据）
 function openRuleEditor(kind, ref){
@@ -604,7 +580,7 @@ function toggleRunView(on){
   const cb=document.getElementById('sim-runview');if(cb)cb.checked=previewMode;
   const b=document.getElementById('btn-runview');
   if(b){b.classList.toggle('act',previewMode);b.textContent=previewMode?(lang==='en'?'■ Exit Preview':'■ 退出预览'):(lang==='en'?'▶ Preview':'▶ 预览效果');}
-  _pathCacheSig='';
+  invalidateRouting();
 }
 // 兼容旧入口名
 function togglePreview(){ toggleSigPanel(); }
@@ -841,14 +817,14 @@ function renderCustomSignals(){
   const gi=globalSigIssues();
   customSignals.forEach((s,idx)=>{
     const iss=gi[idx]||{};
-    const zh=document.createElement('input');zh.className='df-zh-in'+((iss.emptyZh||iss.dupZh)?' df-invalid':'');zh.value=s.key||'';zh.placeholder='中文名(必填)';zh.title=iss.dupZh?'中文名重复（全局唯一）':'中文名（必填）';zh.oninput=e=>{s.key=e.target.value;refreshGlobalSigValidity();_pathCacheSig='';};
-    const en=document.createElement('input');en.className='df-en-in'+((iss.emptyEn||iss.dupEn)?' df-invalid':'');en.value=s.keyEn||'';en.placeholder='英文名(必填)';en.title=iss.dupEn?'英文名重复（全局唯一·作信号键会冲突）':'英文名（必填·作信号键）';en.oninput=e=>{s.keyEn=e.target.value;refreshGlobalSigValidity();_pathCacheSig='';};
+    const zh=document.createElement('input');zh.className='df-zh-in'+((iss.emptyZh||iss.dupZh)?' df-invalid':'');zh.value=s.key||'';zh.placeholder='中文名(必填)';zh.title=iss.dupZh?'中文名重复（全局唯一）':'中文名（必填）';zh.oninput=e=>{s.key=e.target.value;refreshGlobalSigValidity();invalidateRouting();};
+    const en=document.createElement('input');en.className='df-en-in'+((iss.emptyEn||iss.dupEn)?' df-invalid':'');en.value=s.keyEn||'';en.placeholder='英文名(必填)';en.title=iss.dupEn?'英文名重复（全局唯一·作信号键会冲突）':'英文名（必填·作信号键）';en.oninput=e=>{s.keyEn=e.target.value;refreshGlobalSigValidity();invalidateRouting();};
     // 默认值：与数据字段一致的普通输入框（类型按值自动推断，无需单列）
-    const dv=document.createElement('input');dv.className='df-val-in';dv.value=(s.dv==null?'':String(s.dv));dv.placeholder='--';dv.title='默认值（可留空）';dv.oninput=e=>{s.dv=e.target.value;_pathCacheSig='';};
+    const dv=document.createElement('input');dv.className='df-val-in';dv.value=(s.dv==null?'':String(s.dv));dv.placeholder='--';dv.title='默认值（可留空）';dv.oninput=e=>{s.dv=e.target.value;invalidateRouting();};
     const acts=document.createElement('span');acts.className='df-acts';
     const bound=!!(s.bind&&s.bind.field);
     const bindBtn=document.createElement('button');bindBtn.type='button';bindBtn.className='df-bind'+(bound?' bound':'');bindBtn.textContent='🔗';bindBtn.title=bound?'已绑定后台字段，点击修改':'绑定后台字段';bindBtn.onclick=()=>openGlobalBind(idx);
-    const del=document.createElement('button');del.type='button';del.className='df-del';del.textContent='✕';del.title='删除信号';del.onclick=()=>{customSignals.splice(idx,1);renderSimPanel();_pathCacheSig='';};
+    const del=document.createElement('button');del.type='button';del.className='df-del';del.textContent='✕';del.title='删除信号';del.onclick=()=>{customSignals.splice(idx,1);renderSimPanel();invalidateRouting();};
     acts.appendChild(bindBtn);acts.appendChild(del);
     wrap.appendChild(zh);wrap.appendChild(en);wrap.appendChild(dv);wrap.appendChild(acts);
     if(bound){
@@ -876,7 +852,7 @@ function globalBindSummary(s){
 function addCustomSignal(){
   if(customSignals.some((s,i)=>!fieldNameOk(globalSigIssues()[i]))){flashHint(lang==='en'?'Fix existing global signal names (required & unique) before adding':'请先补全/修正现有全局信号的中英文名（必填且不可重复），再添加');return;}
   customSignals.push({key:'',keyEn:'',dv:''});   // 与数据字段一致：无类型列，默认值为普通文本(类型按值推断)
-  renderSimPanel();_pathCacheSig='';
+  renderSimPanel();invalidateRouting();
   const zhs=document.querySelectorAll('#sim-custom .df-zh-in');const last=zhs[zhs.length-1];if(last)last.focus();
 }
 function pasteSimJSON(){
