@@ -103,31 +103,18 @@ def build_icon_manifest(icons_dir: Path) -> dict:
             ng["devices"] = devices
             groups.append(ng)
     extras = sorted(f for f in existing if f not in referenced)
-    # 自动归组：未登记的图片按文件名前缀匹配已有元素类型（最长匹配），落到该类型所在分组；
-    #  例如 bms_charge.png → 前缀 bms → 归入「储能设备」。无任何匹配时才进「自定义图标」兜底。
-    type_to_group_idx = {}
-    for gi, g in enumerate(groups):
-        for d in g.get("devices", []):
-            type_to_group_idx[d["type"]] = gi
-    known_types = list(type_to_group_idx.keys())
-    custom_devices = []
+    # 未登记的图片（手动丢进 icons/ 的）→ 统一归入「未分组」；与 icon-store.js 的 reconcile 行为一致。
+    known_types = {d["type"] for g in groups for d in g.get("devices", [])}
+    ungrouped = []
     for f in extras:
         stem = Path(f).stem
-        if stem in type_to_group_idx:  # 与已有类型同名，跳过避免重复
+        if stem in known_types:  # 与已有类型同名，跳过避免重复
             continue
-        best = None
-        for t in known_types:
-            if stem.startswith(t + "_") and (best is None or len(t) > len(best)):
-                best = t
-        dev = {"type": stem, "label": stem, "label_en": stem, "badge": stem, "file": f}
-        if best is not None:
-            groups[type_to_group_idx[best]]["devices"].append(dev)
-        else:
-            custom_devices.append(dev)
-    if custom_devices:
+        ungrouped.append({"type": stem, "label": stem, "label_en": stem, "badge": stem, "file": f})
+    if ungrouped:
         groups.append({
-            "title": "自定义图标", "title_en": "Custom Icons", "color": "#42a5f5", "tab": "custom",
-            "devices": custom_devices,
+            "title": "未分组", "title_en": "Ungrouped", "color": "#8aa8c4", "tab": "device",
+            "devices": ungrouped,
         })
     out = dict(curated)
     out["groups"] = groups

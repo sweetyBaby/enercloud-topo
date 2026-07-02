@@ -3,7 +3,7 @@ const http = require('http');
 const path = require('path');
 const url = require('url');
 const { createTemplateApi } = require('./template-store');
-const { createIconApi } = require('./icon-store');
+const { createIconApi, buildManifest: buildIconManifest } = require('./icon-store');
 
 const root = path.resolve(__dirname, '..');
 const startPort = Number(process.env.PORT || 5173);
@@ -27,18 +27,8 @@ const types = {
   '.md': 'text/markdown; charset=utf-8',
 };
 
-// ───── 图标库：自动扫描 icons/ 目录，与 icons/index.json 合并 ─────
-//  · 替换图片（同名）→ 直接生效；删除图片 → 对应元素从面板移除；
-//  · 新增未登记的图片 → 自动归入「自定义图标」分组；无需改动任何代码。
+// ───── 图标库：清单由 icon-store.buildManifest 统一生成（扫描 icons/ + 合并 index.json；未登记图片归「未分组」） ─────
 const iconsDir = path.join(root, 'icons');
-const IMG_EXT = new Set(['.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp']);
-function listIconFiles() {
-  try {
-    return fs.readdirSync(iconsDir).filter((f) => IMG_EXT.has(path.extname(f).toLowerCase()));
-  } catch (err) {
-    return [];
-  }
-}
 // ───── 后台字段字典：扫描 dic/ 目录，按 deviceType 合并所有 *.json ─────
 //  每个字典文件形如 [{deviceType, location, fields:[...]}, ...]；增删改 dic/*.json 即自动反映。
 const dicDir = path.join(root, 'dic');
@@ -57,52 +47,6 @@ function buildDicManifest() {
     }
   }
   return out;
-}
-
-function buildIconManifest() {
-  let curated = { groups: [] };
-  try {
-    curated = JSON.parse(fs.readFileSync(path.join(iconsDir, 'index.json'), 'utf8'));
-  } catch (err) {
-    warn(`读取 icons/index.json 失败：${err.message}`);
-  }
-  const existing = new Set(listIconFiles());
-  const referenced = new Set();
-  const groups = (curated.groups || [])
-    .map((g) => {
-      const devices = (g.devices || []).filter((d) => {
-        if (!d.file) return true; // 纯绘制元素（文本框/变量节点）无图片，保留
-        if (existing.has(d.file)) {
-          referenced.add(d.file);
-          return true;
-        }
-        return false; // 图片已删除 → 该元素从面板移除
-      });
-      return Object.assign({}, g, { devices });
-    })
-    .filter((g) => g.devices.length); // 丢弃空分组
-  const extras = [...existing].filter((f) => !referenced.has(f)).sort();
-  // 自动归组：未登记的图片按文件名前缀匹配已有元素类型（最长匹配），落到该类型所在分组；
-  //  例如 bms_charge.png → 前缀 bms → 归入「储能设备」。无任何匹配时才进「自定义图标」兜底。
-  const typeToGroupIdx = {};
-  groups.forEach((g, gi) => (g.devices || []).forEach((d) => { typeToGroupIdx[d.type] = gi; }));
-  const knownTypes = Object.keys(typeToGroupIdx);
-  const customDevices = [];
-  extras.forEach((f) => {
-    const stem = f.replace(/\.[^.]+$/, '');
-    if (knownTypes.includes(stem)) return; // 与已有类型同名，跳过避免重复
-    let best = null;
-    for (const t of knownTypes) {
-      if (stem.startsWith(t + '_') && (!best || t.length > best.length)) best = t;
-    }
-    const dev = { type: stem, label: stem, label_en: stem, badge: stem, file: f };
-    if (best) groups[typeToGroupIdx[best]].devices.push(dev);
-    else customDevices.push(dev);
-  });
-  if (customDevices.length) {
-    groups.push({ title: '自定义图标', title_en: 'Custom Icons', color: '#42a5f5', tab: 'custom', devices: customDevices });
-  }
-  return Object.assign({}, curated, { groups });
 }
 
 function log(message) {
@@ -171,7 +115,7 @@ function createServer() {
       return iconApi.handle(req, res, pathname);
     }
     if (pathname === '/icons/index.json') {
-      return send(res, 200, JSON.stringify(buildIconManifest(), null, 2), types['.json']);
+      return send(res, 200, JSON.stringify(buildIconManifest(iconsDir), null, 2), types['.json']);
     }
     // 后台字段字典：扫描 dic/ 合并（增删改 dic/*.json 即自动反映）。device/* 走静态，内容变更经 no-store 重新拉取即可。
     if (pathname === '/dic/index.json') {

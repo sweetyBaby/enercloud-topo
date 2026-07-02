@@ -40,6 +40,16 @@
             "P(kW)",
             "频率(Hz)"
           ]
+        },
+        {
+          "type": "ems",
+          "label": "EMS系统",
+          "label_en": "EMS",
+          "badge": "ems",
+          "file": "ems.svg",
+          "data": [
+            "运行模式"
+          ]
         }
       ]
     },
@@ -325,16 +335,6 @@
       "tab": "device",
       "devices": [
         {
-          "type": "ems",
-          "label": "EMS系统",
-          "label_en": "EMS",
-          "badge": "ems",
-          "file": "ems.svg",
-          "data": [
-            "运行模式"
-          ]
-        },
-        {
           "type": "aircon",
           "label": "空调",
           "label_en": "HVAC",
@@ -467,6 +467,35 @@
           "label": "变量",
           "label_en": "Variable",
           "badge": "var"
+        }
+      ]
+    },
+    {
+      "title": "未分组",
+      "title_en": "Ungrouped",
+      "color": "#8aa8c4",
+      "tab": "device",
+      "devices": [
+        {
+          "type": "bms_charge",
+          "label": "bms_charge",
+          "label_en": "bms_charge",
+          "badge": "bms_charge",
+          "file": "bms_charge.png"
+        },
+        {
+          "type": "bms_discharge",
+          "label": "bms_discharge",
+          "label_en": "bms_discharge",
+          "badge": "bms_discharge",
+          "file": "bms_discharge.png"
+        },
+        {
+          "type": "bms_standby",
+          "label": "bms_standby",
+          "label_en": "bms_standby",
+          "badge": "bms_standby",
+          "file": "bms_standby.png"
         }
       ]
     }

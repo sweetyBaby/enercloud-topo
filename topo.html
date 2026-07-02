@@ -51,6 +51,7 @@
           <div class="mi" onclick="flashHint(saveDraftNow()?'草稿已保存':'草稿保存失败');closeMenus()" data-i18n="💾 保存草稿">💾 保存草稿</div>
           <div class="mi" onclick="restoreDraftManual();closeMenus()" data-i18n="↺ 恢复草稿">↺ 恢复草稿</div>
           <div class="mi" onclick="clearDraft();closeMenus()" data-i18n="🧹 清除草稿">🧹 清除草稿</div>
+          <div class="mi" onclick="openIconManager();closeMenus()" data-i18n="🗂 图标库管理">🗂 图标库管理</div>
           <div class="mi" onclick="dlAllIconsZip();closeMenus()" data-i18n="🗂 导出元素库包 (ZIP)">🗂 导出元素库包 (ZIP)</div>
         </div>
       </div>
@@ -442,6 +443,10 @@
     <label class="uf-label"><span class="df-tag df-en">EN</span> <span id="uf-en-label">英文名称</span> <span class="req" id="uf-en-req">*必填</span></label>
     <input type="text" id="un-en" placeholder="如：Custom Device">
   </div>
+  <div class="uf">
+    <label class="uf-label"><span>📁</span> <span id="uf-group-label">所属分组</span></label>
+    <select id="un-group"></select>
+  </div>
   <div id="ua"><button class="tb grn" id="ub-ok" onclick="confirmUp()">✓ 添加</button>
     <button class="tb red" id="ub-cancel" onclick="closeUp()">✕ 取消</button></div>
 </div></div>
@@ -450,10 +455,11 @@
 <div id="iconmgr-overlay"><div id="iconmgr-box">
   <div id="iconmgr-head">
     <h4 id="iconmgr-title">🗂 图标库管理</h4>
-    <button class="tb grn" id="iconmgr-add" onclick="document.getElementById('uo').classList.add('show')">＋ 新增图标</button>
+    <button class="tb grn" id="iconmgr-add" onclick="openUploadDialog()">＋ 新增图标</button>
+    <button class="tb" id="iconmgr-addgroup" onclick="iconMgrAddGroup()">＋ 新增分组</button>
     <button id="iconmgr-close" onclick="closeIconManager()" aria-label="关闭" title="关闭">✕</button>
   </div>
-  <div id="iconmgr-hint">增删改会保存到服务器 icons/ 目录并同步清单，操作后自动重扫图标库，左栏与画布即时生效，刷新页面不丢失。</div>
+  <div id="iconmgr-hint">增删改会保存到服务器 icons/ 目录并同步清单，操作后自动重扫图标库，左栏与画布即时生效，刷新页面不丢失。手动放入 icons/ 的图片自动进入「未分组」。</div>
   <div id="iconmgr-list"></div>
 </div></div>
 <input type="file" id="im-fi" accept="image/png,image/svg+xml,image/jpeg,image/gif,image/webp" style="display:none" onchange="onIconMgrFile(event)">

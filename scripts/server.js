@@ -9,7 +9,7 @@ const http = require('http');
 const path = require('path');
 const url = require('url');
 const { createTemplateApi, send } = require('./template-store');
-const { createIconApi } = require('./icon-store');
+const { createIconApi, buildManifest: buildIconManifest } = require('./icon-store');
 
 const projectRoot = path.resolve(__dirname, '..');
 const port = Number(process.env.PORT || 3009);
@@ -50,58 +50,7 @@ const types = {
 function log(message) { console.log(`[${new Date().toLocaleTimeString()}] ${message}`); }
 function warn(message) { console.warn(`[${new Date().toLocaleTimeString()}] ${message}`); }
 
-// 图标库：扫描 icons/ 目录，与 icons/index.json 合并（与 dev-server/build 行为一致）
-const IMG_EXT = new Set(['.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp']);
-function listIconFiles() {
-  try {
-    return fs.readdirSync(iconsDir).filter((f) => IMG_EXT.has(path.extname(f).toLowerCase()));
-  } catch (err) {
-    return [];
-  }
-}
-function buildIconManifest() {
-  let curated = { groups: [] };
-  try {
-    curated = JSON.parse(fs.readFileSync(path.join(iconsDir, 'index.json'), 'utf8'));
-  } catch (err) {
-    warn(`读取 icons/index.json 失败：${err.message}`);
-  }
-  const existing = new Set(listIconFiles());
-  const referenced = new Set();
-  const groups = (curated.groups || [])
-    .map((g) => {
-      const devices = (g.devices || []).filter((d) => {
-        if (!d.file) return true;
-        if (existing.has(d.file)) {
-          referenced.add(d.file);
-          return true;
-        }
-        return false;
-      });
-      return Object.assign({}, g, { devices });
-    })
-    .filter((g) => g.devices.length);
-  const extras = [...existing].filter((f) => !referenced.has(f)).sort();
-  const typeToGroupIdx = {};
-  groups.forEach((g, gi) => (g.devices || []).forEach((d) => { typeToGroupIdx[d.type] = gi; }));
-  const knownTypes = Object.keys(typeToGroupIdx);
-  const customDevices = [];
-  extras.forEach((f) => {
-    const stem = f.replace(/\.[^.]+$/, '');
-    if (knownTypes.includes(stem)) return;
-    let best = null;
-    for (const t of knownTypes) {
-      if (stem.startsWith(t + '_') && (!best || t.length > best.length)) best = t;
-    }
-    const dev = { type: stem, label: stem, label_en: stem, badge: stem, file: f };
-    if (best) groups[typeToGroupIdx[best]].devices.push(dev);
-    else customDevices.push(dev);
-  });
-  if (customDevices.length) {
-    groups.push({ title: '自定义图标', title_en: 'Custom Icons', color: '#42a5f5', tab: 'custom', devices: customDevices });
-  }
-  return Object.assign({}, curated, { groups });
-}
+// 图标库：清单由 icon-store.buildManifest 统一生成（扫描 icons/ + 合并 index.json；未登记图片归「未分组」）
 // 后台字段字典：扫描 dic/ 目录，按 deviceType 合并所有 *.json（增删改 dic/*.json 即自动反映）
 const dicDir = path.join(staticRoot, 'dic');
 function buildDicManifest() {
@@ -150,7 +99,7 @@ const server = http.createServer((req, res) => {
 
   // 2) 图标清单：扫描 icons/ 动态生成；图标文件也从同一目录读取，避免 dist 与根目录不同步
   if (pathname === '/icons/index.json') {
-    return send(res, 200, JSON.stringify(buildIconManifest(), null, 2), 'application/json; charset=utf-8');
+    return send(res, 200, JSON.stringify(buildIconManifest(iconsDir), null, 2), 'application/json; charset=utf-8');
   }
   if (pathname === '/icons' || pathname.startsWith('/icons/')) {
     return serveStatic(res, iconsDir, pathname.replace(/^\/icons\/?/, '') || 'index.json');

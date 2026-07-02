@@ -34,22 +34,17 @@ function buildSidebar(){
   const tools=document.getElementById('side-acc-tools');
   if(activeTab==='custom'){
     if(tools)tools.style.display='none';
-    // 自定义类：上传 / 图标库管理入口 + 图标库里 tab=custom 的元素（持久化） + 本会话内存图标（无写接口时的兜底）
+    // 自定义页签：上传入口（图标库「管理」已移到菜单栏「🗂 图标库管理」）；
+    // 上传的图标按所选分组落库并显示在对应页签(通常「未分组」在设备页签)，此处仅列出无写接口时的会话内存图标。
     const c=document.createElement('div');c.className='ni-custom';
     c.innerHTML='<span>📁</span> '+(lang==='en'?'Upload Icon':'上传自定义图标');
-    c.onclick=()=>document.getElementById('uo').classList.add('show');sb.appendChild(c);
-    const m=document.createElement('div');m.className='ni-custom';
-    m.innerHTML='<span>🗂</span> '+(lang==='en'?'Manage Icon Library':'图标库管理');
-    m.title=lang==='en'?'Add / rename / replace / delete icons; saved to the server library':'增删改图标：保存到服务器图标库，刷新不丢失';
-    m.onclick=()=>openIconManager();sb.appendChild(m);
-    const groups=sidebarGroupsFor('custom');
-    const sessionOnly=customIcons.filter(ci=>!IMGS[ci.type]);   // 已持久化的走图标库渲染，避免重复
-    if(groups.every(g=>!g.devices.length)&&sessionOnly.length===0){
-      const tip=document.createElement('div');tip.style.cssText='padding:14px;font-size:12px;color:var(--ui-text2);line-height:1.6';
-      tip.textContent=lang==='en'?'No custom icons yet. Click above to upload.':'还没有自定义图标，点击上方上传。';
-      sb.appendChild(tip);
-    }
-    groups.forEach(g=>g.devices.forEach(d=>sb.appendChild(makeNI(d.type,d.label,d.label_en,d.badge))));
+    c.onclick=()=>openUploadDialog();sb.appendChild(c);
+    const tip=document.createElement('div');tip.style.cssText='padding:12px 14px;font-size:12px;color:var(--ui-text2);line-height:1.7';
+    tip.innerHTML=lang==='en'
+      ?'Uploaded icons are saved to the library under the chosen group (shown in that tab). Manage all icons &amp; groups via the menu bar → <b>🗂 Icon Library Manager</b>.'
+      :'上传的图标会按所选分组保存到图标库，并显示在对应页签。全部图标与分组请在菜单栏 <b>🗂 图标库管理</b> 中增删改。';
+    sb.appendChild(tip);
+    const sessionOnly=customIcons.filter(ci=>!IMGS[ci.type]);   // 无写接口时的会话内存兜底图标
     sessionOnly.forEach(ci=>sb.appendChild(makeNI(ci.type,ci.zh,ci.en,'custom',ci.url)));
     return;
   }
