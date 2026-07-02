@@ -1,0 +1,10 @@
+.git
+dist
+node_modules
+__pycache__
+*.pyc
+.dev-server.log
+data
+Dockerfile
+docker-compose.yml
+.dockerignore

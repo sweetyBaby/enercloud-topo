@@ -1,0 +1,12 @@
+services:
+  topo:
+    build: .
+    image: enercloud-topo:latest
+    container_name: enercloud-topo
+    restart: unless-stopped
+    ports:
+      - "3009:3009"
+    volumes:
+      # 模板持久化：保存/编辑/删除都落在宿主机 ./data/templates，
+      # 重建镜像、升级容器都不会丢；备份该目录即备份全部用户模板。
+      - ./data/templates:/data/templates
