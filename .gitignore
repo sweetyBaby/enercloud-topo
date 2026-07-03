@@ -3,3 +3,5 @@ node_modules/
 __pycache__/
 *.pyc
 .dev-server.log
+# 图标回收站：删除图标的运行时暂存（可还原），不入库
+icons/.trash/

@@ -3,6 +3,13 @@
   "note": "图标库清单：每个 device 的 file 指向 icons/ 下的图片。增删改图片后，dev-server/build 会自动同步此清单（未登记的图片归入「自定义图标」分组）。可手动编辑 label / 分组 / data 默认字段。",
   "groups": [
     {
+      "title": "uui哦i",
+      "title_en": "iii",
+      "color": "#8aa8c4",
+      "tab": "device",
+      "devices": []
+    },
+    {
       "title": "电源侧",
       "title_en": "Power Source",
       "color": "#4dd0ff",
@@ -356,35 +363,25 @@
       "tab": "device",
       "devices": [
         {
-          "type": "aircon",
-          "label": "空调",
-          "label_en": "HVAC",
-          "badge": "aircon",
-          "file": "aircon.svg",
-          "data": [
-            "温度(℃)"
-          ]
+          "type": "sensor",
+          "label": "传感器",
+          "label_en": "Sensor",
+          "badge": "sensor",
+          "file": "sensor.svg"
         },
         {
           "type": "fire",
           "label": "消防",
           "label_en": "Fire Sys",
           "badge": "fire",
-          "file": "fire.svg",
-          "data": [
-            "告警"
-          ]
+          "file": "fire.svg"
         },
         {
-          "type": "sensor",
-          "label": "传感器",
-          "label_en": "Sensor",
-          "badge": "sensor",
-          "file": "sensor.svg",
-          "data": [
-            "数值",
-            "单位"
-          ]
+          "type": "aircon",
+          "label": "空调",
+          "label_en": "HVAC",
+          "badge": "aircon",
+          "file": "aircon.svg"
         }
       ]
     },
@@ -394,6 +391,27 @@
       "color": "#5dade2",
       "tab": "device",
       "devices": [
+        {
+          "type": "ground",
+          "label": "接地",
+          "label_en": "Ground",
+          "badge": "ground",
+          "file": "ground.svg"
+        },
+        {
+          "type": "spd",
+          "label": "避雷器",
+          "label_en": "SPD",
+          "badge": "spd",
+          "file": "spd.svg"
+        },
+        {
+          "type": "pt",
+          "label": "电压互感器",
+          "label_en": "PT",
+          "badge": "pt",
+          "file": "pt.svg"
+        },
         {
           "type": "resistor",
           "label": "电阻",
@@ -434,33 +452,6 @@
             "变比",
             "二次电流(A)"
           ]
-        },
-        {
-          "type": "pt",
-          "label": "电压互感器",
-          "label_en": "PT",
-          "badge": "pt",
-          "file": "pt.svg",
-          "data": [
-            "变比",
-            "二次电压(V)"
-          ]
-        },
-        {
-          "type": "spd",
-          "label": "避雷器",
-          "label_en": "SPD",
-          "badge": "spd",
-          "file": "spd.svg",
-          "data": []
-        },
-        {
-          "type": "ground",
-          "label": "接地",
-          "label_en": "Ground",
-          "badge": "ground",
-          "file": "ground.svg",
-          "data": []
         }
       ]
     },

@@ -1225,19 +1225,27 @@ function buildAddIconRow(en){
 function iconMgrToggleAdd(){_iconMgrAdding=!_iconMgrAdding;_addIconDataURL=null;renderIconManager();}
 function renderIconManager(){
   const en=lang==='en';
-  // tab 即区标题（标题栏只保留弹框名），右侧为当前 tab 的「新增」按钮
-  const ti=document.getElementById('im-tab-icons'),tg=document.getElementById('im-tab-groups');
-  ti.textContent=en?'Icons':'图标管理';tg.textContent=en?'Groups':'分组管理';
-  ti.classList.toggle('active',_iconMgrTab==='icons');tg.classList.toggle('active',_iconMgrTab==='groups');
+  // tab 即区标题（标题栏只保留弹框名），右侧为「导出全部」+ 当前 tab 的「新增」按钮
+  const ti=document.getElementById('im-tab-icons'),tg=document.getElementById('im-tab-groups'),tt=document.getElementById('im-tab-trash');
+  ti.textContent=en?'Icons':'图标管理';tg.textContent=en?'Groups':'分组管理';tt.textContent=en?'Trash':'回收站';
+  ti.classList.toggle('active',_iconMgrTab==='icons');tg.classList.toggle('active',_iconMgrTab==='groups');tt.classList.toggle('active',_iconMgrTab==='trash');
   const addBtn=document.getElementById('iconmgr-addbtn');
+  addBtn.style.display=(_iconMgrTab==='trash')?'none':'';   // 回收站无「新增」，改显示批量按钮
   addBtn.textContent=_iconMgrTab==='groups'?(en?'＋ Add Group':'＋ 新增分组'):(en?'＋ Add Icon':'＋ 新增图标');
+  const exp=document.getElementById('iconmgr-export');
+  exp.textContent=en?'⬇ Export Library':'⬇ 导出图标库';   // 语义明确：导出图标库（不含回收站）
+  const rall=document.getElementById('iconmgr-restoreall'),pall=document.getElementById('iconmgr-purgeall');
+  rall.style.display=pall.style.display=(_iconMgrTab==='trash')?'':'none';
+  rall.textContent=en?'↺ Restore All':'↺ 全部还原';
+  pall.textContent=en?'🗑 Purge All':'🗑 全部删除';
   const list=document.getElementById('iconmgr-list');list.innerHTML='';
   const bust=_iconBust?('?v='+_iconBust):'';
   _iconMgrFlashEl=null;
   // 顶部内联新增行
-  if(_iconMgrAdding)list.appendChild(_iconMgrTab==='groups'?buildAddGroupRow(en):buildAddIconRow(en));
+  if(_iconMgrAdding&&_iconMgrTab!=='trash')list.appendChild(_iconMgrTab==='groups'?buildAddGroupRow(en):buildAddIconRow(en));
   // 主体
   if(_iconMgrTab==='groups')renderGroupRows(list,en);
+  else if(_iconMgrTab==='trash')renderTrashRows(list,en);
   else renderIconRows(list,en,bust);
   // 新增项：滚动到并短暂高亮，便于立即查看验证（即便所属分组不在最上面）
   if(_iconMgrFlashEl){const el=_iconMgrFlashEl;requestAnimationFrame(()=>{try{el.scrollIntoView({block:'center'});}catch(_){}el.classList.add('im-flash');});}
@@ -1335,14 +1343,149 @@ async function iconMgrDelete(type,label){
     return;
   }
   const ok=await uiConfirm(lang==='en'
-    ?('Delete icon "'+(label||type)+'" from the library?')
-    :('确定从图标库删除「'+(label||type)+'」？'),true);
+    ?('Delete icon "'+(label||type)+'"? It will be moved to Trash and can be restored there.')
+    :('确定删除「'+(label||type)+'」？将移入回收站，可在「回收站」页签中还原。'),true);
   if(!ok)return;
   try{
     await iconApiCall('DELETE',type);
     await reloadIconLibrary();renderIconManager();
-    flashHint(lang==='en'?'Icon deleted':'图标已删除');
+    flashHint(lang==='en'?'Moved to Trash (restorable)':'已移入回收站，可在「回收站」还原');
   }catch(err){flashHint((lang==='en'?'Delete failed: ':'删除失败：')+err.message);}
+}
+// ── 回收站：列表 / 还原 / 彻底删除 ──
+function renderTrashRows(list,en){
+  const tip=document.createElement('div');tip.className='im-empty';tip.textContent=en?'Loading…':'加载中…';
+  list.appendChild(tip);
+  fetch('api/icon-trash',{cache:'no-store'}).then(r=>r.json()).then(j=>{
+    if(_iconMgrTab!=='trash')return;   // 用户已切走，放弃渲染
+    list.innerHTML='';
+    const items=(j&&j.items)||[];
+    if(!items.length){
+      const d=document.createElement('div');d.className='im-empty';
+      d.textContent=en?'Trash is empty. Deleted icons land here and can be restored.':'回收站为空。删除的图标会进入这里，可随时还原。';
+      list.appendChild(d);return;
+    }
+    items.forEach(it=>{
+      const row=document.createElement('div');row.className='im-row';
+      const img=document.createElement('img');img.className='im-icon';img.src=ICON_BASE+'.trash/'+it.trashFile;img.alt=it.type;
+      const tp=document.createElement('div');tp.className='im-type';tp.textContent=it.type;tp.title=(en?'File: ':'文件：')+it.file;
+      const name=document.createElement('div');name.className='im-tname';name.textContent=(it.label||'')+' / '+(it.label_en||'');
+      const meta=document.createElement('div');meta.className='im-tmeta';
+      meta.textContent=(en?'from ':'原分组：')+(it.group||'-')+(it.deletedAt?('　'+(en?'deleted ':'删除于 ')+String(it.deletedAt).replace('T',' ').slice(0,19)):'');
+      const rst=document.createElement('button');rst.className='im-btn';rst.textContent=en?'↺ Restore':'↺ 还原';
+      rst.title=en?'Restore to its original group (Ungrouped if the group is gone)':'还原到原分组（原分组已删则回到未分组）';
+      rst.onclick=()=>iconMgrRestore(it.type,it.label||it.type);
+      const purge=document.createElement('button');purge.className='im-btn im-del';purge.textContent=en?'✕ Purge':'✕ 彻底删除';
+      purge.title=en?'Permanently delete (cannot be undone)':'彻底删除，不可恢复';
+      purge.onclick=()=>iconMgrPurge(it.type,it.label||it.type);
+      row.append(img,tp,name,meta,rst,purge);
+      list.appendChild(row);
+    });
+  }).catch(err=>{
+    list.innerHTML='';
+    const d=document.createElement('div');d.className='im-empty';
+    d.textContent=(en?'Failed to load trash: ':'回收站加载失败：')+err.message;
+    list.appendChild(d);
+  });
+}
+async function iconMgrRestore(type,label){
+  try{
+    const r=await fetch('api/icon-trash/'+encodeURIComponent(type)+'/restore',{method:'POST'});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));
+    await reloadIconLibrary();renderIconManager();
+    flashHint((lang==='en'?'Restored: ':'已还原：')+(label||type));
+  }catch(err){flashHint((lang==='en'?'Restore failed: ':'还原失败：')+err.message);}
+}
+async function iconMgrPurge(type,label){
+  const ok=await uiConfirm(lang==='en'
+    ?('Permanently delete "'+(label||type)+'"? This cannot be undone.')
+    :('确定彻底删除「'+(label||type)+'」？该操作不可恢复。'),true);
+  if(!ok)return;
+  try{
+    const r=await fetch('api/icon-trash/'+encodeURIComponent(type),{method:'DELETE'});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));
+    renderIconManager();
+    flashHint(lang==='en'?'Purged':'已彻底删除');
+  }catch(err){flashHint((lang==='en'?'Purge failed: ':'彻底删除失败：')+err.message);}
+}
+// 读取回收站列表（批量操作共用）
+async function _iconTrashItems(){
+  const r=await fetch('api/icon-trash',{cache:'no-store'});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));
+  return j.items||[];
+}
+// 全部还原：逐个调还原接口（还原含 type/名称冲突自动改名逻辑，复用单个接口最稳）
+async function iconMgrRestoreAll(){
+  try{
+    const items=await _iconTrashItems();
+    if(!items.length){flashHint(lang==='en'?'Trash is empty':'回收站为空');return;}
+    const ok=await uiConfirm(lang==='en'
+      ?('Restore all '+items.length+' icon(s) from Trash?')
+      :('确定还原回收站中的全部 '+items.length+' 个图标？'),false);
+    if(!ok)return;
+    let done=0,fail=0;
+    for(const it of items){
+      try{
+        const r=await fetch('api/icon-trash/'+encodeURIComponent(it.type)+'/restore',{method:'POST'});
+        const j=await r.json().catch(()=>({}));
+        if(r.ok&&j.ok)done++;else fail++;
+      }catch(_){fail++;}
+    }
+    await reloadIconLibrary();renderIconManager();
+    flashHint((lang==='en'?('Restored '+done+' icon(s)'):('已还原 '+done+' 个图标'))
+      +(fail?(lang==='en'?(', '+fail+' failed'):('，'+fail+' 个失败')):''));
+  }catch(err){flashHint((lang==='en'?'Restore all failed: ':'全部还原失败：')+err.message);}
+}
+// 全部删除（清空回收站）：不可恢复，二次确认
+async function iconMgrPurgeAll(){
+  try{
+    const items=await _iconTrashItems();
+    if(!items.length){flashHint(lang==='en'?'Trash is empty':'回收站为空');return;}
+    const ok=await uiConfirm(lang==='en'
+      ?('Permanently delete all '+items.length+' icon(s) in Trash? This cannot be undone.')
+      :('确定彻底删除回收站中的全部 '+items.length+' 个图标？该操作不可恢复。'),true);
+    if(!ok)return;
+    let done=0,fail=0;
+    for(const it of items){
+      try{
+        const r=await fetch('api/icon-trash/'+encodeURIComponent(it.type),{method:'DELETE'});
+        const j=await r.json().catch(()=>({}));
+        if(r.ok&&j.ok)done++;else fail++;
+      }catch(_){fail++;}
+    }
+    renderIconManager();
+    flashHint((lang==='en'?('Purged '+done+' icon(s)'):('已彻底删除 '+done+' 个图标'))
+      +(fail?(lang==='en'?(', '+fail+' failed'):('，'+fail+' 个失败')):''));
+  }catch(err){flashHint((lang==='en'?'Purge all failed: ':'全部删除失败：')+err.message);}
+}
+// ── 导出全部图标：全部图片 + index.json 打包 ZIP（备份/迁移；解压回 icons/ 目录即还原）──
+async function iconMgrExportAll(){
+  try{
+    const r=await fetch(ICON_BASE+'index.json',{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const manifest=await r.json();
+    const files=[{name:'index.json',data:strToBytes(JSON.stringify(manifest,null,2))}];
+    const seen=new Set();let n=0;
+    for(const g of (manifest.groups||[]))for(const d of (g.devices||[])){
+      if(!d.file||seen.has(d.file))continue;seen.add(d.file);
+      try{
+        const ir=await fetch(ICON_BASE+d.file,{cache:'no-store'});
+        if(!ir.ok)continue;
+        files.push({name:d.file,data:new Uint8Array(await ir.arrayBuffer())});n++;
+      }catch(_){/* 单个图片拉取失败跳过，不中断整体导出 */}
+    }
+    if(!n)throw new Error(lang==='en'?'no icons to export':'没有可导出的图标');
+    const zip=makeZip(files);
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([zip],{type:'application/zip'}));
+    const dt=new Date(),p=x=>String(x).padStart(2,'0');
+    a.download='topo-icons-backup-'+dt.getFullYear()+p(dt.getMonth()+1)+p(dt.getDate())+'.zip';
+    a.click();
+    flashHint((lang==='en'?'Exported ':'已导出 ')+n+(lang==='en'?' icons + index.json':' 个图标 + index.json'));
+  }catch(err){flashHint((lang==='en'?'Export failed: ':'导出失败：')+err.message);}
 }
 function onIconMgrFile(e){
   const f=e.target.files[0];e.target.value='';

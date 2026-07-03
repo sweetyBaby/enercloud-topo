@@ -21,7 +21,8 @@ function ensurePropsOpen(){
 window.addEventListener('resize',()=>resizeCanvas());
 function toWorld(sx,sy){return [(sx-panX)/zoom,(sy-panY)/zoom];}
 
-cwrap.addEventListener('wheel',e=>{e.preventDefault();const r=canvas.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;const[wx,wy]=toWorld(mx,my);const f=e.deltaY<0?1.12:1/1.12;zoom=Math.max(.1,Math.min(5,zoom*f));panX=mx-wx*zoom;panY=my-wy*zoom;document.getElementById('zoom-info').textContent=Math.round(zoom*100)+'%';},{passive:false});
+// 外观面板(#bgpanel)及其遮罩挂在 cwrap 内：滚轮落在弹层上时应滚动弹层内容，放行默认行为，不缩放画布
+cwrap.addEventListener('wheel',e=>{if(e.target!==canvas&&e.target.closest&&e.target.closest('#bgpanel,#bgpanel-overlay'))return;e.preventDefault();const r=canvas.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;const[wx,wy]=toWorld(mx,my);const f=e.deltaY<0?1.12:1/1.12;zoom=Math.max(.1,Math.min(5,zoom*f));panX=mx-wx*zoom;panY=my-wy*zoom;document.getElementById('zoom-info').textContent=Math.round(zoom*100)+'%';},{passive:false});
 function resetZoom(){zoom=1;panX=0;panY=0;document.getElementById('zoom-info').textContent='100%';}
 function zoomStep(factor){
   const mx=canvas.width/2,my=canvas.height/2;

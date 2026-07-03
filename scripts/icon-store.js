@@ -169,9 +169,31 @@ function createIconApi(opts) {
     return ungroupedGroup(idx);
   }
 
+  // ── 回收站：删除的图标移入 icons/.trash/（图片 + manifest.json 元数据），可还原 / 彻底删除 ──
+  //   .trash 为点前缀子目录：listImageFiles 的非递归扫描 + extname 过滤天然不会把它算进图标库。
+  const trashDir = path.join(dir, '.trash');
+  const trashManifestPath = path.join(trashDir, 'manifest.json');
+  function readTrash() {
+    try { const a = JSON.parse(fs.readFileSync(trashManifestPath, 'utf8')); return Array.isArray(a) ? a : []; }
+    catch (err) { return []; }
+  }
+  function writeTrash(items) {
+    if (!fs.existsSync(trashDir)) fs.mkdirSync(trashDir, { recursive: true });
+    fs.writeFileSync(trashManifestPath, JSON.stringify(items, null, 2), 'utf8');
+  }
+  // 把图标文件移入回收站，返回回收站内文件名（同名冲突时加时间戳前缀）
+  function moveToTrash(file) {
+    if (!fs.existsSync(trashDir)) fs.mkdirSync(trashDir, { recursive: true });
+    let tf = file;
+    if (fs.existsSync(path.join(trashDir, tf))) tf = Date.now() + '_' + file;
+    fs.renameSync(path.join(dir, file), path.join(trashDir, tf));
+    return tf;
+  }
+
   function matches(pathname) {
     return pathname === '/api/icons' || pathname.startsWith('/api/icons/')
-      || pathname === '/api/icon-groups' || pathname.startsWith('/api/icon-groups/');
+      || pathname === '/api/icon-groups' || pathname.startsWith('/api/icon-groups/')
+      || pathname === '/api/icon-trash' || pathname.startsWith('/api/icon-trash/');
   }
 
   async function handleIcons(req, res, rest, method) {
@@ -230,16 +252,27 @@ function createIconApi(opts) {
       return sendJSON(res, 200, { ok: true, type, file: found.device.file });
     }
 
-    // DELETE /api/icons/:type → 删图片 + 从清单移除（空系统分组保留，空「未分组」由 reconcile 清理）
+    // DELETE /api/icons/:type → 图片移入回收站(icons/.trash/) + 从清单移除；可在「回收站」还原或彻底删除
     if (method === 'DELETE' && type) {
       const idx = load();
       const found = findDevice(idx, type);
       if (!found) return sendJSON(res, 404, { ok: false, error: 'not found' });
       const file = found.device.file;
+      const groupTitle = found.group.title;
       found.group.devices.splice(found.di, 1);
-      if (file) { try { fs.unlinkSync(path.join(dir, file)); } catch (err) { warn(`Delete icons/${file} failed: ${err.message}`); } }
+      if (file) {
+        try {
+          const tf = moveToTrash(file);
+          const items = readTrash();
+          // device 存完整清单对象（含 data 默认字段/badge 等元数据），还原时原样恢复，避免只回写基础字段导致元数据丢失
+          items.unshift({ type, label: found.device.label || type, label_en: found.device.label_en || type,
+            group: groupTitle, file, trashFile: tf, deletedAt: new Date().toISOString(),
+            device: JSON.parse(JSON.stringify(found.device)) });
+          writeTrash(items);
+        } catch (err) { warn(`Move icons/${file} to trash failed: ${err.message}`); }
+      }
       persist(reconcile(idx, dir));
-      log(`Icon deleted: ${type}`);
+      log(`Icon deleted → trash: ${type}`);
       return sendJSON(res, 200, { ok: true });
     }
     return sendJSON(res, 405, { ok: false, error: 'method not allowed' });
@@ -307,11 +340,66 @@ function createIconApi(opts) {
     return sendJSON(res, 405, { ok: false, error: 'method not allowed' });
   }
 
+  // ── 回收站 API ──
+  //   GET    /api/icon-trash               → {ok, items:[{type,label,label_en,group,file,trashFile,deletedAt}]}
+  //   POST   /api/icon-trash/:type/restore → 还原：图片移回 icons/ + 重新登记（原分组不存在则入未分组；type/名称冲突自动加后缀）
+  //   DELETE /api/icon-trash/:type         → 彻底删除（删文件 + 出清单，不可恢复）
+  async function handleTrash(req, res, rest, method) {
+    if (method === 'GET' && !rest) return sendJSON(res, 200, { ok: true, items: readTrash() });
+    const m = /^([^/]+)(?:\/(restore))?$/.exec(rest || '');
+    const type = safeType(decodeURIComponent(m ? m[1] : ''));
+    const isRestore = !!(m && m[2]);
+    if (!type) return sendJSON(res, 400, { ok: false, error: 'type required' });
+    const items = readTrash();
+    const ti = items.findIndex((x) => x && x.type === type);
+    if (ti < 0) return sendJSON(res, 404, { ok: false, error: 'not found in trash' });
+    const item = items[ti];
+
+    if (method === 'POST' && isRestore) {
+      if (!fs.existsSync(path.join(trashDir, item.trashFile))) {
+        items.splice(ti, 1); writeTrash(items);
+        return sendJSON(res, 410, { ok: false, error: 'trashed file is gone' });
+      }
+      const idx = load();
+      // type 冲突（还原前有人新建了同 type）→ 自动加数字后缀
+      let t = item.type;
+      if (hasType(idx, t)) { const base = t; let n = 2; while (hasType(idx, t)) t = base + '_' + (n++); }
+      // 中/英文名冲突 → 自动加「(还原)」后缀直至唯一
+      let zh = item.label || t, en = item.label_en || t;
+      const devs = allDevices(idx);
+      while (devs.some((d) => (d.label || '') === zh)) zh += '(还原)';
+      while (devs.some((d) => (d.label_en || '') === en)) en += '_restored';
+      const ext = (item.file.split('.').pop() || 'png').toLowerCase();
+      const file = t + '.' + ext;
+      fs.renameSync(path.join(trashDir, item.trashFile), path.join(dir, file));
+      // 以回收站里保存的完整 device 对象为底恢复（保留 data 默认字段等元数据；旧格式条目无 device 则退化为基础字段），
+      // 再覆盖为冲突消解后的 type/名称/文件名
+      const restored = Object.assign({}, (item.device && typeof item.device === 'object') ? item.device : {},
+        { type: t, label: zh, label_en: en, badge: (item.device && item.device.badge) || t, file });
+      targetGroup(idx, item.group).devices.unshift(restored);
+      items.splice(ti, 1); writeTrash(items);
+      persist(idx);
+      log(`Icon restored from trash: ${item.type} → ${t}`);
+      return sendJSON(res, 200, { ok: true, type: t, file });
+    }
+
+    if (method === 'DELETE' && !isRestore) {
+      try { fs.unlinkSync(path.join(trashDir, item.trashFile)); } catch (err) { /* 文件可能已不存在 */ }
+      items.splice(ti, 1); writeTrash(items);
+      log(`Icon purged from trash: ${type}`);
+      return sendJSON(res, 200, { ok: true });
+    }
+    return sendJSON(res, 405, { ok: false, error: 'method not allowed' });
+  }
+
   async function handle(req, res, pathname) {
     const method = req.method || 'GET';
     try {
       if (pathname === '/api/icon-groups' || pathname.startsWith('/api/icon-groups/')) {
         return await handleGroups(req, res, pathname.replace(/^\/api\/icon-groups\/?/, ''), method);
+      }
+      if (pathname === '/api/icon-trash' || pathname.startsWith('/api/icon-trash/')) {
+        return await handleTrash(req, res, pathname.replace(/^\/api\/icon-trash\/?/, ''), method);
       }
       return await handleIcons(req, res, pathname.replace(/^\/api\/icons\/?/, ''), method);
     } catch (err) {
