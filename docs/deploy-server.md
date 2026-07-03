@@ -34,9 +34,9 @@ docker load -i /home/bms/base_docker/data/myapp/front/enercloud-topo-1.0.tar
 
 ```yaml
   # ================= 拓扑编辑器 =================
-  topo:
+  topo-editor:
     image: enercloud-topo:1.0
-    container_name: enercloud-topo
+    container_name: topo-editor
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
@@ -72,12 +72,12 @@ docker load -i /home/bms/base_docker/data/myapp/front/enercloud-topo-1.0.tar
 	# 拓扑编辑器：输入 /topo.html 自动跳转（absolute_redirect off 防止跳转丢外部端口 8126）
 	location = /topo.html {
 		absolute_redirect off;
-		return 301 /topo/topo.html;
+		return 301 /topo-editor/topo.html;
 	}
 
-	# 拓扑编辑器：^~ 优先于静态资源正则，勿去掉；结尾斜杠成对（/topo/ → 容器内 /）
-	location ^~ /topo/ {
-		proxy_pass http://enercloud-topo:3009/;
+	# 拓扑编辑器：^~ 优先于静态资源正则，勿去掉；结尾斜杠成对（/topo-editor/ → 容器内 /）
+	location ^~ /topo-editor/ {
+		proxy_pass http://topo-editor:3009/;
 		proxy_http_version 1.1;
 		proxy_set_header Host $host;
 		proxy_set_header X-Real-IP $remote_addr;
@@ -94,12 +94,12 @@ docker load -i /home/bms/base_docker/data/myapp/front/enercloud-topo-1.0.tar
 
 ```bash
 cd /home/bms/base_docker
-docker compose config --quiet    # 先校验 compose 语法，无输出即通过
-docker compose up -d topo
-docker exec nginx nginx -t && docker exec nginx nginx -s reload
+sudo docker compose config --quiet    # 先校验 compose 语法，无输出即通过
+sudo docker compose up -d topo-editor
+sudo docker exec nginx nginx -t && docker exec nginx nginx -s reload
 ```
 
-验证：浏览器打开 http://223.107.76.50:8126/topo/topo.html ，画几个节点保存为模板，
+验证：浏览器打开 http://223.107.76.50:8126/topo-editor/topo.html ，画几个节点保存为模板，
 确认 `/home/bms/base_docker/data/myapp/topo/templates/` 下出现 `tpl_*.json`。
 
 ## 6. 后续升级
@@ -112,18 +112,18 @@ docker save -o enercloud-topo-1.1.tar enercloud-topo:1.1
 scp -P 8119 enercloud-topo-1.1.tar bms@223.107.76.50:/home/bms/
 ```
 
-服务器：`docker load` 后把 compose 里的 tag 改成 1.1，`docker compose up -d topo`。
+服务器：`docker load` 后把 compose 里的 tag 改成 1.1，`docker compose up -d topo-editor`。
 用户已保存的模板和上传/维护的图标都在宿主机目录里，升级不受影响（首启种子拷贝仅在目录为空时执行）。
 
 ## 7. 常见报错排查
 
 | 报错特征 | 原因与处理 |
 |---|---|
-| `networks.topo additional properties 'image', ... not allowed` | `topo` 服务贴到了 `networks:` 区块之后；上移到 `services:` 区块内（见第 3 节） |
+| `networks.topo-editor additional properties 'image', ... not allowed` | `topo-editor` 服务贴到了 `networks:` 区块之后；上移到 `services:` 区块内（见第 3 节） |
 | `docker load` 报 `invalid tar header` / `unexpected EOF` | tar 文件损坏，多为 Windows 下用了 `docker save \| gzip` 管道；改用 `docker save -o` 重新导出重传（见第 1 节） |
 | `docker compose: command not found` | 服务器是老版 compose v1，改用 `docker-compose`（带连字符） |
 | nginx reload 报 `host not found in upstream "enercloud-topo"` | topo 容器未启动或不在 `backend` 网络；先 `docker ps` 确认 `enercloud-topo` 在跑，再 reload |
-| 访问 `/topo/` 白屏、JS 404 | nginx 里 `location ^~ /topo/` 的 `^~` 被去掉，静态文件被末尾的正则 location 劫持到 energy-dashboard |
-| 保存大模板报 413 | `location ^~ /topo/` 里缺 `client_max_body_size 20m` |
+| 访问 `/topo-editor/` 白屏、JS 404 | nginx 里 `location ^~ /topo-editor/` 的 `^~` 被去掉，静态文件被末尾的正则 location 劫持到 energy-dashboard |
+| 保存大模板报 413 | `location ^~ /topo-editor/` 里缺 `client_max_body_size 20m` |
 | 输入 `/topo.html` 跳转后端口丢失 | `location = /topo.html` 里缺 `absolute_redirect off;` |
 | 容器重建/升级后自定义图标丢失 | compose 没挂载 `/data/icons` 或未设置 `ICONS_DIR=/data/icons`；按第 3 节添加 `./data/myapp/topo/icons:/data/icons`，并备份该目录 |
