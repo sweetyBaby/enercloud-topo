@@ -56,9 +56,9 @@
       </div>
       <button class="tb" id="btn-signals" onclick="toggleSignalPanel()" title="信号：管理全局信号（中英文名/默认值/后台绑定）、注入测试数据、批量样例 JSON" data-i18n="⚡ 信号">⚡ 信号</button>
       <button class="tb" id="btn-rules" onclick="toggleRulePanel()" title="规则：总览全部显隐/图标/流向规则，切换运行视图预览（规则在画布上始终实时生效）" data-i18n="📏 规则">📏 规则</button>
-      <button class="tb" id="btn-runview" onclick="toggleRunView()" title="预览效果：按规则彻底隐藏不该显示的元素/连线，并应用数据驱动流向，查看整个图的运行效果" data-i18n="▶ 预览效果">▶ 预览效果</button>
       <button class="tb" id="btn-iconlib" onclick="openIconManager()" title="图标库管理：管理全部图标与分组（增删改，落盘 icons/）" data-i18n="🗂 图标库">🗂 图标库</button>
-    </div>
+      <button class="tb" id="btn-runview" onclick="toggleRunView()" title="预览效果：按规则彻底隐藏不该显示的元素/连线，并应用数据驱动流向，查看整个图的运行效果" data-i18n="▶ 预览效果">▶ 预览效果</button>
+       </div>
   </div>
   <!-- 暂时不做中英文切换 -->
   <div class="tgroup" style="display:none">
@@ -460,6 +460,10 @@
   <div id="iconmgr-tabs">
     <button class="im-tab" id="im-tab-icons" onclick="setIconMgrTab('icons')">图标管理</button>
     <button class="im-tab" id="im-tab-groups" onclick="setIconMgrTab('groups')">分组管理</button>
+    <button class="im-tab" id="im-tab-trash" onclick="setIconMgrTab('trash')">回收站</button>
+    <button class="tb" id="iconmgr-export" onclick="iconMgrExportAll()" title="把图标库（不含回收站）的全部图片 + 清单打包下载为 ZIP，用于备份/迁移">⬇ 导出图标库</button>
+    <button class="tb" id="iconmgr-restoreall" onclick="iconMgrRestoreAll()" style="display:none" title="还原回收站中的全部图标">↺ 全部还原</button>
+    <button class="tb red" id="iconmgr-purgeall" onclick="iconMgrPurgeAll()" style="display:none" title="彻底删除回收站中的全部图标，不可恢复">🗑 全部删除</button>
     <button class="tb grn" id="iconmgr-addbtn" onclick="iconMgrToggleAdd()">＋ 新增图标</button>
   </div>
   <div id="iconmgr-list"></div>
