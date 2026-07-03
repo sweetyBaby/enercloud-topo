@@ -42,13 +42,27 @@ function buildJSON(){
       sizeWorld:Math.round(nsz(n)),          // 实际绘制尺寸(已含 scale)，前端可直接用
       scale:n.scale||1, rotation:n.rotation||0,
       fontSize:n.fontSize||14, fontColor:n.fontColor||'#e8f4ff',
+      // 数据字段独立字体/卡片样式（统一设置或属性面板写入）；未设置则不导出，沿用默认外观
+      ...(n.fieldFontSize!=null?{fieldFontSize:n.fieldFontSize}:{}),
+      ...(n.fieldFontColor?{fieldFontColor:n.fieldFontColor}:{}),
+      ...(n.fieldBg?{fieldBg:n.fieldBg}:{}),
+      ...(n.fieldBorder?{fieldBorder:n.fieldBorder}:{}),
+      ...(n.fieldBorderColor?{fieldBorderColor:n.fieldBorderColor}:{}),
+      ...(n.fieldBorderWidth!=null?{fieldBorderWidth:n.fieldBorderWidth}:{}),
+      ...(n.fieldRadius!=null?{fieldRadius:n.fieldRadius}:{}),
       display:{ showLabel:!n.hideLabel, showFields:!n.hideFields },
       data:(n.data||[]).map(f=>{
         const fo={
           key:{zh:f.key, en:(f.keyEn===''?'':(f.keyEn||f.key))},   // 显式空英文名保留为空(让校验/重载后仍能拦截)；仅 keyEn 缺省(旧数据)才兜底中文名
           value:(f.dv==null||f.dv==='')?'':f.dv,
           hidden:!!f.hidden,
-          offset:{x:parseFloat((f.ox||0).toFixed(1)), y:parseFloat((f.oy||0).toFixed(1))}
+          offset:{x:parseFloat((f.ox||0).toFixed(1)), y:parseFloat((f.oy||0).toFixed(1))},
+          // 字段级卡片样式覆盖（单独框选卡片批量设置时写入）；未设置不导出，沿用节点级/默认
+          ...(f.chipBg?{chipBg:f.chipBg}:{}),
+          ...(f.chipBorder?{chipBorder:f.chipBorder}:{}),
+          ...(f.chipBorderColor?{chipBorderColor:f.chipBorderColor}:{}),
+          ...(f.chipBorderWidth!=null?{chipBorderWidth:f.chipBorderWidth}:{}),
+          ...(f.chipRadius!=null?{chipRadius:f.chipRadius}:{})
         };
         if(f.bind&&f.bind.field){
           // 后台字段绑定：导出时把来源「显式化」——总是写全 deviceType/deviceId，并用 followNode 标明是否跟随本节点设备
@@ -365,6 +379,15 @@ function parseImportedNode(o){
     fontSize:o.fontSize||14,
     fontColor:o.fontColor||'#e8f4ff'
   };
+  // 数据字段独立字体/卡片样式（可选，缺省=沿用默认外观）
+  if(o.fieldFontSize!=null)n.fieldFontSize=+o.fieldFontSize;
+  if(o.fieldFontColor)n.fieldFontColor=o.fieldFontColor;
+  if(o.fieldBg)n.fieldBg=o.fieldBg;
+  if(o.fieldBorder)n.fieldBorder=o.fieldBorder;
+  if(o.fieldBorderColor)n.fieldBorderColor=o.fieldBorderColor;
+  if(o.fieldBorderWidth!=null)n.fieldBorderWidth=+o.fieldBorderWidth;
+  // fieldRadius 兼容百分比字符串（'NN%'），不能强转数字
+  if(o.fieldRadius!=null)n.fieldRadius=(typeof o.fieldRadius==='string'&&o.fieldRadius.trim().endsWith('%'))?o.fieldRadius:+o.fieldRadius;
   // status / online 已移除：忽略旧文件里的 status 字段（向后兼容，不再读入节点）
   // 后台设备绑定（节点默认设备）
   if(o.deviceType)n.deviceType=o.deviceType;
@@ -381,6 +404,12 @@ function parseImportedNode(o){
     if(dv==='--'||dv==null)dv='';   // 兼容旧导出的占位符 '--'：视为无值（空）
     const fld={key:(key.zh||''), keyEn:(key.en===''?'':(key.en||key.zh||'')), dv:dv, hidden:!!f.hidden,   // 显式空英文名保留为空；仅 en 缺省(旧数据)才兜底中文名
             ox:(+off.x||+f.ox||0), oy:(+off.y||+f.oy||0)};
+    // 字段级卡片样式覆盖（可选；chipRadius 兼容 'NN%' 百分比字符串）
+    if(f.chipBg)fld.chipBg=f.chipBg;
+    if(f.chipBorder)fld.chipBorder=f.chipBorder;
+    if(f.chipBorderColor)fld.chipBorderColor=f.chipBorderColor;
+    if(f.chipBorderWidth!=null)fld.chipBorderWidth=+f.chipBorderWidth;
+    if(f.chipRadius!=null)fld.chipRadius=(typeof f.chipRadius==='string'&&f.chipRadius.trim().endsWith('%'))?f.chipRadius:+f.chipRadius;
     if(f.bind&&f.bind.field){
       // followNode=true（或旧格式缺省 device）→ 内部只存 field 保持「跟随节点」；否则固化显式来源
       if(f.bind.followNode||!(f.bind.deviceType||f.bind.deviceId)) fld.bind={field:f.bind.field};

@@ -142,7 +142,6 @@
         <button onclick="zoomStep(1.15)" title="放大">+</button>
       </div>
     </div>
-    <div id="bgpanel-overlay" onclick="toggleBgPanel()"></div>
     <div id="bgpanel">
       <div id="bgpanel-head">
         <h4>🎨 外观设置</h4>
@@ -152,11 +151,11 @@
       <div class="sub">① 界面主题风格</div>
       <div class="theme-row" id="theme-row"></div>
       <div class="sub">② 画布背景颜色</div>
+      <div class="phint" style="margin-bottom:6px">即选即生效。主题自带默认画布背景，此处调整仅覆盖画布背景；再切换主题会重置为该主题默认</div>
       <div class="cps" id="cps"></div>
       <div id="bgcr">
         <input type="color" id="bg-pick" value="#0a1f40" oninput="setBg(this.value)">
-        <input type="text" id="bg-hex" placeholder="#0a1f40" maxlength="7">
-        <button class="tb grn" style="padding:6px 10px;flex-shrink:0" onclick="applyBgHex()">应用背景色</button>
+        <input type="text" id="bg-hex" placeholder="#0a1f40" maxlength="7" oninput="applyBgHexLive(this.value)">
       </div>
       <div class="sub">③ 节点文字（统一设置）</div>
       <div class="phint" style="margin-bottom:8px">勾选要设置的样式和应用范围，未勾选的项保持各节点原样，互不绑定</div>
@@ -165,11 +164,11 @@
       </label>
       <div class="pr" style="margin-bottom:10px">
         <div style="display:flex;gap:8px;align-items:center">
-          <input type="range" id="gf-size" min="8" max="72" value="14" style="flex:1" oninput="gfSizeFromSlider(this.value)">
-          <input type="number" id="gf-size-num" min="6" max="200" step="1" value="14" style="width:62px;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:5px 6px;border-radius:4px;outline:none" oninput="gfSizeFromInput(this.value)">
+          <input type="range" id="gf-size" min="8" max="72" value="14" style="flex:1" oninput="pairFromSlider('gf-size')">
+          <input type="number" id="gf-size-num" min="6" max="200" step="1" value="14" style="width:62px;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:5px 6px;border-radius:4px;outline:none" oninput="pairFromNum('gf-size')">
           <span style="font-size:12px;color:var(--ui-text2);flex-shrink:0">px</span>
         </div>
-        <div class="phint" style="margin-top:3px">滑杆 8–72px；也可在输入框直接键入 6–200px</div>
+        <div class="phint" style="margin-top:3px">常用 8–72px 走滑杆；键入更大值滑杆量程自动扩展，两者始终同步</div>
       </div>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ui-text2);margin-bottom:4px;cursor:pointer">
         <input type="checkbox" id="gf-use-color" checked style="width:auto"> 设置文字颜色
@@ -188,6 +187,52 @@
         </label>
       </div>
       <button class="tb grn" style="width:100%" onclick="applyGlobalFont()">✓ 应用文字样式</button>
+      <div class="sub">④ 数据字段卡片（统一设置）</div>
+      <div class="phint" style="margin-bottom:8px">批量设置字段小卡片的底色/边框/圆角；只应用勾选的项。框选/点选<b>字段卡片</b>=只改选中的那几张卡片；选中<b>节点</b>=改该节点全部卡片</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ui-text2);margin-bottom:4px;cursor:pointer">
+        <input type="checkbox" id="gfd-use-bg" checked style="width:auto"> 设置卡片背景
+      </label>
+      <div style="display:flex;gap:7px;align-items:center;margin-bottom:10px">
+        <input type="color" id="gfd-bg" value="#0a1628" style="width:36px;height:30px;padding:0;border:1px solid var(--ui-border);border-radius:4px;background:none;cursor:pointer;flex-shrink:0">
+        <input type="text" id="gfd-bg-hex" value="#0a1628" style="flex:1;min-width:0;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:6px 8px;border-radius:4px;outline:none">
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ui-text2);margin-bottom:4px;cursor:pointer">
+        <input type="checkbox" id="gfd-use-border" checked style="width:auto"> 设置卡片边框
+      </label>
+      <div style="display:flex;gap:7px;align-items:center;margin-bottom:6px">
+        <select id="gfd-border" style="flex:0 0 84px;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:6px 6px;border-radius:4px">
+          <option value="solid">实线</option><option value="dashed">虚线</option><option value="none">无边框</option>
+        </select>
+        <input type="color" id="gfd-bc" value="#7896b4" style="width:36px;height:30px;padding:0;border:1px solid var(--ui-border);border-radius:4px;background:none;cursor:pointer;flex-shrink:0">
+        <input type="text" id="gfd-bc-hex" value="#7896b4" style="flex:1;min-width:0;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:6px 8px;border-radius:4px;outline:none">
+      </div>
+      <div class="pr" style="margin-bottom:10px">
+        <label style="font-size:12px;color:var(--ui-text2);margin-bottom:4px;display:block">边框线宽</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="range" id="gfd-bw" min="0.5" max="10" step="0.5" value="1.2" style="flex:1" oninput="pairFromSlider('gfd-bw')">
+          <input type="number" id="gfd-bw-num" min="0.5" max="20" step="0.1" value="1.2" style="width:62px;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:5px 6px;border-radius:4px;outline:none;text-align:center" oninput="pairFromNum('gfd-bw')">
+          <span style="font-size:12px;color:var(--ui-text2);flex-shrink:0">px</span>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ui-text2);margin-bottom:4px;cursor:pointer">
+        <input type="checkbox" id="gfd-use-radius" checked style="width:auto"> 设置圆角
+      </label>
+      <div class="pr" style="margin-bottom:10px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="range" id="gfd-radius" min="0" max="20" data-pxmax="20" value="5" style="flex:1" oninput="pairFromSlider('gfd-radius')">
+          <input type="number" id="gfd-radius-num" min="0" max="50" step="1" value="5" style="width:62px;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:5px 6px;border-radius:4px;outline:none;text-align:center" oninput="pairFromNum('gfd-radius')">
+          <select id="gfd-radius-unit" style="flex:0 0 52px;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:5px 4px;border-radius:4px" onchange="onRadiusUnit('gfd-radius','gfd-radius-unit',null)">
+            <option value="px">px</option><option value="%">%</option>
+          </select>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ui-text2);margin-bottom:8px;cursor:pointer" title="勾选后，文本框/变量元素会把同一套 背景/边框/圆角 应用为自己的盒子样式（等价于批量改盒子样式）">
+        <input type="checkbox" id="gfd-inc-box" checked style="width:auto" onchange="updGfdSelBtn()"> 文本框/变量元素同步应用为盒子样式
+      </label>
+      <div style="display:flex;gap:7px">
+        <button class="tb grn" style="flex:1" onclick="applyGlobalFieldStyle('all')">✓ 应用到所有节点</button>
+        <button class="tb" id="gfd-apply-sel" style="flex:1" onclick="applyGlobalFieldStyle('sel')" title="仅应用到画布上当前选中的目标：设备节点→其全部字段卡片；框选的字段卡片→仅这几张；文本框/变量→盒子样式（受上方开关控制）">仅选中</button>
+      </div>
       <div class="psep" style="margin:12px 0"></div>
       <div style="font-size:12px;color:var(--ui-text2);margin-bottom:8px;font-weight:600">🔀 汇流合并</div>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ui-text2);margin-bottom:8px;cursor:pointer">
@@ -247,32 +292,48 @@
         </div>
         <div class="pr" id="prow-type"><label data-i18n="类型">类型</label><select id="p-type" onchange="applyNP()"></select></div>
         <div class="psep"></div>
-        <div class="pr" id="prow-scale"><label>图标大小 <span id="p-scale-v">100</span>%</label>
-          <div class="pr-inline"><input type="range" id="p-scale" min="5" max="800" value="100" oninput="applyNP()"></div></div>
-        <div class="pr"><label>旋转 <span id="p-rot-v">0</span>°</label>
-          <div class="pr-inline"><input type="range" id="p-rot" min="0" max="359" value="0" oninput="applyNP()"><button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="resetRotation()" data-i18n="归零">归零</button></div></div>
-        <div class="pr"><label id="p-fs-label">标签字号 <span id="p-fs-v">14</span>px</label>
-          <div class="pr-inline"><input type="range" id="p-fs" min="10" max="120" value="14" oninput="applyNP()"></div></div>
+        <div class="pr" id="prow-scale"><label data-i18n="图标大小">图标大小</label>
+          <div class="pr-inline"><input type="range" id="p-scale" min="5" max="800" value="100" oninput="pairFromSlider('p-scale');applyNP()">
+            <input type="number" id="p-scale-num" class="pnum" min="5" max="800" step="1" value="100" oninput="pairFromNum('p-scale');applyNP()"><span class="punit">%</span></div></div>
+        <div class="pr"><label data-i18n="旋转">旋转</label>
+          <div class="pr-inline"><input type="range" id="p-rot" min="0" max="359" value="0" oninput="pairFromSlider('p-rot');applyNP()">
+            <input type="number" id="p-rot-num" class="pnum" min="0" max="359" step="1" value="0" oninput="pairFromNum('p-rot');applyNP()"><span class="punit">°</span>
+            <button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="resetRotation()" data-i18n="归零">归零</button></div></div>
+        <div class="pr"><label id="p-fs-label">标签字号</label>
+          <div class="pr-inline"><input type="range" id="p-fs" min="6" max="120" value="14" oninput="pairFromSlider('p-fs');applyNP()">
+            <input type="number" id="p-fs-num" class="pnum" min="4" max="300" step="1" value="14" oninput="pairFromNum('p-fs');applyNP()"><span class="punit">px</span></div></div>
         <div class="pr"><label id="p-fc-label" data-i18n="标签颜色">标签颜色</label>
           <div class="pr-inline"><input type="color" id="p-fc" value="#e8f4ff" oninput="applyNP()">
           <input type="text" id="p-fc-hex" style="flex:1" oninput="syncColor('p-fc',this.value)"></div></div>
         <div id="text-style" style="display:none">
-          <div class="psep"></div>
-          <div class="pr"><label data-i18n="背景填充">背景填充</label>
-            <div class="pr-inline">
-              <input type="color" id="p-bg" value="#102a52" oninput="applyTextStyle()">
-              <input type="text" id="p-bg-hex" style="flex:1" placeholder="无填充留空" oninput="applyTextStyle()">
-              <button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="clearTextBg()">无</button>
-            </div></div>
-          <div class="pr"><label data-i18n="边框样式">边框样式</label>
-            <select id="p-border" onchange="applyTextStyle()">
-              <option value="none" data-i18n="无边框">无边框</option><option value="solid" data-i18n="实线">实线</option><option value="dashed" data-i18n="虚线">虚线</option>
-            </select></div>
-          <div class="pr"><label data-i18n="边框颜色">边框颜色</label>
-            <div class="pr-inline"><input type="color" id="p-border-color" value="#4dd0ff" oninput="applyTextStyle()">
-            <input type="text" id="p-border-color-hex" style="flex:1" oninput="applyTextStyle()"></div></div>
-          <div class="pr"><label>圆角 <span id="p-radius-v">6</span>px</label>
-            <div class="pr-inline"><input type="range" id="p-radius" min="0" max="24" value="6" oninput="applyTextStyle()"></div></div>
+          <div class="pcard">
+            <div class="pcard-title">🎨 盒子样式（背景 / 边框 / 圆角）</div>
+            <div class="pr"><label data-i18n="背景填充">背景填充</label>
+              <div class="pr-inline">
+                <input type="color" id="p-bg" value="#102a52" oninput="applyTextStyle()">
+                <input type="text" id="p-bg-hex" style="flex:1" placeholder="无填充留空" oninput="applyTextStyle()">
+                <button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="clearTextBg()">无</button>
+              </div></div>
+            <div class="pr"><label data-i18n="边框样式">边框样式</label>
+              <select id="p-border" onchange="applyTextStyle()">
+                <option value="none" data-i18n="无边框">无边框</option><option value="solid" data-i18n="实线">实线</option><option value="dashed" data-i18n="虚线">虚线</option>
+              </select></div>
+            <div id="border-detail">
+              <div class="pr"><label data-i18n="边框颜色">边框颜色</label>
+                <div class="pr-inline"><input type="color" id="p-border-color" value="#4dd0ff" oninput="applyTextStyle()">
+                <input type="text" id="p-border-color-hex" style="flex:1" oninput="applyTextStyle()"></div></div>
+              <div class="pr"><label data-i18n="边框线宽">边框线宽</label>
+                <div class="pr-inline"><input type="range" id="p-bw" min="0.5" max="10" step="0.5" value="1.5" oninput="pairFromSlider('p-bw');applyTextStyle()">
+                  <input type="number" id="p-bw-num" class="pnum" min="0.5" max="20" step="0.5" value="1.5" oninput="pairFromNum('p-bw');applyTextStyle()"><span class="punit">px</span></div></div>
+            </div>
+            <div class="pr"><label data-i18n="圆角">圆角</label>
+              <div class="pr-inline"><input type="range" id="p-radius" min="0" max="60" data-pxmax="60" value="6" oninput="pairFromSlider('p-radius');applyTextStyle()">
+                <input type="number" id="p-radius-num" class="pnum" min="0" step="1" value="6" oninput="pairFromNum('p-radius');applyTextStyle()">
+                <select id="p-radius-unit" style="flex:0 0 56px;width:56px" onchange="onRadiusUnit('p-radius','p-radius-unit',applyTextStyle)">
+                  <option value="px">px</option><option value="%">%</option>
+                </select></div>
+              <div class="phint" style="margin-top:3px" data-i18n="百分比按盒子高度计，50%=胶囊圆角">百分比按盒子高度计，50%=胶囊圆角</div></div>
+          </div>
         </div>
         <div id="variable-style" style="display:none">
           <div class="psep"></div>
@@ -284,8 +345,9 @@
           <div class="pr"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--ui-text)"><input type="checkbox" id="p-label-bold" onchange="applyVarStyle()" style="width:auto"> <span data-i18n="标签(label)加粗">标签(label)加粗</span></label></div>
           <div class="psep"></div>
           <div class="phint" data-i18n="值(value)字体：">值(value)字体：</div>
-          <div class="pr"><label>值字号 <span id="p-val-fs-v">16</span>px</label>
-            <div class="pr-inline"><input type="range" id="p-val-fs" min="10" max="120" value="16" oninput="applyVarStyle()"></div></div>
+          <div class="pr"><label data-i18n="值字号">值字号</label>
+            <div class="pr-inline"><input type="range" id="p-val-fs" min="6" max="120" value="16" oninput="pairFromSlider('p-val-fs');applyVarStyle()">
+              <input type="number" id="p-val-fs-num" class="pnum" min="4" max="300" step="1" value="16" oninput="pairFromNum('p-val-fs');applyVarStyle()"><span class="punit">px</span></div></div>
           <div class="pr"><label data-i18n="值颜色">值颜色</label>
             <div class="pr-inline"><input type="color" id="p-val-color" value="#4dd0ff" oninput="applyVarStyle()">
             <input type="text" id="p-val-color-hex" style="flex:1" oninput="syncVarColor(this.value)"></div></div>
@@ -319,6 +381,38 @@
           <div id="dfields"></div>
           <button class="tb" id="btn-add-df" style="width:100%;margin-top:4px;font-size:12px" onclick="addDF()" data-i18n="+ 添加字段">+ 添加字段</button>
           <div class="phint" id="prow-data-hint" style="display:none;margin-top:4px"></div></div>
+        <div id="field-style" style="display:none">
+          <div class="pcard">
+            <div class="pcard-title" data-i18n="🏷 数据字段卡片样式">🏷 数据字段卡片样式</div>
+            <div class="pr"><label data-i18n="卡片背景">卡片背景</label>
+              <div class="pr-inline"><input type="color" id="p-df-bg" value="#0a1628" oninput="applyFieldStyle()">
+                <input type="text" id="p-df-bg-hex" style="flex:1" placeholder="留空=默认底色" oninput="applyFieldStyle()">
+                <button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="resetFieldBg()" data-i18n="默认">默认</button></div></div>
+            <div class="pr"><label data-i18n="卡片边框">卡片边框</label>
+              <select id="p-df-border" onchange="applyFieldStyle()">
+                <option value="inherit" data-i18n="默认（浅色细边）">默认（浅色细边）</option>
+                <option value="none" data-i18n="无边框">无边框</option>
+                <option value="solid" data-i18n="实线">实线</option>
+                <option value="dashed" data-i18n="虚线">虚线</option>
+              </select></div>
+            <div id="df-border-detail">
+              <div class="pr"><label data-i18n="边框颜色">边框颜色</label>
+                <div class="pr-inline"><input type="color" id="p-df-bc" value="#7896b4" oninput="applyFieldStyle()">
+                  <input type="text" id="p-df-bc-hex" style="flex:1" oninput="applyFieldStyle()"></div></div>
+              <div class="pr"><label data-i18n="边框线宽">边框线宽</label>
+                <div class="pr-inline"><input type="range" id="p-df-bw" min="0.5" max="10" step="0.5" value="1.2" oninput="pairFromSlider('p-df-bw');applyFieldStyle()">
+                  <input type="number" id="p-df-bw-num" class="pnum" min="0.5" max="20" step="0.1" value="1.2" oninput="pairFromNum('p-df-bw');applyFieldStyle()"><span class="punit">px</span></div></div>
+            </div>
+            <div class="pr"><label data-i18n="圆角">圆角</label>
+              <div class="pr-inline"><input type="range" id="p-df-radius" min="0" max="20" data-pxmax="20" value="5" oninput="pairFromSlider('p-df-radius');applyFieldStyle()">
+                <input type="number" id="p-df-radius-num" class="pnum" min="0" max="50" step="1" value="5" oninput="pairFromNum('p-df-radius');applyFieldStyle()">
+                <select id="p-df-radius-unit" style="flex:0 0 56px;width:56px" onchange="onRadiusUnit('p-df-radius','p-df-radius-unit',applyFieldStyle)">
+                  <option value="px">px</option><option value="%">%</option>
+                </select></div>
+              <div class="phint" style="margin-top:3px" data-i18n="百分比按卡片高度计，50%=胶囊圆角">百分比按卡片高度计，50%=胶囊圆角</div></div>
+            <button class="tb" style="width:100%;margin-bottom:10px;font-size:12px" onclick="resetFieldStyle()" data-i18n="↺ 恢复默认样式">↺ 恢复默认样式</button>
+          </div>
+        </div>
         <div class="psep"></div>
         <div class="phint">坐标: <span id="p-x">—</span>, <span id="p-y">—</span></div>
       </div>

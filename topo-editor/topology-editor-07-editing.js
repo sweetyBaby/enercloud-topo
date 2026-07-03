@@ -101,6 +101,13 @@ function bgPlate(){
   return bgColor;
 }
 
+// ── 滑杆+数字输入 成对联动（约定：数字框 id = 滑杆 id + '-num'）──
+// 键入值超出滑杆量程时自动扩展量程（不回缩），两控件始终同步；apply* 一律经 pairVal 读数字框
+function pairSet(id,val){const s=document.getElementById(id),n=document.getElementById(id+'-num');if(s){if(+val>+s.max)s.max=val;if(+val<+s.min)s.min=val;s.value=val;}if(n)n.value=val;}
+function pairFromSlider(id){const s=document.getElementById(id),n=document.getElementById(id+'-num');if(s&&n)n.value=s.value;}
+function pairFromNum(id){const s=document.getElementById(id),n=document.getElementById(id+'-num');if(!s||!n)return;const v=parseFloat(n.value);if(!Number.isFinite(v))return;if(v>+s.max)s.max=v;if(v<+s.min)s.min=v;s.value=v;}
+function pairVal(id,def){const el=document.getElementById(id+'-num')||document.getElementById(id);const v=el?parseFloat(el.value):NaN;return Number.isFinite(v)?v:def;}
+
 function selectNode(id){
   ensurePropsOpen();
   selNode=id;selEdge=null;const n=nodes.find(x=>x.id===id);if(!n){showPanel('none');return;}
@@ -109,9 +116,9 @@ function selectNode(id){
   document.getElementById('p-label-zh').value=n.labelZh||n.label||'';
   document.getElementById('p-label-en').value=n.labelEn||'';
   document.getElementById('p-type').value=n.type;
-  document.getElementById('p-fs').value=n.fontSize||14;document.getElementById('p-fs-v').textContent=n.fontSize||14;
-  const sc=Math.round((n.scale||1)*100);document.getElementById('p-scale').value=sc;document.getElementById('p-scale-v').textContent=sc;
-  document.getElementById('p-rot').value=n.rotation||0;document.getElementById('p-rot-v').textContent=n.rotation||0;
+  pairSet('p-fs',n.fontSize||14);
+  pairSet('p-scale',Math.round((n.scale||1)*100));
+  pairSet('p-rot',n.rotation||0);
   document.getElementById('p-fc').value=n.fontColor||'#e8f4ff';document.getElementById('p-fc-hex').value=n.fontColor||'#e8f4ff';
   document.getElementById('p-x').textContent=n.x.toFixed(0);document.getElementById('p-y').textContent=n.y.toFixed(0);
   // 文本框 / 变量节点：隐藏类型/图标大小，数据字段走标准配置
@@ -139,7 +146,8 @@ function selectNode(id){
     document.getElementById('p-anchor-op').value=op;document.getElementById('p-anchor-op-v').textContent=op;
   }
   const fsLabelTxt=isText?'文字字号':(isVariable?'标签(label)字号':'标签字号');
-  document.getElementById('p-fs-label').innerHTML=fsLabelTxt+' <span id="p-fs-v">'+(n.fontSize||(isText?18:14))+'</span>px';
+  document.getElementById('p-fs-label').textContent=fsLabelTxt;
+  pairSet('p-fs',n.fontSize||(isText?18:14));
   document.getElementById('p-fc-label').textContent=isText?'文字颜色':(isVariable?'标签(label)颜色':'标签颜色');
   document.querySelector('#pnode .pr label').textContent=isText?'文本框 ID':(isVariable?'变量 ID':'节点 ID');
   // 盒子样式（背景/边框/圆角）：文本框 + 变量节点共用
@@ -150,8 +158,11 @@ function selectNode(id){
     document.getElementById('p-border').value=n.border||'none';
     document.getElementById('p-border-color').value=n.borderColor||'#4dd0ff';
     document.getElementById('p-border-color-hex').value=n.borderColor||'#4dd0ff';
-    document.getElementById('p-radius').value=n.radius!=null?n.radius:6;
-    document.getElementById('p-radius-v').textContent=n.radius!=null?n.radius:6;
+    pairSet('p-bw',n.borderWidth!=null?n.borderWidth:1.5);
+    // 边框细项（颜色/线宽）仅在选了边框样式时展示
+    document.getElementById('border-detail').style.display=(n.border&&n.border!=='none')?'':'none';
+    // 圆角：内部存 数字=px / 'NN%'=百分比（按盒子高度），回填到 数值+单位 两个控件
+    fillRadiusControls('p-radius','p-radius-unit',n.radius!=null?n.radius:6);
   }
   // 变量节点专属：排列方式 + label/value 字体属性
   document.getElementById('variable-style').style.display=isVariable?'block':'none';
@@ -159,42 +170,142 @@ function selectNode(id){
     document.getElementById('p-var-layout').value=(n.varLayout==='v'?'v':'h');
     document.getElementById('p-label-bold').checked=(n.labelBold!==false);
     const vfs=(n.valFontSize!=null?n.valFontSize:(n.fontSize||16));
-    document.getElementById('p-val-fs').value=vfs;document.getElementById('p-val-fs-v').textContent=vfs;
+    pairSet('p-val-fs',vfs);
     document.getElementById('p-val-color').value=n.valColor||'#4dd0ff';
     document.getElementById('p-val-color-hex').value=n.valColor||'#4dd0ff';
     document.getElementById('p-val-bold').checked=!!n.valBold;
+  }
+  // 数据字段卡片样式：仅设备类节点（文本框/变量/占位点无字段卡片）
+  const showFieldStyle=!isTextBox&&!isAnchor;
+  document.getElementById('field-style').style.display=showFieldStyle?'block':'none';
+  if(showFieldStyle){
+    document.getElementById('p-df-bg').value=n.fieldBg||'#0a1628';
+    document.getElementById('p-df-bg-hex').value=n.fieldBg||'';
+    document.getElementById('p-df-border').value=n.fieldBorder||'inherit';
+    document.getElementById('p-df-bc').value=n.fieldBorderColor||'#7896b4';
+    document.getElementById('p-df-bc-hex').value=n.fieldBorderColor||'';
+    pairSet('p-df-bw',n.fieldBorderWidth!=null?n.fieldBorderWidth:1.2);
+    fillRadiusControls('p-df-radius','p-df-radius-unit',n.fieldRadius!=null?n.fieldRadius:5);
+    document.getElementById('df-border-detail').style.display=(n.fieldBorder==='solid'||n.fieldBorder==='dashed')?'':'none';
   }
   renderNodeActionControls(n);
   renderDFs(n);
   refreshNodeRuleSummary(n);
   refreshNodeIconRuleSummary(n);
+  updGfdSelBtn();   // 单选/点选字段卡片路径不经 updateAlignBar，这里兜底刷新「仅选中节点」计数
+}
+// 数据字段卡片样式（单节点）：背景/边框/线宽/圆角 → n.fieldBg/fieldBorder/fieldBorderColor/fieldBorderWidth/fieldRadius
+// 未设置(删除属性)=沿用默认外观；告警/选中态配色在渲染层优先于自定义
+function applyFieldStyle(){
+  const n=nodes.find(x=>x.id===selNode);if(!n)return;
+  const act=document.activeElement?document.activeElement.id:'';
+  const bgPick=document.getElementById('p-df-bg'),bgHex=document.getElementById('p-df-bg-hex');
+  if(act==='p-df-bg'){ n.fieldBg=bgPick.value; bgHex.value=bgPick.value; }
+  else if(act==='p-df-bg-hex'){
+    const v=bgHex.value.trim();
+    if(v==='')delete n.fieldBg;
+    else if(/^#?[0-9a-fA-F]{6}$/.test(v)){n.fieldBg=(v[0]==='#'?v:'#'+v);bgPick.value=n.fieldBg;}
+  }
+  const bs=document.getElementById('p-df-border').value;
+  // 仅 实线/虚线 才保留边框颜色/线宽；「默认（浅色细边）」和「无边框」都要清掉这两个细项，
+  // 否则渲染/导出会继续沿用旧的自定义颜色/线宽（默认细边不再是默认样式）
+  if(bs==='solid'||bs==='dashed'){
+    n.fieldBorder=bs;
+    const bcPick=document.getElementById('p-df-bc'),bcHex=document.getElementById('p-df-bc-hex');
+    if(act==='p-df-bc'){ n.fieldBorderColor=bcPick.value; bcHex.value=bcPick.value; }
+    else if(act==='p-df-bc-hex'){
+      const v=bcHex.value.trim();
+      if(/^#?[0-9a-fA-F]{6}$/.test(v)){n.fieldBorderColor=(v[0]==='#'?v:'#'+v);bcPick.value=n.fieldBorderColor;}
+    }
+    n.fieldBorderWidth=Math.max(0.5,Math.min(20,pairVal('p-df-bw',1.2)));
+  }else{
+    if(bs==='inherit')delete n.fieldBorder; else n.fieldBorder=bs;   // 'none'=显式无边框
+    delete n.fieldBorderColor;delete n.fieldBorderWidth;
+  }
+  n.fieldRadius=readRadiusControls('p-df-radius','p-df-radius-unit');
+  // 属性面板是「节点级整体设置」：清掉各字段的字段级覆盖（外观面板④框选单卡片写入的 chip*），否则这里的修改会被盖住看不到效果
+  if(n.data)n.data.forEach(f=>{['chipBg','chipBorder','chipBorderColor','chipBorderWidth','chipRadius'].forEach(k=>delete f[k]);});
+  document.getElementById('df-border-detail').style.display=(n.fieldBorder==='solid'||n.fieldBorder==='dashed')?'':'none';
+}
+function resetFieldBg(){const n=nodes.find(x=>x.id===selNode);if(!n)return;delete n.fieldBg;document.getElementById('p-df-bg-hex').value='';}
+function resetFieldStyle(){
+  const n=nodes.find(x=>x.id===selNode);if(!n)return;
+  snapshot();
+  ['fieldBg','fieldBorder','fieldBorderColor','fieldBorderWidth','fieldRadius'].forEach(k=>delete n[k]);
+  // 同时清掉各字段的字段级覆盖，真正回到默认外观
+  if(n.data)n.data.forEach(f=>{['chipBg','chipBorder','chipBorderColor','chipBorderWidth','chipRadius'].forEach(k=>delete f[k]);});
+  snapshot();
+  selectNode(n.id);
 }
 function applyTextStyle(){
   const n=nodes.find(x=>x.id===selNode);if(!n)return;
-  const bgHex=document.getElementById('p-bg-hex').value.trim();
-  const pick=document.getElementById('p-bg').value;
-  if(bgHex){ n.bg=(/^#?[0-9a-fA-F]{6}$/.test(bgHex))?(bgHex[0]==='#'?bgHex:'#'+bgHex):pick; }
-  else if(document.activeElement&&document.activeElement.id==='p-bg'){ n.bg=pick; document.getElementById('p-bg-hex').value=pick; }
+  // 颜色一律以「正在编辑的那个控件」为准：此前 hex 旧值总覆盖取色器新值，导致背景只生效一次、边框颜色改不动
+  const act=document.activeElement?document.activeElement.id:'';
+  const bgPick=document.getElementById('p-bg'),bgHex=document.getElementById('p-bg-hex');
+  if(act==='p-bg'){ n.bg=bgPick.value; bgHex.value=bgPick.value; }
+  else if(act==='p-bg-hex'){
+    const v=bgHex.value.trim();
+    if(v==='')n.bg='none';
+    else if(/^#?[0-9a-fA-F]{6}$/.test(v)){n.bg=(v[0]==='#'?v:'#'+v);bgPick.value=n.bg;}
+  }
   n.border=document.getElementById('p-border').value;
-  n.borderColor=document.getElementById('p-border-color').value;
-  const bch=document.getElementById('p-border-color-hex').value.trim();
-  if(/^#?[0-9a-fA-F]{6}$/.test(bch)){n.borderColor=(bch[0]==='#'?bch:'#'+bch);document.getElementById('p-border-color').value=n.borderColor;}
-  n.radius=parseInt(document.getElementById('p-radius').value);
-  document.getElementById('p-radius-v').textContent=n.radius;
+  const bcPick=document.getElementById('p-border-color'),bcHex=document.getElementById('p-border-color-hex');
+  if(act==='p-border-color'){ n.borderColor=bcPick.value; bcHex.value=bcPick.value; }
+  else if(act==='p-border-color-hex'){
+    const v=bcHex.value.trim();
+    if(/^#?[0-9a-fA-F]{6}$/.test(v)){n.borderColor=(v[0]==='#'?v:'#'+v);bcPick.value=n.borderColor;}
+  }
+  n.borderWidth=Math.max(0.5,Math.min(20,pairVal('p-bw',1.5)));
+  // 圆角：数值+单位。px 存数字；% 存 'NN%'（绘制时按盒子高度换算，50%=胶囊）
+  n.radius=readRadiusControls('p-radius','p-radius-unit');
+  document.getElementById('border-detail').style.display=(n.border&&n.border!=='none')?'':'none';
 }
 function clearTextBg(){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.bg='none';document.getElementById('p-bg-hex').value='';}
+// 圆角「数值+单位」通用逻辑（盒子 p-radius / 字段卡片 p-df-radius、gfd-radius 共用）：
+// % 模式量程 0–50（50%=胶囊）；px 模式恢复滑杆自带量程(data-pxmax)，键入更大值经 pairFromNum 自动扩展
+function radiusUnitRange(sliderId,unit){const s=document.getElementById(sliderId);if(!s)return;if(unit==='%'){s.max=50;if(+s.value>50)s.value=50;}else s.max=Math.max(+(s.dataset.pxmax||60),+s.value);}
+function onRadiusUnit(sliderId,unitId,applyFn){
+  const unit=document.getElementById(unitId).value;
+  let v=pairVal(sliderId,unit==='%'?25:6);
+  if(unit==='%')v=Math.max(0,Math.min(50,v));
+  radiusUnitRange(sliderId,unit);
+  pairSet(sliderId,v);
+  if(typeof applyFn==='function')applyFn();
+}
+// 圆角控件回填：内部值 数字=px / 'NN%'=百分比 → 拆到 数值+单位
+function fillRadiusControls(sliderId,unitId,val){
+  const pct=(typeof val==='string'&&val.trim().endsWith('%'));
+  document.getElementById(unitId).value=pct?'%':'px';
+  radiusUnitRange(sliderId,pct?'%':'px');
+  pairSet(sliderId,pct?Math.max(0,Math.min(50,parseFloat(val)||0)):Math.max(0,(typeof val==='number'?val:parseFloat(val))||0));
+}
+// 圆角控件读值 → 内部存储值（px 数字 / 'NN%'）
+function readRadiusControls(sliderId,unitId){
+  const unit=document.getElementById(unitId).value;
+  let v=Math.max(0,pairVal(sliderId,6));
+  if(unit==='%'){
+    v=Math.min(50,v);
+    document.getElementById(sliderId).max=50;
+    if(parseFloat(document.getElementById(sliderId+'-num').value)>50)pairSet(sliderId,v);
+    return v+'%';
+  }
+  return v;
+}
 // 变量节点：排列方式 + label/value 字体属性（label 复用 p-fs/p-fc/p-label-bold，value 用 p-val-*）
 function applyVarStyle(){
   const n=nodes.find(x=>x.id===selNode);if(!n||n.type!=='variable')return;
   n.varLayout=document.getElementById('p-var-layout').value==='v'?'v':'h';
   n.labelBold=document.getElementById('p-label-bold').checked;
-  n.valFontSize=parseInt(document.getElementById('p-val-fs').value);
-  document.getElementById('p-val-fs-v').textContent=n.valFontSize;
+  n.valFontSize=Math.max(4,Math.min(300,Math.round(pairVal('p-val-fs',16))));
   n.valBold=document.getElementById('p-val-bold').checked;
-  const pick=document.getElementById('p-val-color').value;
-  const hex=document.getElementById('p-val-color-hex').value.trim();
-  if(/^#?[0-9a-fA-F]{6}$/.test(hex)){n.valColor=(hex[0]==='#'?hex:'#'+hex);document.getElementById('p-val-color').value=n.valColor;}
-  else if(document.activeElement&&document.activeElement.id==='p-val-color'){n.valColor=pick;document.getElementById('p-val-color-hex').value=pick;}
+  // 以「正在编辑的控件」为准，避免 hex 旧值覆盖取色器新值（同 applyTextStyle）
+  const act=document.activeElement?document.activeElement.id:'';
+  const vcPick=document.getElementById('p-val-color'),vcHex=document.getElementById('p-val-color-hex');
+  if(act==='p-val-color'){ n.valColor=vcPick.value; vcHex.value=vcPick.value; }
+  else if(act==='p-val-color-hex'){
+    const v=vcHex.value.trim();
+    if(/^#?[0-9a-fA-F]{6}$/.test(v)){ n.valColor=(v[0]==='#'?v:'#'+v); vcPick.value=n.valColor; }
+  }
 }
 function syncVarColor(v){if(/^#[0-9a-fA-F]{6}$/.test(v)){document.getElementById('p-val-color').value=v;applyVarStyle();}}
 function renderNodeActionControls(n){
@@ -216,10 +327,15 @@ function applyNodeAction(){
 // 占位点(anchor)外观：填充色 + 不透明度
 function applyAnchorStyle(){
   const n=nodes.find(x=>x.id===selNode);if(!n)return;
-  const hex=document.getElementById('p-anchor-fill-hex').value.trim();
-  const pick=document.getElementById('p-anchor-fill').value;
-  if(/^#?[0-9a-fA-F]{6}$/.test(hex)){ n.fill=(hex[0]==='#'?hex:'#'+hex); document.getElementById('p-anchor-fill').value=n.fill; }
-  else if(document.activeElement&&document.activeElement.id==='p-anchor-fill'){ n.fill=pick; document.getElementById('p-anchor-fill-hex').value=pick; }
+  // 以「正在编辑的控件」为准，避免 hex 旧值覆盖取色器新值（同 applyTextStyle）
+  const act=document.activeElement?document.activeElement.id:'';
+  const fillPick=document.getElementById('p-anchor-fill'),fillHex=document.getElementById('p-anchor-fill-hex');
+  if(act==='p-anchor-fill'){ n.fill=fillPick.value; fillHex.value=fillPick.value; }
+  else if(act==='p-anchor-fill-hex'){
+    const v=fillHex.value.trim();
+    if(v==='')n.fill='none';
+    else if(/^#?[0-9a-fA-F]{6}$/.test(v)){ n.fill=(v[0]==='#'?v:'#'+v); fillPick.value=n.fill; }
+  }
   n.opacity=parseInt(document.getElementById('p-anchor-op').value)/100;
   document.getElementById('p-anchor-op-v').textContent=Math.round(n.opacity*100);
 }
@@ -267,9 +383,9 @@ function applyNP(){
   n.labelEn=document.getElementById('p-label-en').value;
   n.label=n.labelZh; // 兼容旧字段
   n.type=document.getElementById('p-type').value;
-  n.fontSize=parseInt(document.getElementById('p-fs').value);document.getElementById('p-fs-v').textContent=n.fontSize;
-  n.scale=parseInt(document.getElementById('p-scale').value)/100;document.getElementById('p-scale-v').textContent=Math.round(n.scale*100);
-  n.rotation=parseInt(document.getElementById('p-rot').value);document.getElementById('p-rot-v').textContent=n.rotation;
+  n.fontSize=Math.max(4,Math.min(300,Math.round(pairVal('p-fs',14))));
+  n.scale=Math.max(5,Math.min(800,Math.round(pairVal('p-scale',100))))/100;
+  n.rotation=((Math.round(pairVal('p-rot',0))%360)+360)%360;
   invalidateRouting();
   n.fontColor=document.getElementById('p-fc').value;document.getElementById('p-fc-hex').value=n.fontColor;
 }
@@ -293,11 +409,14 @@ function applyEP(){
   if(!selEdge)return;selEdge.et=document.getElementById('ep-type').value;selEdge.route=optionToRoute(document.getElementById('ep-route').value);
   selEdge.dir=document.getElementById('ep-dir').value;selEdge.lbl=document.getElementById('ep-lbl').value;
   selEdge.w=parseFloat(document.getElementById('ep-w').value);document.getElementById('ep-w-v').textContent=selEdge.w.toFixed(1);
-  const pick=document.getElementById('ep-color').value;
-  const hex=normHex(document.getElementById('ep-color-hex').value);
-  if(hex){selEdge.lineColor=hex;document.getElementById('ep-color').value=hex;}
-  else if(document.activeElement&&document.activeElement.id==='ep-color'){selEdge.lineColor=pick;document.getElementById('ep-color-hex').value=pick;}
-  else if(!document.getElementById('ep-color-hex').value.trim())delete selEdge.lineColor;
+  // 以「正在编辑的控件」为准，避免 hex 旧值覆盖取色器新值（同 applyTextStyle）
+  const epPick=document.getElementById('ep-color'),epHex=document.getElementById('ep-color-hex');
+  if(document.activeElement&&document.activeElement.id==='ep-color'){selEdge.lineColor=epPick.value;epHex.value=epPick.value;}
+  else{
+    const hex=normHex(epHex.value);
+    if(hex){selEdge.lineColor=hex;epPick.value=hex;}
+    else if(!epHex.value.trim())delete selEdge.lineColor;
+  }
   selEdge.lineStyle=document.getElementById('ep-style').value;
   if(selEdge.lineStyle==='inherit')delete selEdge.lineStyle;
   selEdge.hideLabel=!document.getElementById('ep-showlbl').checked;
@@ -504,7 +623,7 @@ function confirmGlobalBind(idx){
   s.bind={field:loc+'.'+field, deviceId:did, deviceType:dt||''};
   closeFieldBind();renderCustomSignals();invalidateRouting();
 }
-function resetRotation(){const n=nodes.find(x=>x.id===selNode);if(!n)return;snapshot();n.rotation=0;document.getElementById('p-rot').value=0;document.getElementById('p-rot-v').textContent=0;snapshot();}
+function resetRotation(){const n=nodes.find(x=>x.id===selNode);if(!n)return;snapshot();n.rotation=0;pairSet('p-rot',0);snapshot();}
 function resetFieldPos(){const n=nodes.find(x=>x.id===selNode);if(!n||!n.data)return;snapshot();n.data.forEach(f=>{f.ox=0;f.oy=0;});snapshot();}
 // 智能环绕布局：把字段卡片分配到设备四周空闲方向，避开连线占用的边
 function connDirsOf(n){
@@ -521,16 +640,16 @@ function connDirsOf(n){
 function smartLayoutFields(n){
   if(!n.data||n.data.length===0)return;
   const s=nsz(n);
-  const cfs=(n.fontSize||14)*0.92/zoom;
+  const cfs=chipBaseFS(n)*0.92/zoom;
   const connDirs=connDirsOf(n);
-  const step=((n.fontSize||14)+18)/zoom; const chipW=130/zoom, chipH=step; // 估算卡片尺寸（屏幕固定）
+  const step=(chipBaseFS(n)+18)/zoom; const chipW=130/zoom, chipH=step; // 估算卡片尺寸（屏幕固定）
   // 8 个候选方向（右、右下、下、左下、左、左上、上、右上）
   const slots=[0, Math.PI/4, Math.PI/2, 3*Math.PI/4, Math.PI, -3*Math.PI/4, -Math.PI/2, -Math.PI/4];
   const radius=s*0.55+cfs*1.6;
   // 收集障碍：其它节点盒 + 其它节点已放置的字段卡片
   const obstacles=[];
   nodes.forEach(o=>{ if(o.id===n.id)return; const b=nodeBox(o); obstacles.push({l:b.left-10,r:b.right+10,t:b.top-10,b:b.bottom+10});
-    if(o.data) o.data.forEach((f,i)=>{ const os=nsz(o); const bx=o.x+os*0.5+12/zoom+(f.ox||0)/zoom, by=o.y-os*0.40+i*(((o.fontSize||14)+18)/zoom)+(f.oy||0)/zoom; obstacles.push({l:bx-6,r:bx+chipW+6,t:by-6,b:by+chipH+6}); });
+    if(o.data) o.data.forEach((f,i)=>{ const os=nsz(o); const bx=o.x+os*0.5+12/zoom+(f.ox||0)/zoom, by=o.y-os*0.40+i*((chipBaseFS(o)+18)/zoom)+(f.oy||0)/zoom; obstacles.push({l:bx-6,r:bx+chipW+6,t:by-6,b:by+chipH+6}); });
   });
   // 画布中心，用于"朝向开阔区"的偏好
   const cw=canvas.width/zoom, ch=canvas.height/zoom;
@@ -578,6 +697,7 @@ function updateAlignBar(){
   if(nc>=2){bar.classList.add('show');document.getElementById('align-count').textContent=lang==='en'?('Align '+nc+' nodes'+(cc>0?' (+'+cc+' fields, nodes first)':'')):('对齐 '+nc+' 个元素'+(cc>0?'（含'+cc+'字段，以元素为准）':''));}
   else if(cc>=2){bar.classList.add('show');document.getElementById('align-count').textContent=lang==='en'?('Align '+cc+' fields'):('对齐 '+cc+' 个字段');}
   else bar.classList.remove('show');
+  updGfdSelBtn();   // 外观面板④「仅选中节点」按钮计数随选择变化实时刷新
 }
 function clearMultiSel(){selSet.clear();selChips.clear();updateAlignBar();}
 function selectedNodes(){return [...selSet].map(id=>nodes.find(n=>n.id===id)).filter(Boolean);}
@@ -928,7 +1048,7 @@ function _compactAxis(cNodes, axis, targetGap){
   if(cNodes.length<2)return;
   const lohi=n=>{ const s=nsz(n);
     const f=(!n.hideFields&&n.data)?n.data.filter(x=>!x.hidden).length:0;
-    const step=((n.fontSize||14)+18);
+    const step=(chipBaseFS(n)+18);
     if(axis==='x'){ const rc=f?185:0; return [n.x-s*0.7, n.x+s*0.7+rc]; }   // 右侧含字段延展
     return [n.y-s*0.9, n.y+Math.max(s*1.2, s*0.4+f*step)];                  // 下方含标签与下垂字段
   };
@@ -1010,25 +1130,134 @@ function ctxCopy(){document.getElementById('ctxmenu').style.display='none';if(ct
 function ctxStraight(){document.getElementById('ctxmenu').style.display='none';if(ctxKind==='edge'){snapshot();ctxTgt.route='smart';delete ctxTgt.waypoints;invalidateRouting();snapshot();selectEdge(ctxTgt);flashHint('该连线已重置为智能走线（最短·自动避障）');}}
 function ctxLine(){document.getElementById('ctxmenu').style.display='none';if(ctxKind==='edge'){snapshot();ctxTgt.route='line';delete ctxTgt.waypoints;delete ctxTgt.orthoDir;invalidateRouting();snapshot();selectEdge(ctxTgt);flashHint('该连线已设为直线（起止直连）');}}
 
-function closeBgPanel(){const p=document.getElementById('bgpanel'),ov=document.getElementById('bgpanel-overlay');if(p)p.classList.remove('show');if(ov)ov.classList.remove('show');}
+// 外观面板：非模态（无遮罩、不点外即关），画布保持可交互，便于「选节点→批量应用」的往返操作
+function closeBgPanel(){const p=document.getElementById('bgpanel');if(p)p.classList.remove('show');}
 function toggleBgPanel(){
-  const p=document.getElementById('bgpanel');const ov=document.getElementById('bgpanel-overlay');const show=!p.classList.contains('show');
+  const p=document.getElementById('bgpanel');const show=!p.classList.contains('show');
   if(show)setSigPanel(false);
-  p.classList.toggle('show',show);ov.classList.toggle('show',show);
+  p.classList.toggle('show',show);
 }
 function setBg(c){bgColor=c;document.documentElement.style.setProperty('--bg',c);const h=document.getElementById('bg-hex');if(h)h.value=c;const p=document.getElementById('bg-pick');if(p&&/^#[0-9a-fA-F]{6}$/.test(c))p.value=c;document.querySelectorAll('.cp').forEach(el=>el.classList.toggle('active',el.dataset.color===c));}
 function applyBgHex(){let v=document.getElementById('bg-hex').value.trim();if(v&&v[0]!=='#')v='#'+v;if(/^#[0-9a-fA-F]{3,6}$/.test(v))setBg(v);else alert('请输入有效色值，如 #0a1f40');}
-// 全局字体：一键应用到所有节点
+// 键入完整 6 位色值即生效（与色板/取色器「即选即生效」语义一致；Enter 仍走 applyBgHex 支持 3 位缩写）
+function applyBgHexLive(v){v=(v||'').trim();if(v&&v[0]!=='#')v='#'+v;if(/^#[0-9a-fA-F]{6}$/.test(v))setBg(v);}
+// 全局字体：按勾选把「大小/颜色」分别应用到所有节点的「名称/数据字段」，四项自由组合、互不绑定
 document.getElementById('gf-color').addEventListener('input',e=>{document.getElementById('gf-color-hex').value=e.target.value;});
+// 外观面板的 取色器↔hex 双向联动（无选中节点语义，纯控件同步）
+function wireColorPair(pickId,hexId){
+  const p=document.getElementById(pickId),h=document.getElementById(hexId);
+  if(!p||!h)return;
+  p.addEventListener('input',()=>{h.value=p.value;});
+  h.addEventListener('input',()=>{const v=h.value.trim();if(/^#[0-9a-fA-F]{6}$/.test(v))p.value=v;});
+}
+wireColorPair('gfd-bg','gfd-bg-hex');
+wireColorPair('gfd-bc','gfd-bc-hex');
+// 数据字段卡片统一设置（外观面板④）：scope 'all'=全部设备节点 / 'sel'=仅当前选中（支持多选）
+// 当前选中的批量目标，两种粒度：
+//   节点级 nodeTargets = 多选集合/单选的设备节点 → 改该节点全部字段卡片（写 n.field*）
+//   字段级 fieldTargets = 框选/点选的字段卡片（其节点不在节点级目标中）→ 只改这几张卡片（写 f.chip*，渲染时覆盖节点级）
+function gfdSelTargets(){
+  // 有字段卡片被选中的节点 → 按字段级处理（只改选中卡片），不再整体计为节点目标。
+  // 注意：单击卡片也会把 selNode 设为该节点（供属性面板显示），故 selNode 只有在「没有选中它的卡片」时才算节点级选中。
+  const chipNodeIds=new Set([...selChips].map(k=>k.split('#')[0]));
+  const selOn=n=>selSet.has(n.id)||(n.id===selNode&&!chipNodeIds.has(n.id));
+  const nodeTargets=nodes.filter(n=>!usesTextBox(n.type)&&n.type!=='anchor'&&selOn(n));
+  const nodeIds=new Set(nodeTargets.map(n=>n.id));
+  const fieldTargets=[...selChips].map(k=>{
+    const a=k.split('#');const n=nodes.find(z=>z.id===a[0]);const f=n&&n.data&&n.data[a[1]];
+    return (f&&!nodeIds.has(n.id))?{n,f}:null;
+  }).filter(Boolean);
+  // 文本框/变量：受「同步应用为盒子样式」开关控制，把同一套设置落为盒子样式；占位点始终跳过
+  const boxTargets=nodes.filter(n=>usesTextBox(n.type)&&selOn(n));
+  const skippedAnchors=nodes.filter(n=>n.type==='anchor'&&selOn(n)).length;
+  return {nodeTargets, fieldTargets, boxTargets, skippedAnchors};
+}
+// 「仅选中」按钮：标签固定简洁，不做计数（目标类型可能增减，避免频繁改统计）
+function updGfdSelBtn(){
+  const b=document.getElementById('gfd-apply-sel');if(!b)return;
+  b.textContent=(lang==='en'?'Selected only':'仅选中');
+}
+function applyGlobalFieldStyle(scope){
+  const useBg=document.getElementById('gfd-use-bg').checked;
+  const useBorder=document.getElementById('gfd-use-border').checked;
+  const useRadius=document.getElementById('gfd-use-radius').checked;
+  if(!useBg&&!useBorder&&!useRadius){flashHint(lang==='en'?'Check at least one style to apply':'请先勾选要设置的样式（背景/边框/圆角）');return;}
+  const incBox=!!(document.getElementById('gfd-inc-box')&&document.getElementById('gfd-inc-box').checked);
+  let nodeTargets=[],fieldTargets=[],boxTargets=[],skipped=0;
+  if(scope==='sel'){
+    const r=gfdSelTargets();
+    nodeTargets=r.nodeTargets;fieldTargets=r.fieldTargets;
+    boxTargets=incBox?r.boxTargets:[];
+    skipped=r.skippedAnchors+(incBox?0:r.boxTargets.length);
+  }else{
+    nodeTargets=nodes.filter(n=>!usesTextBox(n.type)&&n.type!=='anchor');
+    boxTargets=incBox?nodes.filter(n=>usesTextBox(n.type)):[];
+  }
+  if(!nodeTargets.length&&!fieldTargets.length&&!boxTargets.length){
+    flashHint(scope==='sel'
+      ?(skipped?(lang==='en'?'Selected elements are not applicable (enable the box-style option for text/variable)':'当前选中的 '+skipped+' 个元素不可应用（文本框/变量可勾选上方「同步应用为盒子样式」；占位点不参与）')
+               :(lang==='en'?'Select nodes or field chips on canvas first':'请先在画布上选中节点或字段卡片（可框选）'))
+      :(lang==='en'?'No nodes on canvas':'画布暂无节点'));
+    return;
+  }
+  const bg=document.getElementById('gfd-bg').value;
+  const bs=document.getElementById('gfd-border').value;
+  const bc=document.getElementById('gfd-bc').value;
+  const bw=Math.max(0.5,Math.min(20,pairVal('gfd-bw',1.2)));
+  const rad=readRadiusControls('gfd-radius','gfd-radius-unit');
+  snapshot();
+  nodeTargets.forEach(n=>{
+    if(useBg)n.fieldBg=bg;
+    if(useBorder){n.fieldBorder=bs;if(bs!=='none'){n.fieldBorderColor=bc;n.fieldBorderWidth=bw;}else{delete n.fieldBorderColor;delete n.fieldBorderWidth;}}
+    if(useRadius)n.fieldRadius=rad;
+    // 节点级应用时清掉该节点各字段的字段级覆盖，避免旧的单卡片样式残留挡住本次设置
+    if(n.data)n.data.forEach(f=>{
+      if(useBg)delete f.chipBg;
+      if(useBorder){delete f.chipBorder;delete f.chipBorderColor;delete f.chipBorderWidth;}
+      if(useRadius)delete f.chipRadius;
+    });
+  });
+  fieldTargets.forEach(({f})=>{
+    if(useBg)f.chipBg=bg;
+    if(useBorder){f.chipBorder=bs;if(bs!=='none'){f.chipBorderColor=bc;f.chipBorderWidth=bw;}else{delete f.chipBorderColor;delete f.chipBorderWidth;}}
+    if(useRadius)f.chipRadius=rad;
+  });
+  // 文本框/变量：同一套设置落为盒子样式（bg/border/radius 与属性面板「盒子样式」同一组属性，圆角同样支持百分比）
+  boxTargets.forEach(n=>{
+    if(useBg)n.bg=bg;
+    if(useBorder){n.border=bs;if(bs!=='none'){n.borderColor=bc;n.borderWidth=bw;}}   // 盒子 'none' 时保留 borderColor/Width 无碍：盒子渲染以 n.border 为准，不读残留
+    if(useRadius)n.radius=rad;
+  });
+  snapshot();
+  if(selNode)selectNode(selNode);
+  const parts=[];
+  if(nodeTargets.length)parts.push(lang==='en'?(nodeTargets.length+' node(s)'):(nodeTargets.length+' 个节点'));
+  if(fieldTargets.length)parts.push(lang==='en'?(fieldTargets.length+' field chip(s)'):(fieldTargets.length+' 个字段卡片'));
+  if(boxTargets.length)parts.push(lang==='en'?(boxTargets.length+' text/variable box(es)'):(boxTargets.length+' 个文本/变量盒子'));
+  flashHint((lang==='en'?'Style applied to ':'样式已应用到 ')+parts.join(' + ')
+    +(skipped?((lang==='en'?', skipped ':'；已跳过 ')+skipped+(lang==='en'?' element(s)':' 个元素（未勾选盒子同步的文本/变量或占位点）')):''));
+}
 function applyGlobalFont(){
-  if(nodes.length===0){alert('画布暂无节点');return;}
-  const fs=parseInt(document.getElementById('gf-size').value);
+  if(nodes.length===0){alert(lang==='en'?'No nodes on canvas':'画布暂无节点');return;}
+  const useSize=document.getElementById('gf-use-size').checked;
+  const useColor=document.getElementById('gf-use-color').checked;
+  const toLabel=document.getElementById('gf-tgt-label').checked;
+  const toFields=document.getElementById('gf-tgt-fields').checked;
+  if(!useSize&&!useColor){flashHint(lang==='en'?'Check at least one style: size or color':'请先勾选要设置的样式：文字大小 或 文字颜色');return;}
+  if(!toLabel&&!toFields){flashHint(lang==='en'?'Check at least one target: node label or data fields':'请先勾选应用范围：节点名称 或 数据字段');return;}
+  let fs=Math.round(pairVal('gf-size',14));
+  fs=Math.max(6,Math.min(200,fs));
+  pairSet('gf-size',fs);
   const fc=document.getElementById('gf-color').value;
   snapshot();
-  nodes.forEach(n=>{n.fontSize=fs;n.fontColor=fc;});
+  nodes.forEach(n=>{
+    if(toLabel){ if(useSize)n.fontSize=fs; if(useColor)n.fontColor=fc; }
+    if(toFields){ if(useSize)n.fieldFontSize=fs; if(useColor)n.fieldFontColor=fc; }
+  });
   snapshot();
   // 若当前选中节点，刷新属性面板
   if(selNode)selectNode(selNode);
+  flashHint(lang==='en'?'Text style applied':'文字样式已应用');
 }
 document.getElementById('bg-hex').addEventListener('keydown',e=>{if(e.key==='Enter')applyBgHex();});
 

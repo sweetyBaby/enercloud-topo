@@ -22,7 +22,7 @@ window.addEventListener('resize',()=>resizeCanvas());
 function toWorld(sx,sy){return [(sx-panX)/zoom,(sy-panY)/zoom];}
 
 // 外观面板(#bgpanel)及其遮罩挂在 cwrap 内：滚轮落在弹层上时应滚动弹层内容，放行默认行为，不缩放画布
-cwrap.addEventListener('wheel',e=>{if(e.target!==canvas&&e.target.closest&&e.target.closest('#bgpanel,#bgpanel-overlay'))return;e.preventDefault();const r=canvas.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;const[wx,wy]=toWorld(mx,my);const f=e.deltaY<0?1.12:1/1.12;zoom=Math.max(.1,Math.min(5,zoom*f));panX=mx-wx*zoom;panY=my-wy*zoom;document.getElementById('zoom-info').textContent=Math.round(zoom*100)+'%';},{passive:false});
+cwrap.addEventListener('wheel',e=>{if(e.target!==canvas&&e.target.closest&&e.target.closest('#bgpanel'))return;e.preventDefault();const r=canvas.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;const[wx,wy]=toWorld(mx,my);const f=e.deltaY<0?1.12:1/1.12;zoom=Math.max(.1,Math.min(5,zoom*f));panX=mx-wx*zoom;panY=my-wy*zoom;document.getElementById('zoom-info').textContent=Math.round(zoom*100)+'%';},{passive:false});
 function resetZoom(){zoom=1;panX=0;panY=0;document.getElementById('zoom-info').textContent='100%';}
 function zoomStep(factor){
   const mx=canvas.width/2,my=canvas.height/2;
@@ -86,6 +86,8 @@ const I18N={
   '预览/运行态触发；URL 可填写前端路由路径，如 /station/detail?id=1。':'Triggers in preview/runtime mode; URL can be a frontend route, e.g. /station/detail?id=1.',
   '图标大小':'Icon Size','旋转':'Rotation','归零':'Reset','标签字号':'Label Font Size','标签颜色':'Label Color',
   '背景填充':'Background','无':'None','边框样式':'Border Style','无边框':'No Border','实线':'Solid','虚线':'Dashed','边框颜色':'Border Color','圆角':'Radius',
+  '边框线宽':'Border Width','值字号':'Value Font Size','百分比按盒子高度计，50%=胶囊圆角':'Percent is relative to box height; 50% = pill radius','百分比按卡片高度计，50%=胶囊圆角':'Percent is relative to chip height; 50% = pill radius',
+  '🏷 数据字段卡片样式':'🏷 Field Chip Style','卡片背景':'Chip Background','卡片边框':'Chip Border','默认（浅色细边）':'Default (subtle)','默认':'Default','↺ 恢复默认样式':'↺ Reset to Default','留空=默认底色':'Empty = default',
   '数据字段':'Data Fields','中文字段名':'Chinese Name','英文字段名':'English Name','数值':'Value','+ 添加字段':'+ Add Field',
   '🔗 连线属性':'🔗 Edge Properties','连线类型':'Edge Type','走线方式':'Routing','智能（最短·自动避障）':'Smart (shortest, auto-avoid)','直线':'Straight','直线走线':'Straight Line','L型折线（推荐·自动避障）':'L-Bend (recommended)',
   '手动拐点':'Manual','拐点强制横平竖直（正交）':'Force orthogonal waypoints','流向':'Flow',
@@ -240,6 +242,11 @@ canvas.addEventListener('mousedown',e=>{
       selChips.forEach(k=>{const a=k.split('#');const nn=nodes.find(z=>z.id===a[0]);if(nn&&nn.data[a[1]])dragChipGroup.snap[k]={ox:nn.data[a[1]].ox||0,oy:nn.data[a[1]].oy||0};});
       canvas.style.cursor='grabbing';return;
     }
+    // 单击单张卡片：登记为字段级选中（Shift 追加多选），使「仅选中」按字段粒度精确应用（否则会被当成整节点）
+    const _ck=chipHit.node.id+'#'+chipHit.fi;
+    if(e.shiftKey){selChips.add(_ck);}
+    else{selSet.clear();selChips.clear();selChips.add(_ck);}
+    updateAlignBar();
     dragChip=chipHit;selectNode(chipHit.node.id);const f=chipHit.node.data[chipHit.fi];const pos=fieldChipPos(chipHit.node,chipHit.fi);dchox=wx-pos.x;dchoy=wy-pos.y;canvas.style.cursor='grabbing';return;
   }
   // 选中连线的手柄优先于节点检测（手柄即使落在节点附近也能抓取）：拐点(方块) + 起止端(方块)
@@ -290,6 +297,8 @@ canvas.addEventListener('mousedown',e=>{
 canvas.addEventListener('mousemove',e=>{
   const r=canvas.getBoundingClientRect();
   const wpt=toWorld(e.clientX-r.left,e.clientY-r.top);mouseWX=wpt[0];mouseWY=wpt[1];
+  // 在浏览器窗口外松开鼠标时收不到任何 mouseup：发现按键已松开立即收尾残留拖拽
+  if(e.buttons===0&&(dragResize||dragRotate||dragGroupScale||dragBus||dragEndpoint||dragWaypoint||dragChip||dragChipGroup||dragNode||rubber||isPanning)){endAllDrags();return;}
   if(isPanning){panX=e.clientX-panSX;panY=e.clientY-panSY;return;}
   if(dragRotate){
     const ang=Math.atan2(mouseWY-dragRotate.cy, mouseWX-dragRotate.cx);
@@ -298,7 +307,7 @@ canvas.addEventListener('mousemove',e=>{
     deg=((deg%360)+360)%360;
     dragRotate.n.rotation=Math.round(deg);
     invalidateRouting();
-    const el=document.getElementById('p-rot');if(el){el.value=dragRotate.n.rotation;const v=document.getElementById('p-rot-v');if(v)v.textContent=dragRotate.n.rotation;}
+    pairSet('p-rot',dragRotate.n.rotation);
     _hud={x:dragRotate.cx,y:dragRotate.cy,text:'∠ '+dragRotate.n.rotation+'°'};
     return;
   }
@@ -310,8 +319,8 @@ canvas.addEventListener('mousemove',e=>{
     else{dragResize.n.scale=Math.max(0.05,Math.min(8, dragResize.startScale*ratio));}
     invalidateRouting();
     if(selNode===dragResize.n.id){
-      if(dragResize.isText){const el=document.getElementById('p-fs');if(el){el.value=dragResize.n.fontSize;const v=document.getElementById('p-fs-v');if(v)v.textContent=dragResize.n.fontSize;}}
-      else{const el=document.getElementById('p-scale');if(el){el.value=Math.round(dragResize.n.scale*100);const v=document.getElementById('p-scale-v');if(v)v.textContent=Math.round(dragResize.n.scale*100);}}
+      if(dragResize.isText){pairSet('p-fs',dragResize.n.fontSize);}
+      else{pairSet('p-scale',Math.round(dragResize.n.scale*100));}
     }
     _hud={x:dragResize.n.x,y:dragResize.n.y,text:dragResize.isText?(dragResize.n.fontSize+'px'):(Math.round(dragResize.n.scale*100)+'%')};
     return;
@@ -397,7 +406,7 @@ canvas.addEventListener('mousemove',e=>{
   if(dragChip){
     const f=dragChip.node.data[dragChip.fi];
     const s=nsz(dragChip.node);
-    const step=((dragChip.node.fontSize||14)+18)/zoom;
+    const step=(chipBaseFS(dragChip.node)+18)/zoom;
     const baseX=dragChip.node.x+s*0.5+14/zoom, baseY=dragChip.node.y-s*0.40+dragChip.fi*step;
     f.ox=((mouseWX-dchox)-baseX)*zoom; f.oy=((mouseWY-dchoy)-baseY)*zoom;   // 存屏幕像素
     return;
@@ -427,7 +436,9 @@ canvas.addEventListener('mousemove',e=>{
   dragNode.x=nx;dragNode.y=ny;_dragging=true;_dragIds=new Set([dragNode.id]);
   if(selNode===dragNode.id){document.getElementById('p-x').textContent=dragNode.x.toFixed(0);document.getElementById('p-y').textContent=dragNode.y.toFixed(0);}
 });
-canvas.addEventListener('mouseup',()=>{
+// 统一收尾所有拖拽状态。注册在 window 上：缩放/旋转手柄常被拖出画布（大文本框尤甚），
+// 只挂 canvas 的话画布外松开收不到 mouseup，残留的 dragResize 会在回到画布后继续缩放（"停不下来"）
+function endAllDrags(){
   if(rubber){
     const x0=Math.min(rubber.x0,rubber.x1),x1=Math.max(rubber.x0,rubber.x1),y0=Math.min(rubber.y0,rubber.y1),y1=Math.max(rubber.y0,rubber.y1);
     selSet.clear();selChips.clear();
@@ -473,7 +484,8 @@ canvas.addEventListener('mouseup',()=>{
   if(dragChip){dragChip=null;snapshot();canvas.style.cursor='default';return;}
   if(dragNode){suppressNodeActionClick=true;setTimeout(()=>{suppressNodeActionClick=false;},0);_dragging=false;_groupDrag=false;_dragIds=new Set();invalidateRouting();alignGuides=[];snapshot();}
   dragNode=null;canvas.style.cursor=edgeMode?'crosshair':'default';
-});
+}
+window.addEventListener('mouseup',endAllDrags);
 canvas.addEventListener('mouseleave',()=>{dragNode=null;isPanning=false;});
 function isNodeActionRuntime(){return previewMode||document.body.classList.contains('rt');}
 function openNodeAction(action){
@@ -617,6 +629,6 @@ canvas.addEventListener('contextmenu',e=>{
 document.addEventListener('click',e=>{
   if(!e.target.closest('#ctxmenu'))document.getElementById('ctxmenu').style.display='none';
   if(!e.target.closest('#ep-type-dd'))closeEpTypeDD();
-  if(!e.target.closest('#bgpanel')&&!e.target.closest('#topbar'))closeBgPanel();
+  // 外观面板不做「点外即关」：需支持开着面板在画布上选节点后回面板点「仅选中节点」批量应用（关闭走 ✕/工具栏按钮）
   if(e.target.id==='tpl-overlay')closeTemplates();
 });

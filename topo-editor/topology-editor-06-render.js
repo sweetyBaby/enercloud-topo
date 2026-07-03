@@ -445,6 +445,16 @@ function textNodeDisplay(n){
   }
   return label;
 }
+// 盒子圆角(世界坐标)：数字=屏幕像素(随 1/zoom 恒定)；'NN%'=按盒子高度百分比（50%=胶囊）
+function boxRadiusWorld(n,b){
+  const r=(n.radius!=null?n.radius:6);
+  if(typeof r==='string'){
+    const m=r.trim().match(/^(\d+(?:\.\d+)?)\s*%$/);
+    if(m)return Math.max(0,Math.min(50,parseFloat(m[1])))/100*b.h;
+    const v=parseFloat(r);return (Number.isFinite(v)?Math.max(0,v):6)/zoom;
+  }
+  return Math.max(0,r)/zoom;
+}
 // ── 文本框 / 变量节点 共用：在给定盒子上绘制背景、边框、选中虚线框 + 缩放/旋转手柄 ──
 function drawBoxBg(n,b,rr){
   if(!(n.bg&&n.bg!=='none'))return;
@@ -477,6 +487,18 @@ function drawBoxSelectionChrome(n,b,rot){
   ctx.fillStyle='#4dd0ff';ctx.beginPath();ctx.arc(rcx,rcy,5/zoom,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(rcx,rcy,2/zoom,0,Math.PI*2);ctx.fill();
 }
+// 视觉垂直居中绘制单行文本到中心 y=cyc：
+// canvas 'middle' 基线对齐的是字体 em 盒中线，而 CJK/数字字形实际偏上（下沉空间用不满），会显得偏高、下方留白多。
+// 改用实际字形包围盒(actualBoundingBox*)把「可见字形中心」精确落到 cyc；旧浏览器无该指标时按字号比例兜底。
+function fillTextVCenter(txt,cx,cyc,fs){
+  // actualBoundingBox* 相对「当前 textBaseline」测量，故必须先切 alphabetic 再 measure，否则偏移量算错
+  const prev=ctx.textBaseline;ctx.textBaseline='alphabetic';
+  const m=ctx.measureText(txt);
+  const asc=Number.isFinite(m.actualBoundingBoxAscent)?m.actualBoundingBoxAscent:fs*0.72;
+  const desc=Number.isFinite(m.actualBoundingBoxDescent)?m.actualBoundingBoxDescent:fs*0.20;
+  ctx.fillText(txt,cx,cyc+(asc-desc)/2);
+  ctx.textBaseline=prev;
+}
 // 文本框元素渲染
 function drawTextNode(n){
   const isSel=selNode===n.id;
@@ -492,13 +514,13 @@ function drawTextNode(n){
   const padX=(n.padX!=null?n.padX:10)/zoom, padY=(n.padY!=null?n.padY:6)/zoom;
   const lh=fs*1.3, totalH=lines.length*lh;
   n._textBox={x:n.x-maxW/2-padX,y:n.y-totalH/2-padY,w:maxW+padX*2,h:totalH+padY*2};
-  const b=n._textBox, rr=(n.radius!=null?n.radius:6)/zoom;
+  const b=n._textBox, rr=boxRadiusWorld(n,b);
   if(!n.hideLabel){ drawBoxBg(n,b,rr); drawBoxBorder(n,b,rr); }
   if(isSel) drawBoxSelectionChrome(n,b,rot);
   if(!n.hideLabel){
     ctx.fillStyle=n.fontColor||'#ffffff';
     if(!n.bg||n.bg==='none'){ctx.shadowColor='rgba(0,0,0,0.6)';ctx.shadowBlur=3/zoom;}
-    lines.forEach((l,i)=>{ctx.fillText(l,n.x,n.y-totalH/2+lh*(i+0.5));});
+    lines.forEach((l,i)=>{fillTextVCenter(l,n.x,n.y-totalH/2+lh*(i+0.5),fs);});
   }
   ctx.shadowBlur=0;ctx.restore();
 }
@@ -547,7 +569,7 @@ function drawVariableNode(n){
     n._varGap=vgap;
   }
   n._textBox={x:n.x-contentW/2-padX,y:n.y-contentH/2-padY,w:contentW+padX*2,h:contentH+padY*2};
-  const b=n._textBox, rr=(n.radius!=null?n.radius:6)/zoom;
+  const b=n._textBox, rr=boxRadiusWorld(n,b);
   if(!n.hideLabel){ drawBoxBg(n,b,rr); drawBoxBorder(n,b,rr); }
   if(isSel) drawBoxSelectionChrome(n,b,rot);
   if(!n.hideLabel){
@@ -556,24 +578,26 @@ function drawVariableNode(n){
       const gap=n._varGap;
       let x=n.x-contentW/2;
       ctx.textAlign='left';
-      if(labelTxt){ctx.font=lFont;ctx.fillStyle=n.fontColor||'#e8f4ff';ctx.fillText(labelTxt,x,n.y);x+=lw+gap;}
-      if(valTxt){ctx.font=vFont;ctx.fillStyle=n.valColor||'#4dd0ff';ctx.fillText(valTxt,x,n.y);}
+      if(labelTxt){ctx.font=lFont;ctx.fillStyle=n.fontColor||'#e8f4ff';fillTextVCenter(labelTxt,x,n.y,lfs);x+=lw+gap;}
+      if(valTxt){ctx.font=vFont;ctx.fillStyle=n.valColor||'#4dd0ff';fillTextVCenter(valTxt,x,n.y,vfs);}
     }else{
       const vgap=n._varGap;
       ctx.textAlign='center';
       let y=n.y-contentH/2;
-      if(labelTxt){ctx.font=lFont;ctx.fillStyle=n.fontColor||'#e8f4ff';y+=lfs*0.6;ctx.fillText(labelTxt,n.x,y);y+=lfs*0.6+vgap;}
-      if(valTxt){ctx.font=vFont;ctx.fillStyle=n.valColor||'#4dd0ff';y+=vfs*0.6;ctx.fillText(valTxt,n.x,y);}
+      if(labelTxt){ctx.font=lFont;ctx.fillStyle=n.fontColor||'#e8f4ff';y+=lfs*0.6;fillTextVCenter(labelTxt,n.x,y,lfs);y+=lfs*0.6+vgap;}
+      if(valTxt){ctx.font=vFont;ctx.fillStyle=n.valColor||'#4dd0ff';y+=vfs*0.6;fillTextVCenter(valTxt,n.x,y,vfs);}
     }
   }
   ctx.shadowBlur=0;ctx.restore();
 }
+// 字段 chip 基准字号：统一设置可给数据字段单独设 fieldFontSize；未设置时沿用节点标签字号（旧行为）
+function chipBaseFS(n){ return n.fieldFontSize!=null ? n.fieldFontSize : (n.fontSize||14); }
 // 计算某字段 chip 的默认位置（节点右侧堆叠）。全部用世界坐标常量，缩放稳定
 function fieldChipPos(n,i){
   const s=nsz(n);
-  const cfs=(n.fontSize||14)*0.92/zoom;       // 字号随 1/zoom，屏幕字号恒定（与图标一致）
+  const cfs=chipBaseFS(n)*0.92/zoom;          // 字号随 1/zoom，屏幕字号恒定（与图标一致）
   const baseX=n.x+s*0.5+14/zoom;              // 节点右侧（屏幕固定间距，不随缩放漂移）
-  const step=((n.fontSize||14)+8+10)/zoom;    // 卡片高度(字号+上下padding) + 间距（屏幕固定）
+  const step=(chipBaseFS(n)+8+10)/zoom;       // 卡片高度(字号+上下padding) + 间距（屏幕固定）
   const baseY=n.y-s*0.40+i*step;              // 自上而下堆叠（含舒适间距）
   const f=n.data[i];
   const ox=(f.ox!=null?f.ox:0), oy=(f.oy!=null?f.oy:0);   // ox/oy 以屏幕像素存储
@@ -597,10 +621,20 @@ function drawFieldChips(n,s){
     const pos=fieldChipPos(n,i);
     // 编辑态下不合法字段显示醒目告警文案（替代丑陋的空「: 」），提示运营端修正
     const txt=_bad ? ('⚠ '+(((_s.emptyZh||_s.emptyEn)?((dataKey(f)||'未命名')+'·缺名'):(dataKey(f)+'·重名')))) : fieldChipText(f);
-    ctx.font=pos.cfs+"px -apple-system,'Microsoft YaHei',sans-serif";ctx.textAlign='left';
-    const tw=ctx.measureText(txt).width;
-    const padX=7/zoom, padY=4/zoom, rr=5/zoom;   // 屏幕固定（随 1/zoom）
+    ctx.font=pos.cfs+"px -apple-system,'Microsoft YaHei',sans-serif";ctx.textAlign='left';ctx.textBaseline='alphabetic';
+    const _m=ctx.measureText(txt),tw=_m.width;
+    const padX=7/zoom, padY=4/zoom;   // 屏幕固定（随 1/zoom）
     const bx=pos.x, by=pos.y-pos.cfs, bw=tw+padX*2, bh=pos.cfs+padY*2;
+    // 共享光学基线：整条文字（字段名+值）按可见字形包围盒垂直居中到盒子中心，两段同基线不错位
+    const cy=by+bh/2;
+    const _asc=Number.isFinite(_m.actualBoundingBoxAscent)?_m.actualBoundingBoxAscent:pos.cfs*0.72;
+    const _desc=Number.isFinite(_m.actualBoundingBoxDescent)?_m.actualBoundingBoxDescent:pos.cfs*0.20;
+    const yb=cy+(_asc-_desc)/2;
+    // 卡片圆角：字段级 chipRadius > 节点级 fieldRadius > 默认 5。数字=px(随 1/zoom)；'NN%'=按卡片高度百分比（50%=胶囊）
+    const _fr=(f.chipRadius!=null?f.chipRadius:(n.fieldRadius!=null?n.fieldRadius:5));
+    let rr;
+    if(typeof _fr==='string'){const m=_fr.trim().match(/^(\d+(?:\.\d+)?)\s*%$/);rr=m?Math.max(0,Math.min(50,parseFloat(m[1])))/100*bh:5/zoom;}
+    else rr=Math.max(0,_fr)/zoom;
     // 引导线：当 chip 被拖离默认位置较远时，用细线连回节点视觉中心，避免不知归属
     const off=Math.hypot(f.ox||0,f.oy||0);
     if(off>40){
@@ -613,27 +647,34 @@ function drawFieldChips(n,s){
       ctx.beginPath();ctx.moveTo(nb.cx,nb.cy);ctx.lineTo(ccx,ccy);ctx.stroke();
       ctx.setLineDash([]);ctx.restore();
     }
-    // 背景板
+    // 背景板：告警(_bad)/chip 选中态配色优先；普通态默认「无背景」，仅显式设了 chipBg/fieldBg 才填充
     const chipSel=selChips.has(n.id+'#'+i);
-    ctx.fillStyle=_bad?'rgba(60,20,24,0.85)':(chipSel?'rgba(40,70,110,0.92)':'rgba(10,22,40,0.82)');
-    ctx.strokeStyle=_bad?'#ff6b6b':(chipSel?'#ffcc44':(isSel?'rgba(77,208,255,0.7)':'rgba(120,150,180,0.3)'));ctx.lineWidth=(_bad?1.6:(chipSel?1.8:1.2))/zoom;
-    if(_bad)ctx.setLineDash([4/zoom,3/zoom]);
+    const cbs=(f.chipBorder||n.fieldBorder);                       // undefined=默认浅色细边；'none'=不描边
+    const cbw=(f.chipBorderWidth!=null?f.chipBorderWidth:(n.fieldBorderWidth!=null?n.fieldBorderWidth:1.2));
+    const fillC=_bad?'rgba(60,20,24,0.85)':(chipSel?'rgba(40,70,110,0.92)':(f.chipBg||n.fieldBg||null));
+    const strokeC=_bad?'#ff6b6b':(chipSel?'#ffcc44':(isSel?'rgba(77,208,255,0.7)':(cbs==='none'?null:(f.chipBorderColor||n.fieldBorderColor||'rgba(120,150,180,0.3)'))));
+    ctx.lineWidth=(_bad?1.6:(chipSel?1.8:cbw))/zoom;
+    if(_bad||(!chipSel&&cbs==='dashed'))ctx.setLineDash([4/zoom,3/zoom]);
     ctx.beginPath();
     if(ctx.roundRect)ctx.roundRect(bx,by,bw,bh,rr);else ctx.rect(bx,by,bw,bh);
-    ctx.fill();ctx.stroke();
-    if(_bad)ctx.setLineDash([]);
+    if(fillC){ctx.fillStyle=fillC;ctx.fill();}
+    if(strokeC){ctx.strokeStyle=strokeC;ctx.stroke();}
+    ctx.setLineDash([]);
+    // 无背景填充时给文字加淡阴影，避免压在连线/图标上看不清（与节点标签一致）
+    if(!fillC){ctx.shadowColor='rgba(0,0,0,0.65)';ctx.shadowBlur=3/zoom;}
     if(_bad){
       // 不合法字段：整条红色告警文案
-      ctx.fillStyle='#ff9a9a';ctx.fillText(txt,bx+padX,pos.y);
+      ctx.fillStyle='#ff9a9a';ctx.fillText(txt,bx+padX,yb);
     }else{
-      // 文字：字段名浅色，值强调色
+      // 文字：字段名浅色，值强调色；节点设了 fieldFontColor（统一设置·数据字段）则整条用该色
       const k=dataKey(f), kw=ctx.measureText(k+': ').width;
-      ctx.fillStyle='#9fc0dd';ctx.fillText(k+': ',bx+padX,pos.y);
+      ctx.fillStyle=n.fieldFontColor||'#9fc0dd';ctx.fillText(k+': ',bx+padX,yb);
       const _hv=(f.dv!=null&&f.dv!=='');         // 有值(含 0)→强调色显示；无值→留空
       const v=_hv?f.dv:'';
-      ctx.fillStyle=_hv?'#4dd0ff':'#6b8299';
-      ctx.fillText(''+v,bx+padX+kw,pos.y);
+      ctx.fillStyle=_hv?(n.fieldFontColor||'#4dd0ff'):'#6b8299';
+      ctx.fillText(''+v,bx+padX+kw,yb);
     }
+    ctx.shadowBlur=0;   // 复位，避免阴影影响后续绘制
     f._chipBox={x:bx,y:by,w:bw,h:bh};
   });
 }
