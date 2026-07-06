@@ -13,3 +13,6 @@ services:
       # 图标库持久化：上传/重命名/替换/删除的图标（图片 + index.json）落在宿主机 ./data/icons，
       # 重建镜像、升级容器都不会丢；备份该目录即备份全部自定义图标。
       - ./data/icons:/data/icons
+      # 值字典持久化：新建/编辑/导入的值字典（code→中英文案）落在宿主机 ./data/value-dicts，
+      # 重建镜像、升级容器都不会丢；备份该目录即备份全部值字典。
+      - ./data/value-dicts:/data/value-dicts
