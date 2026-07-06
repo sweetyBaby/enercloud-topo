@@ -299,7 +299,7 @@ const text2 = rt.translateFieldValue(f, v);
 
 ### 9.5 字典数据从哪来
 
-- **编辑器共享字典库**：`value-dicts/` 目录（每个字典一个 `<type>.json`），菜单栏「📖 值字典」增删改，落盘接口 `/api/value-dicts`（GET 清单 / POST 新建 / PUT `/:type` 更新 / DELETE `/:type`），清单 `GET value-dicts/index.json`（目录扫描动态生成，与图标库/模板库同构）。
+- **编辑器共享字典库**：`value-dicts/` 目录（每个字典一个 `<type>.json`），菜单栏「📖 值字典」增删改，落盘接口 `/api/value-dicts`（GET 清单 / POST 新建 / PUT `/:type` 更新 / DELETE `/:type`），清单 `GET value-dicts/index.json`（目录扫描动态生成，与图标库/模板库同构）。管理弹框支持 **⬇ 导出**（单个 `<type>.json` / 全部 `{dicts:[…]}` 清单）与 **📥 导入**（兼容单对象/数组/清单三种形态，同名 type 询问后覆盖）；手动增删改目录里的 JSON 文件后点 **🔄 重新扫描** 即时生效（服务端每次请求实时扫描目录，无需重启）。
 - **导出快照**：画布 JSON 顶层 `valueDicts[]` 只内嵌被引用/命中的字典，前端拿到 JSON 即自包含。
 - **前端注入**：`getValueDicts` 由调用方提供，可改传自己后台的字典数据（结构同 9.1），实现运行期覆盖。
 

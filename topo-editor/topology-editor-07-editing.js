@@ -2052,10 +2052,14 @@ function _vdOverlayEnsure(){
   const ov=document.createElement('div');ov.id='vdmgr-overlay';
   ov.innerHTML='<div id="vdmgr-box">'+
     '<div id="vdmgr-head"><h4 id="vdmgr-title">📖 值字典管理</h4>'+
+    '<button class="tb" onclick="_vdRescan()" title="重新扫描 value-dicts/ 目录：手动增删改 JSON 文件后点此即时生效（画布同步刷新）">🔄 重新扫描</button>'+
+    '<button class="tb" onclick="_vdImportClick()" title="导入字典 JSON（支持多选；单个字典对象 / 数组 / {dicts:[…]} 清单均可；同名 type 询问后覆盖）">📥 导入</button>'+
+    '<button class="tb" onclick="_vdExportAll()" title="导出全部字典为一个 JSON（{dicts:[…]} 清单格式，可直接导入或拆放到 value-dicts/ 目录）">⬇ 导出全部</button>'+
     '<button class="tb grn" id="vdmgr-addbtn" onclick="_vdToggleAdd()">＋ 新建字典</button>'+
     '<button id="vdmgr-close" onclick="closeDictManager()" aria-label="关闭" title="关闭">✕</button></div>'+
-    '<div class="phint" id="vdmgr-hint" style="margin:0 0 8px">字典把字段/信号的 code 码值转义成中英文案显示在画布上。在「适用后台字段」里认领后台字段后，绑定了该字段的画布元素自动生效；无后台绑定的字段可在字段行的 📖 按钮里手动指定。</div>'+
-    '<div id="vdmgr-list"></div></div>';
+    '<div class="phint" id="vdmgr-hint" style="margin:0 0 8px">字典把字段/信号的 code 码值转义成中英文案显示在画布上。在「适用后台字段」里认领后台字段后，绑定了该字段的画布元素自动生效；无后台绑定的字段可在字段行的 📖 按钮里手动指定。清单由服务端实时扫描 value-dicts/ 目录生成——手动增删改 JSON 文件后点「🔄 重新扫描」即生效。</div>'+
+    '<div id="vdmgr-list"></div>'+
+    '<input type="file" id="vd-import-fi" accept="application/json,.json" multiple style="display:none" onchange="_vdImportFiles(event)"></div>';
   ov.addEventListener('click',e=>{if(e.target===ov)closeDictManager();});
   document.body.appendChild(ov);
 }
@@ -2108,12 +2112,14 @@ function _vdRender(){
       ' <span class="vd-type">('+tplEsc(d.type)+')</span></span>'+
       '<span class="vd-sum">'+tplEsc(_vdApplySummary(d))+'</span>'+
       (editing?'':('<button class="tb" data-vdedit="'+tplEsc(d.type)+'">✎ 编辑</button>'))+
+      '<button class="tb" data-vdexp="'+tplEsc(d.type)+'" title="导出该字典为 <type>.json（与 value-dicts/ 落盘文件同构，可直接放入目录或导入）">⬇</button>'+
       '<button class="tb red" data-vddel="'+tplEsc(d.type)+'">🗑 删除</button></div>';
     if(editing)html+=_vdEditorHTML();
     html+='</div>';
   });
   list.innerHTML=html;
   list.querySelectorAll('[data-vdedit]').forEach(b=>{b.onclick=()=>_vdExpand(b.getAttribute('data-vdedit'));});
+  list.querySelectorAll('[data-vdexp]').forEach(b=>{b.onclick=()=>_vdExportOne(b.getAttribute('data-vdexp'));});
   list.querySelectorAll('[data-vddel]').forEach(b=>{b.onclick=()=>_vdDelete(b.getAttribute('data-vddel'));});
   if(_vdEdit)_vdBindEditor();
 }
@@ -2268,4 +2274,100 @@ async function _vdSave(){
     await _vdAfterWrite();
     flashHint('字典已保存（画布即时生效）');
   }catch(err){console.warn(err);flashHint('保存失败：'+(err.message||err));}
+}
+
+// ───── 值字典：导入 / 导出 / 目录重扫 ─────
+// 导出格式与落盘/清单同构：单个={schemaVersion:'vd-1',type,...}；全部={schemaVersion:'vd-index-1',dicts:[...]}。
+// 导入兼容三种形态（单个对象 / 数组 / {dicts:[…]} 清单），宽松归一化（nameEn←name、item.en←zh 兜底），
+// 同名 type 统一询问一次后覆盖(PUT)，其余新建(POST)。清单由服务端实时扫描目录——手动改文件后「重新扫描」即生效。
+function _vdDownload(name,obj){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));
+  a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function _vdExportAll(){
+  const dicts=(_vdList&&_vdList.length)?_vdList:effectiveValueDicts();
+  if(!dicts.length){flashHint('暂无字典可导出');return;}
+  _vdDownload('value-dicts.json',{schemaVersion:'vd-index-1',dicts});
+  flashHint('已导出 '+dicts.length+' 个字典（value-dicts.json）');
+}
+function _vdExportOne(type){
+  const d=((_vdList||[]).find(x=>x.type===type))||findValueDict(type);
+  if(!d){flashHint('字典不存在：'+type);return;}
+  _vdDownload(type+'.json',{schemaVersion:'vd-1',type:d.type,name:d.name||d.type,nameEn:d.nameEn||d.name||d.type,
+    applyTo:d.applyTo||[],items:d.items||[]});
+  flashHint('已导出：'+(d.name||type));
+}
+async function _vdRescan(){
+  try{ await _vdFetch(); await reloadValueDicts(); _vdEdit=null; _vdRender();
+    flashHint('值字典已重新扫描（'+(_vdList?_vdList.length:0)+' 个）——目录里手动增删改的 JSON 已生效'); }
+  catch(err){ console.warn(err); flashHint('重新扫描失败：'+(err.message||err)); }
+}
+function _vdImportClick(){ const fi=document.getElementById('vd-import-fi'); if(fi){fi.value='';fi.click();} }
+// 归一化一份待导入字典：type 合法化、名称/文案兜底（en←zh）、剔除无 code 条目、同字典内 code 去重（保留先出现者）
+function _vdNormalizeImport(o){
+  if(!o||typeof o!=='object')return null;
+  const type=String(o.type||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64);
+  if(!type)return null;
+  const name=String(o.name||type).trim()||type;
+  const nameEn=String(o.nameEn||name).trim()||name;
+  const seen=new Set(),items=[];
+  (Array.isArray(o.items)?o.items:[]).forEach(it=>{
+    if(!it||it.code===undefined||it.code===null||String(it.code).trim()==='')return;
+    const code=String(it.code).trim();
+    if(seen.has(code))return;
+    seen.add(code);
+    const zh=String(it.zh||it.en||'').trim(),en=String(it.en||it.zh||'').trim();
+    if(!zh&&!en)return;
+    items.push({code,zh:zh||en,en:en||zh});
+  });
+  const applyTo=(Array.isArray(o.applyTo)?o.applyTo:[]).filter(a=>a&&a.field&&String(a.field).indexOf('.')>0)
+    .map(a=>({deviceType:String(a.deviceType||''),field:String(a.field)}));
+  return {type,name,nameEn,applyTo,items};
+}
+async function _vdImportFiles(ev){
+  const files=[...(ev.target.files||[])];
+  if(!files.length)return;
+  // 1) 解析全部文件 → 摊平成字典数组（兼容 单对象/数组/{dicts:[…]}）
+  const incoming=[],bad=[];
+  for(const f of files){
+    let obj;
+    try{ obj=JSON.parse(await f.text()); }
+    catch(err){ bad.push(f.name+'（JSON 解析失败）'); continue; }
+    const arr=Array.isArray(obj)?obj:(obj&&Array.isArray(obj.dicts))?obj.dicts:[obj];
+    let ok=0;
+    arr.forEach(o=>{const d=_vdNormalizeImport(o);if(d){incoming.push(d);ok++;}});
+    if(!ok)bad.push(f.name+'（未识别出有效字典：需含 type 字段）');
+  }
+  if(!incoming.length){flashHint('导入失败：'+(bad.join('；')||'文件里没有有效字典'));return;}
+  // 同批内同 type 去重（后出现覆盖先出现，便于「清单+单文件」混选时以单文件为准）
+  const byType=new Map();incoming.forEach(d=>byType.set(d.type,d));
+  const list=[...byType.values()];
+  // 2) 与现有库比对：同名 type 统一询问一次是否覆盖
+  try{ await _vdFetch(); }catch(err){ flashHint('值字典接口不可用，无法导入（需 dev/生产 server）'); return; }
+  const existing=new Set((_vdList||[]).map(d=>d.type));
+  const dup=list.filter(d=>existing.has(d.type));
+  let overwrite=false;
+  if(dup.length){
+    overwrite=await uiConfirm('导入的 '+dup.length+' 个字典与现有同名（'+dup.map(d=>d.type).join('、')+'）。覆盖现有字典？（取消则跳过同名项，只导入新增）',false);
+  }
+  // 3) 逐个写入：同名→PUT 覆盖（或跳过），新增→POST
+  let created=0,updated=0,skipped=0;const fails=[];
+  for(const d of list){
+    const isDup=existing.has(d.type);
+    if(isDup&&!overwrite){skipped++;continue;}
+    try{
+      const r=isDup
+        ?await fetch(VD_API+'/'+encodeURIComponent(d.type),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:d.name,nameEn:d.nameEn,applyTo:d.applyTo,items:d.items})})
+        :await fetch(VD_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+      if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
+      isDup?updated++:created++;
+    }catch(err){fails.push(d.type+'：'+(err.message||err));}
+  }
+  await _vdAfterWrite();
+  let msg='导入完成：新增 '+created+'、覆盖 '+updated+(skipped?('、跳过同名 '+skipped):'');
+  if(bad.length)msg+='；文件问题：'+bad.join('；');
+  if(fails.length)msg+='；失败：'+fails.join('；');
+  flashHint(msg);
 }
