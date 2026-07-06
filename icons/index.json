@@ -3,13 +3,6 @@
   "note": "图标库清单：每个 device 的 file 指向 icons/ 下的图片。增删改图片后，dev-server/build 会自动同步此清单（未登记的图片归入「自定义图标」分组）。可手动编辑 label / 分组 / data 默认字段。",
   "groups": [
     {
-      "title": "uui哦i",
-      "title_en": "iii",
-      "color": "#8aa8c4",
-      "tab": "device",
-      "devices": []
-    },
-    {
       "title": "电源侧",
       "title_en": "Power Source",
       "color": "#4dd0ff",
