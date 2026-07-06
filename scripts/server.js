@@ -10,6 +10,7 @@ const path = require('path');
 const url = require('url');
 const { createTemplateApi, send } = require('./template-store');
 const { createIconApi, buildManifest: buildIconManifest } = require('./icon-store');
+const { createDictApi } = require('./dict-store');
 
 const projectRoot = path.resolve(__dirname, '..');
 const port = Number(process.env.PORT || 3009);
@@ -72,6 +73,11 @@ function buildDicManifest() {
 
 const templateApi = createTemplateApi({ dir: tplDir, log, warn });
 const iconApi = createIconApi({ dir: iconsDir, log, warn });
+// 值字典目录：可写、持久（与模板同理，build 重建 dist 不影响）；可用 VALUE_DICTS_DIR 覆盖
+const vdDir = process.env.VALUE_DICTS_DIR
+  ? path.resolve(process.env.VALUE_DICTS_DIR)
+  : path.join(projectRoot, 'value-dicts');
+const dictApi = createDictApi({ dir: vdDir, log, warn });
 
 function inside(baseDir, file) {
   const rel = path.relative(baseDir, file);
@@ -99,6 +105,15 @@ const server = http.createServer((req, res) => {
   //   避免生产环境二次解码，使含 % 等字符的分组名在 dev / 生产表现不一致。
   if (templateApi.matches(pathname)) return templateApi.handle(req, res, rawPath);
   if (iconApi.matches(pathname)) return iconApi.handle(req, res, rawPath);
+  if (dictApi.matches(pathname)) return dictApi.handle(req, res, rawPath);
+
+  // 值字典：清单由扫描 vdDir 动态生成；字典文件也从同一可写目录读取
+  if (pathname === '/value-dicts/index.json') {
+    return send(res, 200, JSON.stringify(dictApi.buildIndex(), null, 2), 'application/json; charset=utf-8');
+  }
+  if (pathname === '/value-dicts' || pathname.startsWith('/value-dicts/')) {
+    return serveStatic(res, vdDir, pathname.replace(/^\/value-dicts\/?/, '') || 'index.json');
+  }
 
   // 2) 图标清单：扫描 icons/ 动态生成；图标文件也从同一目录读取，避免 dist 与根目录不同步
   if (pathname === '/icons/index.json') {
@@ -134,4 +149,5 @@ server.listen(port, host, () => {
   log(`Static root : ${staticRoot}`);
   log(`Templates    : ${tplDir} (read + write, persistent)`);
   log(`Icons        : ${iconsDir} (dynamic manifest + files)`);
+  log(`Value dicts  : ${vdDir} (read + write, persistent)`);
 });

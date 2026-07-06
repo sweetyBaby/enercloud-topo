@@ -39,6 +39,8 @@ function toggleBusMerge(){busMerge=!busMerge;invalidateRouting();}
 // 完整中英文对照表（界面静态文案）
 const I18N={
   '⚙ 规则与信号':'⚙ Rules & Signals',
+  '⚡ 信号':'⚡ Signals','📏 规则':'📏 Rules','🗂 图标库':'🗂 Icons','📖 值字典':'📖 Value Dicts',
+  '📌 基本':'📌 Basic','🎨 外观':'🎨 Appearance','🛤 走线':'🛤 Routing','⚡ 数据驱动':'⚡ Data-driven','🏷 标签':'🏷 Label','🔗 后台绑定与数据':'🔗 Backend & Data',
   '▶ 预览效果':'▶ Preview','■ 退出预览':'■ Exit Preview',
   '运行视图（彻底隐藏被规则隐藏者）':'Run view (fully hide rule-hidden items)',
   '规则随信号实时生效：编辑态被隐藏的元素/连线会「虚化」显示，仍可点选并编辑；勾选「运行视图」可预览真实显隐效果。':'Rules apply live as signals change: in edit mode, hidden elements/edges are dimmed but still selectable & editable; tick "Run view" to preview the real show/hide result.',
@@ -62,7 +64,7 @@ const I18N={
   '显示条件（数据驱动）':'Show condition (data-driven)','流向规则（数据驱动）':'Direction rules (data-driven)','编辑':'Edit',
   '流向（按规则确定）':'Flow (set by rules)','固定流向（兜底）':'Fixed direction (fallback)',
   '按信号实时匹配规则确定流向；规则都不命中时用下面的固定流向':'Direction is matched live from signal rules; falls back to the fixed direction below when no rule matches',
-  '条件不满足→不画此连线（适合"动态建立的连线"）':'If condition fails → edge is not drawn (use for "dynamically created links")',
+  '条件不满足→不画此连线（适合「动态建立的连线」）':'If condition fails → edge is not drawn (use for "dynamically created links")',
   '清空条件':'Clear','取消':'Cancel','保存':'Save','+ 信号':'+ Signal','应用JSON':'Apply JSON','清空注入':'Reset',
   '分组':'Groups','全部展开':'Expand all','全部折叠':'Collapse all','＋ 全部展开':'+ Expand all','－ 全部折叠':'- Collapse all','▼ 全部展开':'▼ Expand all','▶ 全部折叠':'▶ Collapse all','▾ 全部展开':'▾ Expand all','▸ 全部折叠':'▸ Collapse all',
   '注入信号':'Inject Signals','（覆盖预览数据；不填用静态值）':'(override preview values; blank = static)','自定义全局信号':'Custom Global Signals',
@@ -249,6 +251,31 @@ canvas.addEventListener('mousedown',e=>{
     updateAlignBar();
     dragChip=chipHit;selectNode(chipHit.node.id);const f=chipHit.node.data[chipHit.fi];const pos=fieldChipPos(chipHit.node,chipHit.fi);dchox=wx-pos.x;dchoy=wy-pos.y;canvas.style.cursor='grabbing';return;
   }
+  // 选中连线的标签手柄优先：旋转（背板上方圆点）/ 缩放（右下角方块）——点击标签即出手柄，可直接拖拽调整
+  if(selEdge && !edgeMode){
+    const rh=selEdge._lblRotHandle;
+    if(rh&&Math.hypot(wx-rh[0],wy-rh[1])<8/zoom){
+      const a=selEdge._lblAnchor||[wx,wy];
+      const total0=((selEdge._lblBox?selEdge._lblBox.ang:0)*180/Math.PI);
+      dragLblRotate={e:selEdge,cx:a[0],cy:a[1],startAng:Math.atan2(wy-a[1],wx-a[0]),total0,base0:total0-(selEdge.lblRot||0)};
+      canvas.style.cursor='grabbing';return;
+    }
+    const sh=selEdge._lblScaleHandle;
+    if(sh&&Math.abs(wx-sh[0])<7/zoom&&Math.abs(wy-sh[1])<7/zoom){
+      const a=selEdge._lblAnchor||[wx,wy];
+      dragLblScale={e:selEdge,cx:a[0],cy:a[1],d0:Math.max(4/zoom,Math.hypot(wx-a[0],wy-a[1])),start:selEdge.lblScale||1};
+      canvas.style.cursor='grabbing';return;
+    }
+  }
+  // 连线标签命中：选中该连线并开始拖拽标签（存 lblOx/Oy 屏幕像素偏移，与字段 chip 同规则）
+  if(!edgeMode){
+    const lblEdge=edgeLabelAt(wx,wy);
+    if(lblEdge){
+      selSet.clear();selChips.clear();updateAlignBar();selectEdge(lblEdge);
+      dragEdgeLabel={e:lblEdge,sx:wx,sy:wy,ox:lblEdge.lblOx||0,oy:lblEdge.lblOy||0,moved:false};
+      canvas.style.cursor='grabbing';return;
+    }
+  }
   // 选中连线的手柄优先于节点检测（手柄即使落在节点附近也能抓取）：拐点(方块) + 起止端(方块)
   if(selEdge && !edgeMode){
     const wi=waypointAt(selEdge,wx,wy);
@@ -298,7 +325,7 @@ canvas.addEventListener('mousemove',e=>{
   const r=canvas.getBoundingClientRect();
   const wpt=toWorld(e.clientX-r.left,e.clientY-r.top);mouseWX=wpt[0];mouseWY=wpt[1];
   // 在浏览器窗口外松开鼠标时收不到任何 mouseup：发现按键已松开立即收尾残留拖拽
-  if(e.buttons===0&&(dragResize||dragRotate||dragGroupScale||dragBus||dragEndpoint||dragWaypoint||dragChip||dragChipGroup||dragNode||rubber||isPanning)){endAllDrags();return;}
+  if(e.buttons===0&&(dragResize||dragRotate||dragGroupScale||dragBus||dragEndpoint||dragWaypoint||dragChip||dragChipGroup||dragEdgeLabel||dragLblRotate||dragLblScale||dragNode||rubber||isPanning)){endAllDrags();return;}
   if(isPanning){panX=e.clientX-panSX;panY=e.clientY-panSY;return;}
   if(dragRotate){
     const ang=Math.atan2(mouseWY-dragRotate.cy, mouseWX-dragRotate.cx);
@@ -411,6 +438,31 @@ canvas.addEventListener('mousemove',e=>{
     f.ox=((mouseWX-dchox)-baseX)*zoom; f.oy=((mouseWY-dchoy)-baseY)*zoom;   // 存屏幕像素
     return;
   }
+  if(dragEdgeLabel){
+    const d=dragEdgeLabel;
+    d.e.lblOx=d.ox+(mouseWX-d.sx)*zoom; d.e.lblOy=d.oy+(mouseWY-d.sy)*zoom;   // 存屏幕像素（与字段 chip 同规则）
+    d.moved=true;
+    return;
+  }
+  if(dragLblRotate){
+    const d=dragLblRotate;
+    let deg=d.total0+(Math.atan2(mouseWY-d.cy,mouseWX-d.cx)-d.startAng)*180/Math.PI;
+    if(e.shiftKey)deg=Math.round(deg/15)*15;   // Shift 吸附 15°
+    const rot=(((Math.round(deg-d.base0))%360)+360)%360;
+    if(rot)d.e.lblRot=rot;else delete d.e.lblRot;
+    pairSet('ep-lbl-rot',rot);
+    _hud={x:d.cx,y:d.cy,text:'∠ '+rot+'°'};
+    return;
+  }
+  if(dragLblScale){
+    const d=dragLblScale;
+    const sc=Math.max(0.2,Math.min(8,d.start*Math.hypot(mouseWX-d.cx,mouseWY-d.cy)/d.d0));
+    const v=Math.round(sc*100)/100;
+    if(v!==1)d.e.lblScale=v;else delete d.e.lblScale;
+    pairSet('ep-lbl-scale',Math.round(v*100));
+    _hud={x:d.cx,y:d.cy,text:Math.round(v*100)+'%'};
+    return;
+  }
   if(dragNode&&_groupDrag){
     const ddx=(mouseWX-dox)-_groupStart[dragNode.id][0], ddy=(mouseWY-doy)-_groupStart[dragNode.id][1];
     selSet.forEach(id=>{const nn=nodes.find(z=>z.id===id);if(nn&&_groupStart[id]){nn.x=_groupStart[id][0]+ddx;nn.y=_groupStart[id][1]+ddy;}});
@@ -482,6 +534,9 @@ function endAllDrags(){
     invalidateRouting();snapshot();canvas.style.cursor='default';return;}
   if(dragChipGroup){dragChipGroup=null;snapshot();canvas.style.cursor='default';return;}
   if(dragChip){dragChip=null;snapshot();canvas.style.cursor='default';return;}
+  if(dragEdgeLabel){const moved=dragEdgeLabel.moved;dragEdgeLabel=null;if(moved)snapshot();canvas.style.cursor='default';return;}
+  if(dragLblRotate){dragLblRotate=null;_hud=null;snapshot();canvas.style.cursor='default';return;}
+  if(dragLblScale){dragLblScale=null;_hud=null;snapshot();canvas.style.cursor='default';return;}
   if(dragNode){suppressNodeActionClick=true;setTimeout(()=>{suppressNodeActionClick=false;},0);_dragging=false;_groupDrag=false;_dragIds=new Set();invalidateRouting();alignGuides=[];snapshot();}
   dragNode=null;canvas.style.cursor=edgeMode?'crosshair':'default';
 }
@@ -520,6 +575,11 @@ canvas.addEventListener('dblclick',e=>{
       invalidateRouting();snapshot();
       return;
     }
+  }
+  // 双击连线标签 → 选中连线（属性面板「🏷 标签」分组即为标签的全部设置）
+  if(!edgeMode){
+    const le=edgeLabelAt(wx,wy);
+    if(le){selectEdge(le);return;}
   }
   // 双击数据字段 chip → 内联编辑数值（自定义弹层，替代原生 prompt）
   const hit=fieldChipAt(wx,wy);

@@ -253,6 +253,41 @@ if dic_src.is_dir():
     (dist_dic / "index.json").write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Copied dic/ ({n} files) + generated index.json (deviceTypes: {', '.join(merged.keys()) or 'none'})")
 
+# 值字典 value-dicts/：拷贝 *.json + 扫描生成 value-dicts/index.json（与 dict-store.buildIndexFromDir 行为一致；
+#   静态部署下前端直接读该清单；带生产 server 时清单由扫描动态生成、以可写目录为准）
+vd_src = ROOT / "value-dicts"
+if vd_src.is_dir():
+    dist_vd = DIST / "value-dicts"
+    dist_vd.mkdir(parents=True, exist_ok=True)
+    vd_dicts: list = []
+    n = 0
+    for fp in sorted(vd_src.glob("*.json")):
+        if fp.name == "index.json":
+            continue
+        try:
+            doc = json.loads(fp.read_text(encoding="utf-8"))
+        except Exception as err:  # noqa: BLE001
+            print(f"WARN read {fp} failed: {err}")
+            continue
+        if not isinstance(doc, dict):
+            continue
+        shutil.copy2(fp, dist_vd / fp.name)
+        n += 1
+        t = doc.get("type") or fp.stem
+        if any(d.get("type") == t for d in vd_dicts):
+            continue  # type 冲突：先到先得（文件名有序，结果稳定）
+        vd_dicts.append({
+            "type": t,
+            "name": doc.get("name") or t,
+            "nameEn": doc.get("nameEn") or doc.get("name") or t,
+            "applyTo": [a for a in (doc.get("applyTo") or []) if isinstance(a, dict) and a.get("field")],
+            "items": [it for it in (doc.get("items") or []) if isinstance(it, dict) and it.get("code") is not None],
+        })
+    (dist_vd / "index.json").write_text(
+        json.dumps({"schemaVersion": "vd-index-1", "dicts": vd_dicts}, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"Copied value-dicts/ ({n} files) + generated index.json ({len(vd_dicts)} dicts)")
+
 # 设备档案 device/：原样拷贝（device-type.json / device-info.json 等，内容变更由前端 no-store 重新拉取）
 dev_src = ROOT / "device"
 if dev_src.is_dir():

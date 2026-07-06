@@ -23,6 +23,8 @@ function collectSignals(){
     const iss=fieldNameIssues(n);
     (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i]))add(fieldSig(n,f),nodeLabel(n)+' · '+(f.key||fieldSigKey(f)));});
   });
+  // 连线标签信号：有 id + 英文名的连线标签（键=连线id.标签英文名）
+  edges.forEach(e=>{const s=edgeLabelSig(e);if(s)add(s,edgeLabelDisplayName(e));});
   const gi=globalSigIssues();   // 全局信号：信号键=英文名，仅合法(中英文名必填且唯一)的入列
   (customSignals||[]).forEach((s,i)=>{if(fieldSigKey(s)&&fieldNameOk(gi[i]))add(fieldSigKey(s),sigDisplayName(s));});
   return out;
@@ -35,6 +37,7 @@ function buildCtx(values){
     const iss=fieldNameIssues(n);
     (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i]))ctx[fieldSig(n,f)]=f.dv;});
   });
+  edges.forEach(e=>{const s=edgeLabelSig(e);if(s&&e.lblVal!==undefined)ctx[s]=e.lblVal;});   // 连线标签信号的静态默认值
   const gi=globalSigIssues();
   (customSignals||[]).forEach((s,i)=>{if(fieldSigKey(s)&&fieldNameOk(gi[i])&&s.dv!==undefined)ctx[fieldSigKey(s)]=s.dv;});
   if(values)Object.keys(values).forEach(k=>{ctx[k]=values[k];});
@@ -180,6 +183,15 @@ function signalValueMeta(name){
     if(typeof s.dv==='number')return {kind:'num'};
     if(s.dv!==''&&s.dv!=null&&!isNaN(Number(s.dv)))return {kind:'num'};
     return {kind:'text'};
+  }
+  if(p.edge){   // 连线标签信号：按静态值 lblVal 推断类型
+    const ed=edgeById(p.edge);
+    if(ed){
+      if(typeof ed.lblVal==='boolean')return {kind:'bool'};
+      if(typeof ed.lblVal==='number')return {kind:'num'};
+      if(ed.lblVal!==''&&ed.lblVal!=null&&!isNaN(Number(ed.lblVal)))return {kind:'num'};
+      return {kind:'text'};
+    }
   }
   const n=nodes.find(x=>x.id===p.node);
   const f=n&&(n.data||[]).find(d=>fieldSigKey(d)===p.field);   // 信号键段用英文名，需按英文名匹配字段
@@ -587,10 +599,10 @@ function togglePreview(){ toggleSigPanel(); }
 // 注入行 → 信号名（@global 用字段名本身，否则 节点id.字段）
 function injSignalName(r){ if(!r)return null; if(r.node==='@global')return r.field||null; if(r.node&&r.field)return r.node+'.'+r.field; return null; }
 // 信号名 → 注入行结构（导入/粘贴时反解）
-function parseSignal(name){ const i=String(name).lastIndexOf('.'); if(i>0){const nd=name.slice(0,i),fd=name.slice(i+1);if(nodes.some(n=>n.id===nd))return {node:nd,field:fd};} return {node:'@global',field:name}; }
+function parseSignal(name){ const i=String(name).lastIndexOf('.'); if(i>0){const nd=name.slice(0,i),fd=name.slice(i+1);if(nodes.some(n=>n.id===nd))return {node:nd,field:fd};if(edges.some(e=>e.id===nd))return {node:nd,edge:nd,field:fd};} return {node:'@global',field:name}; }
 // 注入行 → signalValues（供求值用）。全局信号为自由文本，保留原样(不 autoNum，避免把 "true"/"false" 等字符悄悄转类型)；
 // 节点字段沿用 autoNum。数值/布尔比较由 cmpOp 在求值时用 _num/_looseEq 强转，字符串同样能命中规则。
-function syncInjections(){ signalValues={}; injRows.forEach(r=>{const nm=injSignalName(r);if(nm&&r.val!=='')signalValues[nm]=(r.node==='@global')?r.val:autoNum(r.val);}); }
+function syncInjections(){ signalValues={}; injRows.forEach(r=>{const nm=injSignalName(r);if(nm&&r.val!=='')signalValues[nm]=(r.node==='@global')?r.val:autoNum(r.val);}); if(selEdge)try{elcValTrace();}catch(e){} }
 function signalExistsForRow(r){
   if(!r||!r.node||!r.field)return false;
   return fieldOptionsFor(r.node).some(o=>o.v===r.field);
@@ -604,6 +616,8 @@ function pruneInvalidInjections(){
 // 某元素的「字段」可选项
 function fieldOptionsFor(node){
   if(node==='@global'){const gi=globalSigIssues();return (customSignals||[]).map((s,i)=>({v:fieldSigKey(s),t:sigDisplayName(s),_bad:!fieldNameOk(gi[i])})).filter(o=>o.v&&!o._bad).map(o=>({v:o.v,t:o.t}));}
+  const ed=edgeById(node);   // 连线标签信号：一条连线只有一个标签字段（键段=标签英文名）
+  if(ed)return edgeLabelSigKey(ed)?[{v:edgeLabelSigKey(ed),t:(ed.lbl||edgeLabelSigKey(ed))}]:[];
   const n=nodes.find(x=>x.id===node);if(!n)return [];
   // 仅暴露节点「合法的已绑定数据字段」；不合法(空名/同节点重名)字段不入列——与 buildCtx 的过滤一致，避免规则引用到求值时被忽略的信号
   // 信号值(v)=英文名(端到端信号键)；显示(t)=中文名，便于运营端识别
@@ -616,6 +630,8 @@ function fieldOptionsFor(node){
 function valSuggestFor(r){
   const n=(r&&r.node&&r.node!=='@global')?nodes.find(x=>x.id===r.node):null;
   if(r.node==='@global'){const s=(customSignals||[]).find(c=>fieldSigKey(c)===r.field);if(!s)return [];return (s.dv!==''&&s.dv!=null)?[String(s.dv)]:[];}
+  const ed=!n&&r&&r.node?edgeById(r.node):null;   // 连线标签信号：建议值=当前静态值
+  if(ed)return (ed.lblVal!==''&&ed.lblVal!=null)?[String(ed.lblVal)]:[];
   const f=n&&(n.data||[]).find(d=>fieldSigKey(d)===r.field);return (f&&f.dv!=='')?[String(f.dv)]:[];
 }
 function renderSimPanel(){ renderRulesList(); renderInjRows(); renderCustomSignals(); autoGrowSimJSON(); }
@@ -685,6 +701,8 @@ function buildInjDraftCard(){
   const nsel=document.createElement('select');nsel.className='sim-sel';
   const ph=document.createElement('option');ph.value='';ph.textContent=(lang==='en'?'Element':'选择元素');nsel.appendChild(ph);
   nodes.forEach(n=>{const o=document.createElement('option');o.value=n.id;o.textContent=nodeLabel(n);if(remainingFieldsFor(n.id,-1).length===0){o.disabled=true;o.textContent+=fullTag;}nsel.appendChild(o);});
+  // 连线标签信号（有 id + 英文名的连线才有可注入字段）
+  edges.forEach(ed=>{if(!edgeLabelSig(ed))return;const o=document.createElement('option');o.value=ed.id;o.textContent=edgeLabelDisplayName(ed);if(remainingFieldsFor(ed.id,-1).length===0){o.disabled=true;o.textContent+=fullTag;}nsel.appendChild(o);});
   const og=document.createElement('option');og.value='@global';og.textContent=(lang==='en'?'＊Global signals':'＊全局信号');if(remainingFieldsFor('@global',-1).length===0){og.disabled=true;og.textContent+=((customSignals&&customSignals.length)?fullTag:(lang==='en'?' (none)':'（无全局信号）'));}nsel.appendChild(og);
   nsel.value=d.node||'';
   nsel.onchange=e=>{d.node=e.target.value;const rem=remainingFieldsFor(d.node,-1);d.field=(rem[0]?rem[0].v:'');d.val='';renderInjRows();};
@@ -740,10 +758,11 @@ function renderInjRows(){
       if(collapsed)box.classList.add('collapsed');
       head.classList.add('clk');
       const chev=document.createElement('span');chev.className='sim-gchev';chev.textContent=collapsed?'▶':'▼';
-      const chip=document.createElement('span');chip.className='sim-gchip';chip.textContent=(g.node==='@global'?(lang==='en'?'GLOBAL':'全局'):(lang==='en'?'NODE':'元素'));
       const nd=nodes.find(x=>x.id===g.node);
+      const gEdge=!nd&&g.node!=='@global'?edgeById(g.node):null;   // 连线标签信号分组
+      const chip=document.createElement('span');chip.className='sim-gchip';chip.textContent=(g.node==='@global'?(lang==='en'?'GLOBAL':'全局'):(gEdge?(lang==='en'?'EDGE':'连线'):(lang==='en'?'NODE':'元素')));
       const lab=document.createElement('span');lab.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-      lab.textContent=(g.node==='@global'?(lang==='en'?'Global signals':'全局信号'):(nd?nodeLabel(nd):g.node));
+      lab.textContent=(g.node==='@global'?(lang==='en'?'Global signals':'全局信号'):(nd?nodeLabel(nd):(gEdge?edgeLabelDisplayName(gEdge):g.node)));
       name.appendChild(chip);name.appendChild(lab);
       const cnt=document.createElement('span');cnt.className='sim-gcount';cnt.textContent='('+g.items.length+')';
       const gadd=document.createElement('button');gadd.type='button';gadd.className='sim-gadd';gadd.textContent=(lang==='en'?'+ field':'+ 字段');
@@ -784,12 +803,14 @@ function normalizeSignal(s){
     const o={key:zh, keyEn:en, dv:(s.value!==undefined?s.value:''), type:s.type};
     if(Array.isArray(s.options))o.options=s.options.slice();
     if(s.bind&&s.bind.field)o.bind={field:s.bind.field, deviceType:s.bind.deviceType||'', deviceId:s.bind.deviceId||''};
+    if(s.dict!==undefined&&s.dict!==null)o.dict=String(s.dict);   // 值字典显式指定（''=强制不转义）
     return o;
   }
   if(typeof s.key==='string'||s.keyEn){               // 已是内部格式
     const o={key:s.key||'', keyEn:s.keyEn||'', dv:(s.dv!==undefined?s.dv:''), type:s.type};
     if(Array.isArray(s.options))o.options=s.options.slice();
     if(s.bind&&s.bind.field)o.bind={field:s.bind.field, deviceType:s.bind.deviceType||'', deviceId:s.bind.deviceId||''};
+    if(s.dict!==undefined&&s.dict!==null)o.dict=String(s.dict);
     return o;
   }
   if(s.name){                                          // 旧导出格式：keyEn=name(保持信号键不变)，key=label||name
@@ -824,8 +845,15 @@ function renderCustomSignals(){
     const acts=document.createElement('span');acts.className='df-acts';
     const bound=!!(s.bind&&s.bind.field);
     const bindBtn=document.createElement('button');bindBtn.type='button';bindBtn.className='df-bind'+(bound?' bound':'');bindBtn.textContent='🔗';bindBtn.title=bound?'已绑定后台字段，点击修改':'绑定后台字段';bindBtn.onclick=()=>openGlobalBind(idx);
+    // 值字典：显式指定(强制/不转义)高亮；默认自动匹配（bind 命中某字典 applyTo 即转义）
+    const hasDict=(s.dict!==undefined&&s.dict!==null);
+    const effD=resolveValueDict(s,'');
+    const dictBtn=document.createElement('button');dictBtn.type='button';dictBtn.className='df-bind df-dict'+(hasDict?' bound':'');dictBtn.textContent='📖';
+    dictBtn.title=hasDict?(s.dict===''?'值字典：已设为「不转义」，点击修改':('值字典：强制使用「'+vdDisplayName(s.dict)+'」，点击修改'))
+      :(effD?('值字典：自动命中「'+vdDisplayName(effD.type)+'」，点击可覆盖'):'值字典：code 码转义显示（默认自动匹配后台绑定），点击设置');
+    dictBtn.onclick=()=>openGlobalDict(idx);
     const del=document.createElement('button');del.type='button';del.className='df-del';del.textContent='✕';del.title='删除信号';del.onclick=()=>{customSignals.splice(idx,1);renderSimPanel();invalidateRouting();};
-    acts.appendChild(bindBtn);acts.appendChild(del);
+    acts.appendChild(bindBtn);acts.appendChild(dictBtn);acts.appendChild(del);
     wrap.appendChild(zh);wrap.appendChild(en);wrap.appendChild(dv);wrap.appendChild(acts);
     if(bound){
       const bl=document.createElement('div');bl.className='df-bindline'+((s.bind.deviceId)?'':' warn');

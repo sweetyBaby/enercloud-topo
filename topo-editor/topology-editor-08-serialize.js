@@ -62,7 +62,9 @@ function buildJSON(){
           ...(f.chipBorder?{chipBorder:f.chipBorder}:{}),
           ...(f.chipBorderColor?{chipBorderColor:f.chipBorderColor}:{}),
           ...(f.chipBorderWidth!=null?{chipBorderWidth:f.chipBorderWidth}:{}),
-          ...(f.chipRadius!=null?{chipRadius:f.chipRadius}:{})
+          ...(f.chipRadius!=null?{chipRadius:f.chipRadius}:{}),
+          // 值字典显式指定（undefined=自动匹配不导出；''=强制不转义；'xxx'=强制用该字典）
+          ...(f.dict!==undefined&&f.dict!==null?{dict:f.dict}:{})
         };
         if(f.bind&&f.bind.field){
           // 后台字段绑定：导出时把来源「显式化」——总是写全 deviceType/deviceId，并用 followNode 标明是否跟随本节点设备
@@ -134,6 +136,17 @@ function buildJSON(){
       active:true
     };
     if(e.lineColor||e.lineStyle)eo.style={color:e.lineColor||'',lineStyle:e.lineStyle||'inherit'};
+    // ★ 连线标签扩展：id(绑定时生成，信号键前缀)、英文名、后台绑定、值字典、当前值、位置/旋转/缩放/走向
+    if(e.id)eo.id=e.id;
+    if(e.lblEn)eo.labelEn=e.lblEn;
+    if(e.lblBind&&e.lblBind.field)eo.labelBind={field:e.lblBind.field, deviceType:e.lblBind.deviceType||'', deviceId:e.lblBind.deviceId||''};
+    if(e.lblDict!==undefined&&e.lblDict!==null)eo.labelDict=e.lblDict;
+    if(e.lblVal!=null&&e.lblVal!=='')eo.labelValue=e.lblVal;
+    if(e.lblOx||e.lblOy)eo.labelOffset={x:parseFloat((+e.lblOx||0).toFixed(1)),y:parseFloat((+e.lblOy||0).toFixed(1))};
+    if(e.lblRot)eo.labelRot=e.lblRot;
+    if(e.lblScale&&e.lblScale!==1)eo.labelScale=e.lblScale;
+    if(e.lblDir&&e.lblDir!=='auto')eo.labelDir=e.lblDir;
+    if(e.lblShow&&e.lblShow!=='value')eo.labelShow=e.lblShow;   // 展示内容：缺省 value=只显示值；'name'/'both'
     if(e.fromPort)eo.fromPort=e.fromPort;
     if(e.toPort)eo.toPort=e.toPort;
     if(e.showWhen!=null) eo.showWhen=e.showWhen;                              // ★ 数据驱动：显示/存在条件
@@ -146,8 +159,19 @@ function buildJSON(){
     // key.en 用真实英文名（空则保留空）——不兜底成中文名，否则草稿/导出重载后会掩盖「缺英文名」使校验失效
     const o={key:{zh:s.key||'', en:(s.keyEn||'')}, value:(s.dv==null?'':s.dv)};
     if(s.bind&&s.bind.field)o.bind={field:s.bind.field, deviceType:s.bind.deviceType||'', deviceId:s.bind.deviceId||''};
+    if(s.dict!==undefined&&s.dict!==null)o.dict=s.dict;   // 值字典显式指定（同数据字段语义）
     return o;
   });
+  // ★ 值字典快照：只内嵌「本图实际用到」的字典（显式指定 + bind 自动命中），运行端/前端拿到 JSON 即自包含，
+  //   无需依赖字典服务；前端如有自己的字典源可注入覆盖（见 docs/realtime-data-api.md）。
+  {
+    const usedDicts=new Map();
+    const collect=(f,dt)=>{const d=resolveValueDict(f,dt);if(d&&!usedDicts.has(d.type))usedDicts.set(d.type,d);};
+    nodes.forEach(n=>(n.data||[]).forEach(f=>collect(f,nodeDeviceType(n))));
+    (customSignals||[]).forEach(s=>collect(s,''));
+    edges.forEach(e=>{if(e.lblBind||e.lblDict!=null)collect({bind:e.lblBind,...(e.lblDict!==undefined&&e.lblDict!==null?{dict:e.lblDict}:{})},'');});   // 连线标签命中的字典
+    if(usedDicts.size)obj.valueDicts=[...usedDicts.values()].map(d=>JSON.parse(JSON.stringify(d)));
+  }
   // ★ 数据驱动：当前注入的样例信号值（预览数据，随图导出，便于运行端/再次编辑时作默认值）
   if(signalValues&&Object.keys(signalValues).length){
     const valid=new Set(collectSignals().map(s=>s.name)),samples={};
@@ -168,6 +192,15 @@ function buildJSON(){
       // signal=端到端信号键(节点id.英文字段名)；label 保留中文名便于人读
       dataBindings.push({ signal:fieldSig(n,f), node:n.id, label:f.key||fieldSigKey(f), source });
     });
+  });
+  // 连线标签的后台绑定：signal=连线id.标签英文名，node=null、edge=连线id（后端消费方式与其它条目一致：按 source 取值、以 signal 为键输出）
+  edges.forEach(e=>{
+    if(!(e.lblBind&&e.lblBind.field)||!e.id||!edgeLabelSigKey(e))return;
+    const deviceId=e.lblBind.deviceId||'';
+    const dev=deviceId?DEVICE_LIST.find(d=>d.deviceId===deviceId):null;
+    const source={deviceType:e.lblBind.deviceType||'', deviceId, field:e.lblBind.field};
+    if(dev&&dev.deviceName)source.deviceName=dev.deviceName;
+    dataBindings.push({ signal:edgeLabelSig(e), node:null, edge:e.id, label:e.lbl||edgeLabelSigKey(e), source });
   });
   // 全局信号的后台绑定：signal=英文名(无节点前缀)，node=null 表示全局量
   (customSignals||[]).forEach(s=>{
@@ -205,12 +238,21 @@ function unboundBindingReport(){
       }
     });
   });
+  // 连线标签绑定的完整性：绑定成立必须有 英文名(信号键段) + 设备实例（UI 已拦，此处兜手改/导入文件）
+  edges.forEach(e=>{
+    if(!(e.lblBind&&e.lblBind.field))return;
+    const name=(e.lbl||e.lblEn||(e.from+'→'+e.to));
+    if(!String(e.lblEn||'').trim()){miss.push({node:e.id||(e.from+'→'+e.to),label:'连线标签',key:name,reason:'缺英文名（无法生成信号键）'});return;}
+    if(!e.lblBind.deviceId){miss.push({node:e.id||(e.from+'→'+e.to),label:'连线标签',key:name,reason:'缺设备实例'});return;}
+    if(haveDevices&&!DEVICE_LIST.some(d=>d.deviceId===e.lblBind.deviceId)){miss.push({node:e.id||(e.from+'→'+e.to),label:'连线标签',key:name,reason:'设备实例不存在'});}
+  });
   return miss;
 }
 // 导出前校验：节点 ID 是否重复/为空（ID 是 signal 键与 dataBindings 的主键，重复会冲突，属严重问题）
 // 用 Object.create(null) 避免 __proto__/constructor/toString 等 ID 与对象原型属性碰撞导致误计数。
 function duplicateIdReport(){
   const cnt=Object.create(null);nodes.forEach(n=>{const id=n.id||'';cnt[id]=(cnt[id]||0)+1;});
+  edges.forEach(e=>{if(e.id)cnt[e.id]=(cnt[e.id]||0)+1;});   // 连线 id 也是信号键前缀，与节点 id 同一命名空间，不可重复
   const dups=Object.keys(cnt).filter(id=>id&&cnt[id]>1).map(id=>({id,count:cnt[id]}));
   const emptyCount=(cnt['']||0);
   return {dups,emptyCount};
@@ -274,7 +316,7 @@ function renderBindRisk(){
   if(dups.length||emptyCount){
     const parts=dups.map(d=>'· ID「'+tplEsc(d.id)+'」重复 '+d.count+' 次');
     if(emptyCount)parts.push('· 有 '+emptyCount+' 个节点 ID 为空');
-    html+='<div style="color:#ff6b6b"><b>✕ 节点 ID 冲突：会造成信号键/dataBindings 冲突，已阻止导出，请先修正：</b>'+
+    html+='<div style="color:#ff6b6b"><b>✕ 节点/连线 ID 冲突：会造成信号键/dataBindings 冲突，已阻止导出，请先修正：</b>'+
       '<div style="margin-top:5px;max-height:120px;overflow:auto;font-size:12px;line-height:1.5">'+parts.join('<br>')+'</div></div>';
   }
   if(nameMiss.length){
@@ -306,7 +348,7 @@ function renderBindRisk(){
 function refreshJSON(){document.getElementById('jout').textContent=buildJSON();renderBindRisk();}
 function showJSON(){document.getElementById('jout').textContent=buildJSON();renderBindRisk();document.getElementById('jpanel').classList.add('show');
   const {dups,emptyCount}=duplicateIdReport();const nameMiss=missingFieldNameReport();const nameDup=duplicateFieldNameReport();const sigBad=globalSignalNameReport();const miss=unboundBindingReport();
-  if(dups.length||emptyCount)flashHint(lang==='en'?'⚠ Duplicate/empty node IDs — fix before use':'✕ 存在重复/为空的节点 ID，会造成信号键冲突，请先修正');
+  if(dups.length||emptyCount)flashHint(lang==='en'?'⚠ Duplicate/empty node IDs — fix before use':'✕ 存在重复/为空的节点或连线 ID，会造成信号键冲突，请先修正');
   else if(nameMiss.length)flashHint(lang==='en'?('✕ '+nameMiss.length+' field(s) missing zh/en name — fix before export'):('✕ 有 '+nameMiss.length+' 个数据字段缺中文名或英文名，请先补全（英文名作信号键）'));
   else if(nameDup.length)flashHint(lang==='en'?('✕ '+nameDup.length+' duplicate field name(s) — fix before export'):('✕ 有 '+nameDup.length+' 个数据字段名在同节点内重复，请先修正（英文名重复会冲突）'));
   else if(sigBad.length)flashHint(lang==='en'?('✕ '+sigBad.length+' global signal name issue(s) — fix before export'):('✕ 有 '+sigBad.length+' 个全局信号缺中/英文名或名称重复，请先修正'));
@@ -318,7 +360,7 @@ function blockExportForIds(){
   const {dups,emptyCount}=duplicateIdReport();
   if(dups.length||emptyCount){
     renderBindRisk();
-    flashHint(lang==='en'?'Export blocked: duplicate/empty node IDs — fix first':'✕ 存在重复或为空的节点 ID，已阻止导出，请先修正');
+    flashHint(lang==='en'?'Export blocked: duplicate/empty node IDs — fix first':'✕ 存在重复或为空的节点/连线 ID，已阻止导出，请先修正');
     return true;
   }
   const nameMiss=missingFieldNameReport();
@@ -410,6 +452,7 @@ function parseImportedNode(o){
     if(f.chipBorderColor)fld.chipBorderColor=f.chipBorderColor;
     if(f.chipBorderWidth!=null)fld.chipBorderWidth=+f.chipBorderWidth;
     if(f.chipRadius!=null)fld.chipRadius=(typeof f.chipRadius==='string'&&f.chipRadius.trim().endsWith('%'))?f.chipRadius:+f.chipRadius;
+    if(f.dict!==undefined&&f.dict!==null)fld.dict=String(f.dict);   // 值字典显式指定（''=强制不转义）
     if(f.bind&&f.bind.field){
       // followNode=true（或旧格式缺省 device）→ 内部只存 field 保持「跟随节点」；否则固化显式来源
       if(f.bind.followNode||!(f.bind.deviceType||f.bind.deviceId)) fld.bind={field:f.bind.field};
@@ -452,6 +495,24 @@ function parseImportedEdge(o){
   };
   if(o.fromPort)e.fromPort=o.fromPort;
   if(o.toPort)e.toPort=o.toPort;
+  // ★ 连线标签扩展（可选，缺省不落对象）
+  if(o.id)e.id=String(o.id);
+  if(o.labelEn||o.lblEn)e.lblEn=String(o.labelEn||o.lblEn);
+  if(o.labelBind&&o.labelBind.field)e.lblBind={field:o.labelBind.field, ...(o.labelBind.deviceType?{deviceType:o.labelBind.deviceType}:{}), ...(o.labelBind.deviceId?{deviceId:o.labelBind.deviceId}:{})};
+  const _ldc=(o.labelDict!==undefined?o.labelDict:o.lblDict);
+  if(_ldc!==undefined&&_ldc!==null)e.lblDict=String(_ldc);
+  const _lv=(o.labelValue!==undefined?o.labelValue:o.lblVal);
+  if(_lv!=null&&_lv!=='')e.lblVal=_lv;
+  const _lo=o.labelOffset||{};
+  if(+_lo.x||+o.lblOx)e.lblOx=+_lo.x||+o.lblOx||0;
+  if(+_lo.y||+o.lblOy)e.lblOy=+_lo.y||+o.lblOy||0;
+  if(+o.labelRot||+o.lblRot)e.lblRot=+o.labelRot||+o.lblRot;
+  const _lsc=(o.labelScale!==undefined?o.labelScale:o.lblScale);
+  if(_lsc&&+_lsc!==1)e.lblScale=+_lsc;
+  const _ldr=o.labelDir||o.lblDir;
+  if(_ldr==='h'||_ldr==='v')e.lblDir=_ldr;
+  const _lsh=o.labelShow||o.lblShow;
+  if(_lsh==='name'||_lsh==='both')e.lblShow=_lsh;
   const st=o.style||{};
   if(normHex(st.color))e.lineColor=normHex(st.color);
   if(st.lineStyle==='solid'||st.lineStyle==='dashed')e.lineStyle=st.lineStyle;
@@ -547,6 +608,8 @@ async function importCanvasJSON(obj){
   // 1.5) 还原自定义全局信号 + 清空上次注入
   customSignals=(Array.isArray(obj.signals)?obj.signals:[]).map(normalizeSignal).filter(Boolean);
   signalValues={};injRows=[];injDraft=null;_injInited=false;
+  // 1.6) 还原文档内嵌的值字典快照（共享库优先，快照只补库里没有的 type——无字典服务也能正确转义）
+  docValueDicts=(Array.isArray(obj.valueDicts)?obj.valueDicts:[]).filter(d=>d&&d.type);
   // 2) 还原节点 / 连线（仅保留两端节点都存在的连线）
   const newNodes=obj.nodes.map(parseImportedNode).filter(Boolean);
   const idSet=new Set(newNodes.map(n=>n.id));
@@ -565,9 +628,13 @@ async function importCanvasJSON(obj){
     pruneInvalidInjections();
     syncInjections();
   }
-  // 4) 重建 id 计数器，保证后续新增节点 id 不冲突
+  // 4) 重建 id 计数器（节点 + 连线），保证后续新增 id 不冲突
   ids={};
   nodes.forEach(n=>{const m=String(n.id).match(/^(.+?)_?(\d+)$/);if(m){ids[m[1]]=Math.max(ids[m[1]]||0,parseInt(m[2]));}});
+  edges.forEach(e=>{if(!e.id)return;const m=String(e.id).match(/^(.+?)_?(\d+)$/);if(m){ids[m[1]]=Math.max(ids[m[1]]||0,parseInt(m[2]));}});
+  // 4.1) 连线 id 去重（与节点 id、其它连线 id 均不可撞——id 是信号键前缀）：冲突则重新生成
+  {const seen=new Set(nodes.map(n=>n.id));
+   edges.forEach(e=>{if(!e.id)return;if(seen.has(e.id))e.id=genId('edge');seen.add(e.id);});}
   // 5) 还原画布设置
   const canv=(obj.meta&&obj.meta.canvas)||{};
   if(canv.bgColor) setBg(canv.bgColor);

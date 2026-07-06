@@ -131,6 +131,28 @@ async function reloadBackendBindingData(){
     flashHint(lang==='en'?'Backend dict/devices reloaded':'后台字典/设备已刷新'); }
   catch(err){ console.error('刷新后台绑定数据失败：',err); }
 }
+/* ───── 值字典（code 码 → 中/英显示文案）：共享字典库（value-dicts/ 落盘，跨拓扑复用，类似图标库）
+   + 文档内嵌快照（导出 JSON 的 valueDicts，导入时恢复，保证无字典服务也能正确转义）。
+   转义逻辑在 packages/topology-runtime（fieldDisplayValue 等），此处只负责数据的加载与合并。 ───── */
+const VD_BASE=(typeof window!=='undefined'&&window.TOPO_DICT_BASE)||'value-dicts/';   // 清单/文件目录（相对 topo.html）
+const VD_API=(typeof window!=='undefined'&&window.TOPO_DICT_API)||'api/value-dicts';  // 写接口（dev/生产 server 均提供；可被父平台覆盖）
+let VALUE_DICTS=[];      // 共享字典库（服务端扫描 value-dicts/*.json 合并）
+let docValueDicts=[];    // 当前文档内嵌的字典快照（importCanvasJSON 恢复；仅补库里没有的 type）
+async function loadValueDicts(){
+  try{
+    const r=await fetch(VD_BASE+'index.json',{cache:'no-store'});
+    if(!r.ok)return;
+    const m=await r.json();
+    if(m&&Array.isArray(m.dicts))VALUE_DICTS=m.dicts.filter(d=>d&&d.type);
+  }catch(err){ console.warn('加载值字典 '+VD_BASE+'index.json 失败：',err); }
+}
+// 生效字典 = 共享库优先 + 文档内嵌兜底（库是编辑器内可管理的事实源：改库立即生效；内嵌快照只补缺）
+function effectiveValueDicts(){
+  const have=new Set(VALUE_DICTS.map(d=>d.type));
+  return VALUE_DICTS.concat((docValueDicts||[]).filter(d=>d&&d.type&&!have.has(d.type)));
+}
+async function reloadValueDicts(){ await loadValueDicts(); }
+
 // 应用启动（Promise.all(...).then(init)）已移至最后加载的 topology-editor-12-bootstrap.js：
 //  init() 体内会调用分布在 02/03/06/11 等后续文件的函数，必须待全部 <script> 求值后再启动，
 //  否则若 loadIconLibrary/loadBackendBindingData 在后续脚本加载前 resolve，init() 会 ReferenceError。
@@ -139,7 +161,7 @@ const CUSTOM_ICONS={},CUSTOM_LABELS={};let pendingDataURL=null;
 let nodes=[],edges=[],selNode=null,selEdge=null;
 let edgeMode=false,edgeFrom=null,edgeFromPort=null,edgeWaypoints=[],pendingET='ac_power',pendingRoute='smart',mouseWX=null,mouseWY=null,selectMode=false;
 let dragNode=null,dox=0,doy=0,panX=0,panY=0,zoom=1,isPanning=false,panSX=0,panSY=0;
-let dragChip=null,dchox=0,dchoy=0,dragWaypoint=null,dragBus=null,dragResize=null,dragGroupScale=null,_groupBox=null,dragRotate=null,_hud=null,dragChipGroup=null,dragEndpoint=null;
+let dragChip=null,dchox=0,dchoy=0,dragWaypoint=null,dragBus=null,dragResize=null,dragGroupScale=null,_groupBox=null,dragRotate=null,_hud=null,dragChipGroup=null,dragEndpoint=null,dragEdgeLabel=null,dragLblRotate=null,dragLblScale=null;
 let selSet=new Set(),selChips=new Set(),rubber=null,_groupDrag=false,_groupStart={},alignGuides=[],_overlapHandles=[]; // 多选集合 + 选中字段 + 框选矩形 + 对齐辅助线 + 重叠线拐点浅色手柄
 let ids={},animT=0,ctxTgt=null,ctxKind=null,bgColor='#0a1f40',showGrid=true,showEdgeLabels=true,showFieldChips=true,showAnchors=true,busMerge=true,busMergeGap=16,busTrunkBold=true,busStyle='busbar',busOffsets={},busShareTrunk=false,busShowHandles=false,routeStyle=3,busAggregation=false;
 let history=[],histIdx=-1;

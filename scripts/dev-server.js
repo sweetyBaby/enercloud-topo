@@ -4,6 +4,7 @@ const path = require('path');
 const url = require('url');
 const { createTemplateApi } = require('./template-store');
 const { createIconApi, buildManifest: buildIconManifest } = require('./icon-store');
+const { createDictApi } = require('./dict-store');
 
 const root = path.resolve(__dirname, '..');
 const startPort = Number(process.env.PORT || 5173);
@@ -107,6 +108,8 @@ function serveFile(req, res) {
 const templateApi = createTemplateApi({ dir: tplDir, log, warn });
 // ───── 图标库读写 API：上传/重命名/替换/删除自动落盘到 icons/ + index.json（dev 与生产共用 icon-store） ─────
 const iconApi = createIconApi({ dir: iconsDir, log, warn });
+// ───── 值字典读写 API：增删改落盘到 value-dicts/*.json；清单由目录扫描动态生成（dev 与生产共用 dict-store） ─────
+const dictApi = createDictApi({ dir: path.join(root, 'value-dicts'), log, warn });
 
 function createServer() {
   return http.createServer((req, res) => {
@@ -120,6 +123,13 @@ function createServer() {
     // 后台字段字典：扫描 dic/ 合并（增删改 dic/*.json 即自动反映）。device/* 走静态，内容变更经 no-store 重新拉取即可。
     if (pathname === '/dic/index.json') {
       return send(res, 200, JSON.stringify(buildDicManifest(), null, 2), types['.json']);
+    }
+    // 值字典：清单由目录扫描动态生成（增删改 value-dicts/*.json 即自动反映）
+    if (dictApi.matches(pathname)) {
+      return dictApi.handle(req, res, pathname);
+    }
+    if (pathname === '/value-dicts/index.json') {
+      return send(res, 200, JSON.stringify(dictApi.buildIndex(), null, 2), types['.json']);
     }
     // 模板清单由目录扫描动态生成（增删改 templates/*.json 即自动反映，不依赖 index.json）
     if (pathname === '/templates/index.json') {
@@ -157,7 +167,7 @@ function scheduleReload(file) {
   //   若让它们触发整页热重载，会把用户正开着的弹框（如图标库管理）无故刷掉。
   //   手动改 icons/ 图片仍可用左栏「🔄 重扫图标库」即时生效，无需整页刷新。
   // 注意 Windows 的 fs.watch 会对目录本身发事件（rel 恰为 'icons'，无斜杠），用 rel+'/' 统一匹配目录及其内容
-  if (rel === '.dev-server.log' || (rel + '/').startsWith('icons/') || (rel + '/').startsWith('templates/')) return;
+  if (rel === '.dev-server.log' || (rel + '/').startsWith('icons/') || (rel + '/').startsWith('templates/') || (rel + '/').startsWith('value-dicts/')) return;
   clearTimeout(timer);
   timer = setTimeout(notifyReload, 80);
 }

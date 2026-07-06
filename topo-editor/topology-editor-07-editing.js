@@ -349,13 +349,13 @@ function selectEdge(e){
   ensurePropsOpen();
   selEdge=e;selNode=null;showPanel('edge');
   document.getElementById('ep-type').value=e.et||'ac_power';document.getElementById('ep-route').value=routeToOption(e.route);
-  document.getElementById('ep-dir').value=e.dir||'forward';document.getElementById('ep-lbl').value=e.lbl||'';
+  document.getElementById('ep-dir').value=e.dir||'forward';
+  refreshEdgeLblUI(e);   // 填充属性面板「🏷 标签」分组（文字/样式/绑定级联/值字典/当前值溯源）
   document.getElementById('ep-w').value=e.w||1;document.getElementById('ep-w-v').textContent=(e.w||1).toFixed(1);
   const cfg=edgeCfg(e);
   document.getElementById('ep-color').value=cfg.color;
   document.getElementById('ep-color-hex').value=e.lineColor||'';
   document.getElementById('ep-style').value=e.lineStyle||'inherit';
-  document.getElementById('ep-showlbl').checked=!e.hideLabel;
   // 仅手动拐点连线显示正交开关
   const orow=document.getElementById('ep-ortho-row');
   orow.style.display=(e.route==='manual')?'block':'none';
@@ -408,7 +408,8 @@ function batchVis(which,show){
 }
 function applyEP(){
   if(!selEdge)return;selEdge.et=document.getElementById('ep-type').value;selEdge.route=optionToRoute(document.getElementById('ep-route').value);
-  selEdge.dir=document.getElementById('ep-dir').value;selEdge.lbl=document.getElementById('ep-lbl').value;
+  selEdge.dir=document.getElementById('ep-dir').value;
+  // 标签相关属性由「🏷 标签」分组的 applyELbl/elcApplyBind 等专职处理，applyEP 不再读写
   selEdge.w=parseFloat(document.getElementById('ep-w').value);document.getElementById('ep-w-v').textContent=selEdge.w.toFixed(1);
   // 以「正在编辑的控件」为准，避免 hex 旧值覆盖取色器新值（同 applyTextStyle）
   const epPick=document.getElementById('ep-color'),epHex=document.getElementById('ep-color-hex');
@@ -420,7 +421,6 @@ function applyEP(){
   }
   selEdge.lineStyle=document.getElementById('ep-style').value;
   if(selEdge.lineStyle==='inherit')delete selEdge.lineStyle;
-  selEdge.hideLabel=!document.getElementById('ep-showlbl').checked;
   selEdge.orthoSnap=document.getElementById('ep-ortho').checked;
   document.getElementById('ep-ortho-row').style.display=(selEdge.route==='manual')?'block':'none';
   invalidateRouting();
@@ -436,6 +436,11 @@ function renderDFs(n){const c=document.getElementById('dfields');c.className='df
   (n.data||[]).forEach((f,i)=>{
     const dvVal=(f.dv==null||f.dv==='')?'':String(f.dv);   // 原始值；下方统一用 tplEsc 转义
     const bound=!!(f.bind&&f.bind.field);
+    // 值字典状态：显式指定(强制/不转义)高亮；否则按 bind 自动匹配（title 提示当前生效字典）
+    const hasDict=(f.dict!==undefined&&f.dict!==null);
+    const effDict=resolveValueDict(f,nodeDeviceType(n));
+    const dictTip=hasDict?(f.dict===''?'值字典：已设为「不转义」（原样显示），点击修改':('值字典：强制使用「'+vdDisplayName(f.dict)+'」，点击修改'))
+      :(effDict?('值字典：自动命中「'+vdDisplayName(effDict.type)+'」（经后台绑定），点击可覆盖'):'值字典：code 码转义显示（默认自动匹配后台绑定），点击设置');
     const iss=_issues[i]||{};
     const zhBad=iss.emptyZh||iss.dupZh, enBad=iss.emptyEn||iss.dupEn;
     const zhTip=iss.dupZh?'中文名重复（同节点内需唯一）':'中文字段名（必填）';
@@ -445,8 +450,15 @@ function renderDFs(n){const c=document.getElementById('dfields');c.className='df
       '<input class="df-val-in" value="'+tplEsc(dvVal)+'" placeholder="--" title="默认值（可留空）" oninput="updDFVal('+i+',this.value)">'+
       '<span class="df-acts">'+
         '<button class="df-bind'+(bound?' bound':'')+'" onclick="openFieldBind('+i+')" title="'+(bound?'已绑定后台字段，点击修改':'绑定后台字段')+'">🔗</button>'+
+        '<button class="df-bind df-dict'+(hasDict?' bound':'')+'" onclick="openFieldDict('+i+')" title="'+tplEsc(dictTip)+'">📖</button>'+
         '<button class="df-del" onclick="rmDF('+i+')" title="删除字段">✕</button>'+
       '</span>';
+    // 显式指定了值字典 → 整行紧贴显示（同绑定摘要），✕ 恢复自动匹配
+    if(hasDict){
+      html+='<div class="df-bindline"><span class="df-bindsum" onclick="openFieldDict('+i+')" title="点击修改值字典">↳ '+
+        tplEsc((f.key||('字段'+(i+1)))+'  ·  值字典：'+(f.dict===''?'不转义（原样显示）':('强制「'+vdDisplayName(f.dict)+'」')))+'</span>'+
+        '<button class="df-bindclr" onclick="clearFieldDict('+i+')" title="恢复自动匹配（按后台绑定自动命中字典）">✕</button></div>';
+    }
     // 已绑定 → 整行(跨全部列)紧贴显示来源（前缀字段名，杜绝歧义）+ ✕ 快速清除
     if(bound){
       const noInst=!(f.bind.deviceId||n.deviceId);
@@ -640,6 +652,193 @@ function confirmGlobalBind(idx){
   const o=devSel.selectedOptions[0],did=devSel.value,dt=o&&o.getAttribute('data-dt');
   s.bind={field:loc+'.'+field, deviceId:did, deviceType:dt||''};
   closeFieldBind();renderCustomSignals();invalidateRouting();
+}
+// ───── 值字典选择（数据字段 / 全局信号共用）：自动匹配(默认) / 不转义 / 强制指定某字典 ─────
+// 存储语义：f.dict 不存在=自动（bind 命中 applyTo 即转义）；''=强制不转义；'xxx'=强制用该字典。
+function vdDisplayName(type){
+  const d=findValueDict(type);
+  if(!d)return type+'（未找到，按不转义处理）';
+  return (lang==='en'?(d.nameEn||d.name):(d.name||d.nameEn))||d.type;
+}
+// 通用选择弹窗：f=字段/信号对象；deviceType=自动匹配兜底类型；title 弹窗标题；onDone 应用后回调
+function openValueDictPicker(f,deviceType,title,onDone){
+  closeFieldBind();
+  const dicts=effectiveValueDicts();
+  const cur=(f.dict!==undefined&&f.dict!==null)?(f.dict===''?'@none':f.dict):'@auto';
+  const auto=resolveValueDict({bind:f.bind},deviceType);   // 忽略显式指定，看自动匹配会命中谁
+  const autoLbl='自动匹配（默认）'+(auto?('：当前命中「'+vdDisplayName(auto.type)+'」'):'：当前未命中（未绑定后台字段或无字典认领）');
+  const opts=['<option value="@auto"'+(cur==='@auto'?' selected':'')+'>'+tplEsc(autoLbl)+'</option>',
+    '<option value="@none"'+(cur==='@none'?' selected':'')+'>不转义（原样显示 code）</option>']
+    .concat(dicts.map(d=>'<option value="'+tplEsc(d.type)+'"'+(cur===d.type?' selected':'')+'>强制：'+
+      tplEsc((d.name||d.type)+(d.nameEn?(' / '+d.nameEn):'')+' ('+d.type+')')+'</option>'));
+  const ov=document.createElement('div');ov.id='fb-overlay';ov.onclick=e=>{if(e.target===ov)closeFieldBind();};
+  ov.innerHTML='<div id="fb-box"><button class="dlg-close" onclick="closeFieldBind()" title="关闭" aria-label="关闭">✕</button>'+
+    '<div id="fb-title">'+tplEsc(title)+'</div>'+
+    '<label class="fb-l">值字典（code 码 → 中/英显示文案）</label><select id="vd-pick">'+opts.join('')+'</select>'+
+    '<div id="fb-acts" style="margin-top:12px"><span style="flex:1"></span>'+
+    '<button class="tb" onclick="closeFieldBind()">取消</button><button class="tb grn" id="vd-pick-ok">确定</button></div>'+
+    '<div class="phint" style="margin-top:6px">显示语言随编辑器中英文切换自动变化；查不到的 code 回退显示原始值。字典本身在菜单栏「📖 值字典」中维护。</div></div>';
+  document.body.appendChild(ov);
+  document.getElementById('vd-pick-ok').onclick=()=>{
+    const v=document.getElementById('vd-pick').value;
+    snapshot();
+    if(v==='@auto')delete f.dict; else if(v==='@none')f.dict=''; else f.dict=v;
+    snapshot();closeFieldBind();
+    if(onDone)onDone();
+  };
+}
+function openFieldDict(i){
+  const n=nodes.find(x=>x.id===selNode);if(!n)return;
+  const f=(n.data||[])[i];if(!f)return;
+  openValueDictPicker(f,nodeDeviceType(n),'值字典：'+(f.key||('字段'+(i+1))),()=>renderDFs(n));
+}
+function clearFieldDict(i){
+  const n=nodes.find(x=>x.id===selNode);if(!n)return;const f=(n.data||[])[i];
+  if(f&&f.dict!==undefined){snapshot();delete f.dict;snapshot();}
+  renderDFs(n);
+}
+function openGlobalDict(idx){
+  const s=(customSignals||[])[idx];if(!s)return;
+  openValueDictPicker(s,'','值字典（全局信号）：'+(sigDisplayName(s)||('信号'+(idx+1))),()=>renderCustomSignals());
+}
+// ───── 标签设置（属性面板「🏷 标签」分组，非弹框）：文字/样式 + 绑定后台字段 + 值字典 + 当前值溯源 ─────
+// · 绑定：设备类型必选（驱动分类/字段级联），设备实例可选——未指定实例仍可绑定
+//   （导出校验仅黄色提醒，与数据字段「未指定实例」同级），由后台按类型自行对应设备。
+// · 标签值 = 绑定字段的实时值；命中值字典（applyTo 自动匹配）则转义显示——非强制，查不到回退原始值。
+//   「当前值」溯源行（elcValTrace）实时展示：原始值 → 转义结果 · 来源 · 经过哪个字典，杜绝"不知道显示的值哪来的"。
+// · 绑定成立自动生成连线 id（信号键=连线id.标签英文名，进 dataBindings 供后台推送）。
+function refreshEdgeLblUI(e){
+  const $=id=>document.getElementById(id);
+  if(!$('elc-zh'))return;
+  $('elc-zh').value=e.lbl||'';$('elc-en').value=e.lblEn||'';
+  $('elc-show').value=e.lblShow||'value';$('elc-dir').value=e.lblDir||'auto';
+  pairSet('ep-lbl-rot',e.lblRot||0);pairSet('ep-lbl-scale',Math.round((e.lblScale||1)*100));
+  $('elc-visible').checked=!e.hideLabel;
+  const b=e.lblBind||{};
+  let curLoc='',curFld='';if(b.field){const p=String(b.field).split('.');curFld=p.pop();curLoc=p.join('.');}
+  $('elc-dt').innerHTML='<option value="">未指定</option>'+DEVICE_TYPES.map(t=>'<option value="'+tplEsc(t.value)+'"'+(t.value===(b.deviceType||'')?' selected':'')+'>'+tplEsc(t.label)+'</option>').join('');
+  elcFillDev(b.deviceType||'',b.deviceId||'');
+  elcFillLoc(b.deviceType||'',curLoc,curFld);
+  const ev=document.getElementById('elc-val');if(ev)ev.value=(e.lblVal==null?'':String(e.lblVal));
+  elcBHint();elcDictFill();elcValTrace();
+}
+function elcFillDev(dt,cur){
+  const el=document.getElementById('elc-dev');if(!el)return;
+  el.innerHTML='<option value="">不指定实例（后台按类型对应）</option>'+devicesOfType(dt,'').map(d=>'<option value="'+tplEsc(d.deviceId)+'"'+(d.deviceId===cur?' selected':'')+'>'+tplEsc(d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</option>').join('');
+}
+function elcFillFld(dt,loc,cur){
+  const el=document.getElementById('elc-fld');if(!el)return;
+  const fs=dictFields(dt,loc);
+  el.innerHTML=fs.length?fs.map(x=>'<option'+(x===cur?' selected':'')+'>'+tplEsc(x)+'</option>').join(''):'<option value="">无字段</option>';
+}
+function elcFillLoc(dt,cl,cf){
+  const el=document.getElementById('elc-loc');if(!el)return;
+  const ls=dictLocations(dt);
+  el.innerHTML=ls.length?ls.map(l=>'<option'+(l===cl?' selected':'')+'>'+tplEsc(l)+'</option>').join(''):'<option value="">该类型无字典</option>';
+  elcFillFld(dt,el.value,cf);
+  const off=!dt;['elc-dev','elc-loc','elc-fld'].forEach(id=>{const x=document.getElementById(id);if(x)x.disabled=off;});
+}
+function elcDtChanged(){const dt=document.getElementById('elc-dt').value;elcFillDev(dt,'');elcFillLoc(dt,'','');}
+function elcLocChanged(){elcFillFld(document.getElementById('elc-dt').value,document.getElementById('elc-loc').value,'');}
+// 文字/样式类属性（中文文字/展示内容/走向/旋转/缩放/显示开关）——照 applyEP 模式，每次变更即应用+入历史
+function applyELbl(){
+  const e=selEdge;if(!e)return;
+  const $=id=>document.getElementById(id);
+  e.lbl=$('elc-zh').value;
+  const sh=$('elc-show').value;if(sh==='value')delete e.lblShow;else e.lblShow=sh;
+  const dr=$('elc-dir').value;if(dr==='auto')delete e.lblDir;else e.lblDir=dr;
+  const rot=((Math.round(pairVal('ep-lbl-rot',0))%360)+360)%360;if(rot)e.lblRot=rot;else delete e.lblRot;
+  const sc=Math.max(5,Math.min(800,Math.round(pairVal('ep-lbl-scale',100))))/100;if(sc!==1)e.lblScale=sc;else delete e.lblScale;
+  e.hideLabel=!$('elc-visible').checked;
+  snapshot();
+}
+// 静态默认值（labelValue）：无实时数据时标签显示它；直接填 code 即可模拟后台值看展示效果（注入/实时信号会覆盖）
+function applyELblVal(inp){
+  const e=selEdge;if(!e)return;
+  const v=inp.value;
+  if(v==='')delete e.lblVal;else e.lblVal=v;
+  elcValTrace();snapshot();
+}
+// 标签英文名（信号键段）变更 → 同步迁移注入行到新键，避免旧键的注入值残留导致标签取不到值
+function elcMigrateInj(e,oldKey,newKey){
+  if(!e||!e.id||!oldKey||oldKey===newKey)return;
+  if(newKey)injRows.forEach(r=>{if(r.node===e.id&&r.field===oldKey)r.field=newKey;});
+  else injRows=injRows.filter(r=>!(r.node===e.id&&r.field===oldKey));
+  syncInjections();renderInjRows();
+}
+// 英文名单独处理：已绑定时不可清空（作信号键）；变更后信号键随之变化，注入行一并迁移
+function applyELblEn(inp){
+  const e=selEdge;if(!e)return;
+  const v=inp.value.trim();
+  if(e.lblBind&&e.lblBind.field&&!v){flashHint('已绑定后台字段，English 不能为空（作信号键）');inp.value=e.lblEn||'';return;}
+  const oldKey=edgeLabelSigKey(e);
+  if(v)e.lblEn=v;else delete e.lblEn;
+  elcMigrateInj(e,oldKey,v);
+  elcBHint();elcValTrace();snapshot();
+}
+function elcApplyBind(){
+  const e=selEdge;if(!e)return;
+  const $=id=>document.getElementById(id);
+  const dt=$('elc-dt').value,loc=$('elc-loc').value,fld=$('elc-fld').value,did=$('elc-dev').value;
+  if(!dt){flashHint('请选择设备类型（决定可选的分类/字段）');return;}
+  if(!loc||!fld){flashHint('请选择分类与字段');return;}
+  const en=$('elc-en').value.trim();
+  if(!en){flashHint('请先填写标签「English」（作端到端信号键，如 Power / ChargeState）');$('elc-en').focus();return;}
+  const _oldKey=edgeLabelSigKey(e);
+  e.lblEn=en;
+  if(!e.id)e.id=genId('edge');                     // 绑定成立 → 需要稳定信号键前缀
+  elcMigrateInj(e,_oldKey,en);
+  e.lblBind={field:loc+'.'+fld, deviceType:dt, ...(did?{deviceId:did}:{})};
+  elcBHint();elcDictFill();elcValTrace();snapshot();
+  flashHint('已绑定：标签值将随实时数据更新'+(resolveValueDict({bind:e.lblBind},'')?'（命中值字典，自动转义显示）':''));
+}
+function elcClearBind(){
+  const e=selEdge;if(!e)return;
+  if(e.lblBind){delete e.lblBind;delete e.lblVal;snapshot();}
+  elcBHint();elcDictFill();elcValTrace();
+}
+// 当前绑定摘要 + 信号键
+function elcBHint(){
+  const e=selEdge,h=document.getElementById('elc-bhint');if(!e||!h)return;
+  if(e.lblBind&&e.lblBind.field){
+    const dt=e.lblBind.deviceType||'',did=e.lblBind.deviceId||'';
+    h.textContent='↳ 已绑定：'+(dt?deviceTypeLabel(dt)+'·':'')+(did?deviceNameOf(did):'（未指定实例）')+' / '+e.lblBind.field
+      +(e.id&&e.lblEn?('　信号键：'+e.id+'.'+e.lblEn):'');
+    h.style.color='#2ecc71';
+  }else{h.textContent='未绑定：标签仅显示静态文字。';h.style.color='';}
+}
+// 值字典下拉（自动匹配为默认；可强制指定/强制不转义）
+function elcDictFill(){
+  const e=selEdge,el=document.getElementById('elc-dict');if(!e||!el)return;
+  const dicts=effectiveValueDicts();
+  const cur=(e.lblDict!==undefined&&e.lblDict!==null)?(e.lblDict===''?'@none':e.lblDict):'@auto';
+  const auto=resolveValueDict({bind:e.lblBind},'');
+  const autoLbl='自动匹配（默认）'+(auto?('：当前命中「'+vdDisplayName(auto.type)+'」'):'：当前未命中（未绑定或无字典认领该字段）');
+  el.innerHTML='<option value="@auto"'+(cur==='@auto'?' selected':'')+'>'+tplEsc(autoLbl)+'</option>'+
+    '<option value="@none"'+(cur==='@none'?' selected':'')+'>不转义（原样显示 code）</option>'+
+    dicts.map(d=>'<option value="'+tplEsc(d.type)+'"'+(cur===d.type?' selected':'')+'>强制：'+tplEsc((d.name||d.type)+' ('+d.type+')')+'</option>').join('');
+}
+function elcDictChanged(){
+  const e=selEdge;if(!e)return;
+  const v=document.getElementById('elc-dict').value;
+  if(v==='@auto')delete e.lblDict;else if(v==='@none')e.lblDict='';else e.lblDict=v;
+  elcValTrace();snapshot();
+}
+// ★ 当前值溯源：画布上显示的值从哪来、有没有被字典转义——「原始值 → 转义结果 · 来源 · 字典」
+function elcValTrace(){
+  const e=selEdge,el=document.getElementById('elc-valtrace');if(!e||!el)return;
+  if(!(e.lblBind&&e.lblBind.field)){el.textContent='';return;}
+  const sig=edgeLabelSig(e);
+  let v=e.lblVal,src='静态默认值（上方输入框，导入/历史测试留存）';
+  if(sig&&Object.prototype.hasOwnProperty.call(signalValues,sig)&&signalValues[sig]!==''&&signalValues[sig]!=null){v=signalValues[sig];src='实时/注入信号 '+sig;}
+  if(v==null||v===''){el.textContent='当前值：（空）— 等待后台推送'+(sig?('信号 '+sig):'（需先填 English 生成信号键）');el.style.color='';return;}
+  const f={bind:e.lblBind,...(e.lblDict!==undefined&&e.lblDict!==null?{dict:e.lblDict}:{})};
+  const d=resolveValueDict(f,'');
+  const tv=translateFieldValue(f,v,'');
+  if(d&&String(tv)!==String(v))el.textContent='当前值：'+v+' →「'+tv+'」　来源：'+src+'　· 经值字典「'+vdDisplayName(d.type)+'」转义';
+  else if(d)el.textContent='当前值：「'+v+'」　来源：'+src+'　· 命中字典「'+vdDisplayName(d.type)+'」但未收录此 code，原样显示';
+  else el.textContent='当前值：「'+v+'」　来源：'+src+'　· 未命中值字典，原样显示';
+  el.style.color='#4dd0ff';
 }
 function resetRotation(){const n=nodes.find(x=>x.id===selNode);if(!n)return;snapshot();n.rotation=0;pairSet('p-rot',0);snapshot();}
 function resetFieldPos(){const n=nodes.find(x=>x.id===selNode);if(!n||!n.data)return;snapshot();n.data.forEach(f=>{f.ox=0;f.oy=0;});snapshot();}
@@ -1841,3 +2040,232 @@ function usedTypeList(){return [...new Set(nodes.map(n=>n.type))];}
 const LIBRARY_VERSION='2.0.0';
 const LIBRARY_NAME='energy-topology';
 
+
+// ───── 值字典管理（菜单栏「📖 值字典」）：管理共享字典库，增删改落盘 value-dicts/*.json ─────
+// 字典 = {type, name, nameEn, applyTo:[{deviceType, field:'location.field'}], items:[{code, zh, en}]}
+//  · applyTo：字典「认领」的后台字段——画布字段/全局信号绑定了这些后台字段即自动转义（零配置）；
+//  · items：code 码 → 中/英文案；显示语言随编辑器语言切换，en 缺失回退 zh，查不到回退原始值。
+// 转义逻辑在 packages/topology-runtime（fieldDisplayValue），此处只管字典数据的增删改。
+let _vdList=null,_vdEdit=null,_vdAdding=false;   // 服务端清单 / 展开编辑中的工作副本 / 新建表单是否展开
+function _vdOverlayEnsure(){
+  if(document.getElementById('vdmgr-overlay'))return;
+  const ov=document.createElement('div');ov.id='vdmgr-overlay';
+  ov.innerHTML='<div id="vdmgr-box">'+
+    '<div id="vdmgr-head"><h4 id="vdmgr-title">📖 值字典管理</h4>'+
+    '<button class="tb grn" id="vdmgr-addbtn" onclick="_vdToggleAdd()">＋ 新建字典</button>'+
+    '<button id="vdmgr-close" onclick="closeDictManager()" aria-label="关闭" title="关闭">✕</button></div>'+
+    '<div class="phint" id="vdmgr-hint" style="margin:0 0 8px">字典把字段/信号的 code 码值转义成中英文案显示在画布上。在「适用后台字段」里认领后台字段后，绑定了该字段的画布元素自动生效；无后台绑定的字段可在字段行的 📖 按钮里手动指定。</div>'+
+    '<div id="vdmgr-list"></div></div>';
+  ov.addEventListener('click',e=>{if(e.target===ov)closeDictManager();});
+  document.body.appendChild(ov);
+}
+async function openDictManager(){
+  _vdOverlayEnsure();
+  document.getElementById('vdmgr-overlay').classList.add('show');
+  document.getElementById('vdmgr-title').textContent=lang==='en'?'📖 Value Dictionaries':'📖 值字典管理';
+  document.getElementById('vdmgr-list').innerHTML='<div class="tpl-empty">'+(lang==='en'?'Loading…':'加载中…')+'</div>';
+  _vdEdit=null;_vdAdding=false;
+  try{ await _vdFetch(); _vdRender(); }
+  catch(err){
+    console.warn('load value dicts failed',err);
+    document.getElementById('vdmgr-list').innerHTML='<div class="tpl-empty" style="color:#ff7a6a">'+
+      (lang==='en'?'Value dict API unavailable (needs dev/production server)':'值字典接口不可用（需 dev-server / 生产 server 提供 /api/value-dicts）')+'</div>';
+  }
+}
+function closeDictManager(){const ov=document.getElementById('vdmgr-overlay');if(ov)ov.classList.remove('show');}
+async function _vdFetch(){
+  const r=await fetch(VD_API,{cache:'no-store'});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const m=await r.json();
+  _vdList=(m&&Array.isArray(m.dicts))?m.dicts:[];
+}
+// 写操作后统一收尾：重拉清单 + 刷新画布用的共享库 + 重渲染
+async function _vdAfterWrite(){ await _vdFetch(); await reloadValueDicts(); _vdRender(); }
+function _vdApplySummary(d){
+  const n=(d.applyTo||[]).length,m=(d.items||[]).length;
+  return (n?('认领 '+n+' 个后台字段'):'未认领后台字段（仅可手动指定）')+' · '+m+' 个 code';
+}
+function _vdRender(){
+  const list=document.getElementById('vdmgr-list');if(!list)return;
+  let html='';
+  // 新建表单
+  if(_vdAdding){
+    html+='<div class="vd-card vd-addcard"><div class="vd-row">'+
+      '<input id="vd-new-type" placeholder="标识 type（英文/数字/_/-，唯一）" title="字典唯一标识，字段引用它；建议如 bms_status">'+
+      '<input id="vd-new-name" placeholder="字典名（中文，必填）">'+
+      '<input id="vd-new-nameen" placeholder="字典名（English，必填）">'+
+      '<button class="tb grn" onclick="_vdCreate()">✓ 创建</button>'+
+      '<button class="tb" onclick="_vdToggleAdd()">取消</button></div></div>';
+  }
+  if(!_vdList||!_vdList.length){
+    html+='<div class="tpl-empty">'+(lang==='en'?'No value dicts yet — click ＋ to create one.':'暂无值字典。点右上「＋ 新建字典」创建；也可直接把字典 JSON 放入 value-dicts/ 目录。')+'</div>';
+    list.innerHTML=html;return;
+  }
+  _vdList.forEach(d=>{
+    const editing=_vdEdit&&_vdEdit.type===d.type;
+    html+='<div class="vd-card'+(editing?' editing':'')+'">';
+    html+='<div class="vd-row vd-head-row"><span class="vd-name">📖 '+tplEsc((d.name||d.type)+(d.nameEn?(' / '+d.nameEn):''))+
+      ' <span class="vd-type">('+tplEsc(d.type)+')</span></span>'+
+      '<span class="vd-sum">'+tplEsc(_vdApplySummary(d))+'</span>'+
+      (editing?'':('<button class="tb" data-vdedit="'+tplEsc(d.type)+'">✎ 编辑</button>'))+
+      '<button class="tb red" data-vddel="'+tplEsc(d.type)+'">🗑 删除</button></div>';
+    if(editing)html+=_vdEditorHTML();
+    html+='</div>';
+  });
+  list.innerHTML=html;
+  list.querySelectorAll('[data-vdedit]').forEach(b=>{b.onclick=()=>_vdExpand(b.getAttribute('data-vdedit'));});
+  list.querySelectorAll('[data-vddel]').forEach(b=>{b.onclick=()=>_vdDelete(b.getAttribute('data-vddel'));});
+  if(_vdEdit)_vdBindEditor();
+}
+function _vdToggleAdd(){_vdAdding=!_vdAdding;_vdRender();if(_vdAdding){const t=document.getElementById('vd-new-type');if(t)t.focus();}}
+async function _vdCreate(){
+  const t=(document.getElementById('vd-new-type').value||'').trim();
+  const zh=(document.getElementById('vd-new-name').value||'').trim();
+  const en=(document.getElementById('vd-new-nameen').value||'').trim();
+  if(!/^[a-zA-Z0-9_-]+$/.test(t)){flashHint('标识 type 必填，只能用 字母/数字/_/-');return;}
+  if(!zh){flashHint('字典名（中文）必填');return;}
+  if(!en){flashHint('字典名（English）必填');return;}
+  try{
+    const r=await fetch(VD_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:t,name:zh,nameEn:en,applyTo:[],items:[]})});
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
+    _vdAdding=false;
+    await _vdAfterWrite();
+    _vdExpand(t);                       // 建完直接展开编辑，接着配 applyTo / items
+    flashHint('字典已创建：'+zh);
+  }catch(err){console.warn(err);flashHint('创建失败：'+(err.message||err));}
+}
+function _vdExpand(type){
+  const d=(_vdList||[]).find(x=>x.type===type);if(!d)return;
+  _vdEdit=JSON.parse(JSON.stringify(d));   // 工作副本：保存(PUT)才生效，取消/切换即丢弃
+  _vdEdit.applyTo=_vdEdit.applyTo||[];_vdEdit.items=_vdEdit.items||[];
+  _vdRender();
+}
+async function _vdDelete(type){
+  const d=(_vdList||[]).find(x=>x.type===type);if(!d)return;
+  const ok=await uiConfirm('确定删除值字典「'+(d.name||d.type)+'」？引用它的字段将不再转义（回退显示原始 code）。',true);
+  if(!ok)return;
+  try{
+    const r=await fetch(VD_API+'/'+encodeURIComponent(type),{method:'DELETE'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    if(_vdEdit&&_vdEdit.type===type)_vdEdit=null;
+    await _vdAfterWrite();flashHint('已删除');
+  }catch(err){console.warn(err);flashHint('删除失败：'+(err.message||err));}
+}
+// 展开的编辑器（工作副本 _vdEdit）：名称 + 适用后台字段(applyTo 级联) + code 条目表
+function _vdEditorHTML(){
+  const d=_vdEdit;
+  let h='<div class="vd-editor">';
+  h+='<div class="vd-row"><label class="vd-l">字典名</label><input id="vd-e-name" value="'+tplEsc(d.name||'')+'" placeholder="中文名（必填）">'+
+     '<input id="vd-e-nameen" value="'+tplEsc(d.nameEn||'')+'" placeholder="English（必填）"></div>';
+  // 适用后台字段（applyTo）：设备类型 → 分类 → 字段 级联；绑定了这些后台字段的画布字段/信号自动用本字典
+  h+='<div class="vd-sec">适用后台字段（自动匹配）<span class="vd-secnote">绑定了这些后台字段的画布字段/全局信号将自动转义</span></div>';
+  (d.applyTo||[]).forEach((a,i)=>{
+    const p=String(a.field||'').split('.'),fld=p.pop()||'',loc=p.join('.');
+    const dts=DEVICE_TYPES.map(t=>t.value);if(a.deviceType&&!dts.includes(a.deviceType))dts.push(a.deviceType);
+    const locs=dictLocations(a.deviceType||'').slice();if(loc&&!locs.includes(loc))locs.push(loc);
+    const flds=dictFields(a.deviceType||'',loc).slice();if(fld&&!flds.includes(fld))flds.push(fld);
+    h+='<div class="vd-row vd-apply-row">'+
+      '<select data-ap="'+i+'" data-k="deviceType">'+dts.map(v=>'<option value="'+tplEsc(v)+'"'+(v===(a.deviceType||'')?' selected':'')+'>'+tplEsc(deviceTypeLabel(v)||v)+'</option>').join('')+'</select>'+
+      '<select data-ap="'+i+'" data-k="loc">'+(locs.length?locs.map(l=>'<option'+(l===loc?' selected':'')+'>'+tplEsc(l)+'</option>').join(''):'<option value="">该类型无字典</option>')+'</select>'+
+      '<select data-ap="'+i+'" data-k="fld">'+(flds.length?flds.map(x=>'<option'+(x===fld?' selected':'')+'>'+tplEsc(x)+'</option>').join(''):'<option value="">无字段</option>')+'</select>'+
+      '<button class="df-del" data-apdel="'+i+'" title="移除">✕</button></div>';
+  });
+  h+='<button class="tb" id="vd-e-addap">＋ 添加适用字段</button>';
+  // code 条目表
+  h+='<div class="vd-sec">code 转义条目<span class="vd-secnote">code/中文/英文均必填；code 按字符串匹配（数字/字符串均可）、同字典内唯一</span></div>';
+  h+='<div class="vd-items-head"><span>code</span><span>中文文案</span><span>English</span><span></span></div>';
+  (d.items||[]).forEach((it,i)=>{
+    h+='<div class="vd-row vd-item-row">'+
+      '<input data-it="'+i+'" data-k="code" value="'+tplEsc(it.code==null?'':String(it.code))+'" placeholder="如 0 / 1 / FAULT（必填）">'+
+      '<input data-it="'+i+'" data-k="zh" value="'+tplEsc(it.zh||'')+'" placeholder="如 待机（必填）">'+
+      '<input data-it="'+i+'" data-k="en" value="'+tplEsc(it.en||'')+'" placeholder="如 Standby（必填）">'+
+      '<button class="df-del" data-itdel="'+i+'" title="删除条目">✕</button></div>';
+  });
+  h+='<button class="tb" id="vd-e-additem">＋ 添加条目</button>';
+  h+='<div class="vd-row vd-save-row"><span style="flex:1"></span>'+
+     '<button class="tb" id="vd-e-cancel">取消</button><button class="tb grn" id="vd-e-save">💾 保存字典</button></div>';
+  return h+'</div>';
+}
+function _vdBindEditor(){
+  const d=_vdEdit,box=document.querySelector('.vd-card.editing');if(!d||!box)return;
+  box.querySelector('#vd-e-name').oninput=e=>{d.name=e.target.value;e.target.classList.remove('df-invalid');};
+  box.querySelector('#vd-e-nameen').oninput=e=>{d.nameEn=e.target.value;e.target.classList.remove('df-invalid');};
+  box.querySelectorAll('[data-ap]').forEach(sel=>{
+    sel.onchange=()=>{
+      const i=+sel.getAttribute('data-ap'),k=sel.getAttribute('data-k'),a=d.applyTo[i];if(!a)return;
+      const p=String(a.field||'').split('.'),fld=p.pop()||'',loc=p.join('.');
+      if(k==='deviceType'){a.deviceType=sel.value;const ls=dictLocations(a.deviceType);const nl=ls[0]||'';a.field=nl?(nl+'.'+(dictFields(a.deviceType,nl)[0]||'')):'';}
+      else if(k==='loc'){const nl=sel.value;a.field=nl?(nl+'.'+(dictFields(a.deviceType,nl)[0]||'')):'';}
+      else{a.field=(loc?loc+'.':'')+sel.value;}
+      _vdRender();
+    };
+  });
+  box.querySelectorAll('[data-apdel]').forEach(b=>{b.onclick=()=>{d.applyTo.splice(+b.getAttribute('data-apdel'),1);_vdRender();};});
+  box.querySelector('#vd-e-addap').onclick=()=>{
+    const dt=(DEVICE_TYPES[0]&&DEVICE_TYPES[0].value)||'';
+    const loc=dictLocations(dt)[0]||'';
+    d.applyTo.push({deviceType:dt,field:loc?(loc+'.'+(dictFields(dt,loc)[0]||'')):''});
+    _vdRender();
+  };
+  box.querySelectorAll('[data-it]').forEach(inp=>{
+    inp.oninput=()=>{const i=+inp.getAttribute('data-it'),k=inp.getAttribute('data-k'),it=d.items[i];if(it)it[k]=inp.value;inp.classList.remove('df-invalid');};
+  });
+  box.querySelectorAll('[data-itdel]').forEach(b=>{b.onclick=()=>{d.items.splice(+b.getAttribute('data-itdel'),1);_vdRender();};});
+  box.querySelector('#vd-e-additem').onclick=()=>{d.items.push({code:'',zh:'',en:''});_vdRender();
+    const rows=document.querySelectorAll('.vd-item-row');const last=rows[rows.length-1];if(last)last.querySelector('input').focus();};
+  box.querySelector('#vd-e-cancel').onclick=()=>{_vdEdit=null;_vdRender();};
+  box.querySelector('#vd-e-save').onclick=_vdSave;
+}
+// 保存前校验（与服务端校验一致）：字典名中/英文必填；条目 code/中文/英文三项必填、code 唯一。
+// 全空行（三项均空）视为「没填完的空白行」自动剔除，不算错误；有任一项内容的行必须补全。
+function _vdValidate(d){
+  if(!String(d.name||'').trim())return '字典名（中文）必填';
+  if(!String(d.nameEn||'').trim())return '字典名（English）必填';
+  const rows=(d.items||[]).filter(it=>it&&(String(it.code==null?'':it.code).trim()!==''||String(it.zh||'').trim()!==''||String(it.en||'').trim()!==''));
+  const bad=[];
+  rows.forEach((it,i)=>{
+    const miss=[];
+    if(!String(it.code==null?'':it.code).trim())miss.push('code');
+    if(!String(it.zh||'').trim())miss.push('中文文案');
+    if(!String(it.en||'').trim())miss.push('英文文案');
+    if(miss.length)bad.push('第'+(i+1)+'条缺 '+miss.join('、'));
+  });
+  if(bad.length)return '转义条目不完整（code/中文/英文均必填）：'+bad.join('；');
+  const codes=rows.map(it=>String(it.code).trim());
+  const dup=[...new Set(codes.filter((c,i)=>codes.indexOf(c)!==i))];
+  if(dup.length)return 'code 重复：'+dup.join('、')+'（同一字典内 code 需唯一）';
+  return null;
+}
+// 校验未过时给弹框里对应输入框标红（复用 .df-invalid 样式），便于定位
+function _vdMarkInvalid(d){
+  const box=document.querySelector('.vd-card.editing');if(!box)return;
+  const mark=(el,bad)=>{if(el)el.classList.toggle('df-invalid',!!bad);};
+  mark(box.querySelector('#vd-e-name'),!String(d.name||'').trim());
+  mark(box.querySelector('#vd-e-nameen'),!String(d.nameEn||'').trim());
+  const codeSeen={};
+  (d.items||[]).forEach((it,i)=>{
+    const code=String(it.code==null?'':it.code).trim(),zh=String(it.zh||'').trim(),en=String(it.en||'').trim();
+    const blank=!code&&!zh&&!en;   // 全空行不标红（保存时自动剔除）
+    const dupC=code&&codeSeen[code];if(code)codeSeen[code]=1;
+    mark(box.querySelector('[data-it="'+i+'"][data-k="code"]'),!blank&&(!code||dupC));
+    mark(box.querySelector('[data-it="'+i+'"][data-k="zh"]'),!blank&&!zh);
+    mark(box.querySelector('[data-it="'+i+'"][data-k="en"]'),!blank&&!en);
+  });
+}
+async function _vdSave(){
+  const d=_vdEdit;if(!d)return;
+  const err=_vdValidate(d);
+  if(err){_vdMarkInvalid(d);flashHint(err);return;}
+  _vdMarkInvalid(d);   // 清除历史标红
+  const items=(d.items||[]).filter(it=>it&&String(it.code==null?'':it.code).trim()!=='')
+    .map(it=>({code:String(it.code).trim(),zh:String(it.zh||'').trim(),en:String(it.en||'').trim()}));
+  const applyTo=(d.applyTo||[]).filter(a=>a&&a.field&&a.field.indexOf('.')>0);
+  try{
+    const r=await fetch(VD_API+'/'+encodeURIComponent(d.type),{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:d.name.trim(),nameEn:d.nameEn.trim(),applyTo,items})});
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
+    _vdEdit=null;
+    await _vdAfterWrite();
+    flashHint('字典已保存（画布即时生效）');
+  }catch(err){console.warn(err);flashHint('保存失败：'+(err.message||err));}
+}

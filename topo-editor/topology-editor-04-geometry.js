@@ -11,6 +11,7 @@ const TR = createTopoRuntime({
   setEdges: (v)=>{ edges=v; },
   getZoom: ()=>zoom,
   getLang: ()=>lang,
+  getValueDicts: ()=>effectiveValueDicts(),   // 值字典：共享库 + 文档内嵌快照（转义逻辑在包内，编辑器/前端同款）
   getConfig: ()=>({busMergeGap, busAggregation, routeStyle, busOffsets, busShareTrunk, ET}),
   // 编辑器的视口自适应尺寸基准：min(canvas.w,canvas.h)/zoom/600（与原 nsz 逐字等价）
   sizeUnit: ()=>Math.min(canvas.width,canvas.height)/zoom/600,
@@ -19,6 +20,9 @@ const TR = createTopoRuntime({
 });
 // ── 落回全局名（分段脚本沿用原函数名裸调用）──
 const nodeLabel=TR.nodeLabel, dataKey=TR.dataKey, nsz=TR.nsz, nodeBox=TR.nodeBox,
+      findValueDict=TR.findValueDict, resolveValueDict=TR.resolveValueDict,
+      valueDictLabel=TR.valueDictLabel, translateFieldValue=TR.translateFieldValue,
+      fieldDisplayValue=TR.fieldDisplayValue,
       anchorPoint=TR.anchorPoint, clamp=TR.clamp, isLinearBusNode=TR.isLinearBusNode,
       linearBusSpan=TR.linearBusSpan, linearBusPort=TR.linearBusPort,
       nodePortPoint=TR.nodePortPoint, nearestNodePort=TR.nearestNodePort,
@@ -43,6 +47,7 @@ const nodeLabel=TR.nodeLabel, dataKey=TR.dataKey, nsz=TR.nsz, nodeBox=TR.nodeBox
 // 接线自检：包导出与别名清单是两处手工同步的清单——加载期断言,防止包改名/漏导出后
 // 别名静默绑定 undefined、直到低频路径被点到才炸。
 [['createTopoRuntime 实例', {nodeLabel,dataKey,nsz,nodeBox,anchorPoint,edgePath,edgePathRaw,channelRoute,
+  findValueDict,resolveValueDict,valueDictLabel,translateFieldValue,fieldDisplayValue,
   recomputeAllPaths,applyBusMerge,straightVariants,detourRoute,dedupe,simplifyPath,computeSmartEdge,edgeAt,
   segsCross,pathsCross,clipEnds,edgeAnchorPoint,nodePortPoint,nearestNodePort,directionalNodePort,
   invalidateRouting,invalidatePathCache,_pathScore,_countCross}],
@@ -86,6 +91,15 @@ function addNode(type,x,y){
 // 英文名为必填项（见字段校验）；为防内部报错，缺失时暂兜底中文名。字段卡片显示仍走 dataKey（中文标签）。
 function fieldSigKey(f){ return (f&&(f.keyEn||f.key))||''; }
 function fieldSig(n,f){ return n.id+'.'+fieldSigKey(f); }
+// ───── 连线标签信号：连线可选 id（绑定后台字段时自动生成，如 edge_1），信号键=「连线id.标签英文名」 ─────
+function edgeById(id){ return id?edges.find(e=>e.id===id):null; }
+function edgeLabelSigKey(e){ return (e&&String(e.lblEn||'').trim())||''; }
+function edgeLabelSig(e){ const k=edgeLabelSigKey(e); return (e&&e.id&&k)?(e.id+'.'+k):null; }
+// 连线的人读名称（注入面板/规则列表用）：连线 起点→终点 · 标签
+function edgeLabelDisplayName(e){
+  const a=nodes.find(n=>n.id===e.from),b=nodes.find(n=>n.id===e.to);
+  return (lang==='en'?'Edge ':'连线 ')+(a?nodeLabel(a):e.from)+'→'+(b?nodeLabel(b):e.to)+(e.lbl?(' · '+e.lbl):'');
+}
 // 数据字段名称校验：同一节点内「中文名」「英文名」各自必填且不可重复（中、英分开判定，故允许同一字段中英文同名，如 P(kW)）。
 // 返回与 n.data 等长的数组，每项 {emptyZh,emptyEn,dupZh,dupEn}。
 // 通用名称校验：items=[{zh,en}] → [{emptyZh,emptyEn,dupZh,dupEn}]（zh、en 各自必填且组内唯一；允许同一项 zh===en）
@@ -115,7 +129,7 @@ function nodeSnapBox(n){
     n.data.forEach((f,i)=>{
       if(f.hidden)return;
       const pos=fieldChipPos(n,i);
-      const txt=fieldChipText(f);
+      const txt=fieldChipText(n,f);
       let tw=Math.max(74/zoom,120/zoom);
       try{ctx.save();ctx.font=pos.cfs+"px -apple-system,'Microsoft YaHei',sans-serif";tw=Math.max(tw,ctx.measureText(txt).width+14/zoom);ctx.restore();}catch(_){}
       const bx=pos.x,by=pos.y-pos.cfs,bw=tw,bh=pos.cfs+8/zoom;

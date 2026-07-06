@@ -31,7 +31,8 @@
 | 信号类型 | 键格式 | 示例 | 值的含义 |
 |---|---|---|---|
 | **节点数据字段** | `节点id.英文字段名` | `pcs_1.P(kW)`、`bms_1.SOC(%)`、`pcs_1.Status` | 该设备该字段的实测值；**所有可下发的节点信号都来自画布里绑定的数据字段** |
-| **全局信号** | `信号英文名`（无前缀点号或前缀非节点 id） | `mode`、`islanding` | 全局运行量，任意规则可引用。运营端每个全局信号有中文名+英文名（都必填、全局唯一），**键用英文名**；可绑定后台设备字段（导出到 `dataBindings`，其 `node` 为 `null`） |
+| **连线标签** | `连线id.标签英文名` | `edge_1.Power`、`edge_2.ChargeState` | 连线标签绑定后台字段后动态显示的值（显示前经值字典转义，见第 9 节）。连线 id 在绑定时自动生成，与节点 id 同一命名空间；`dataBindings` 里对应条目带 `edge` 字段、`node` 为 `null` |
+| **全局信号** | `信号英文名`（无前缀点号或前缀非节点/连线 id） | `mode`、`islanding` | 全局运行量，任意规则可引用。运营端每个全局信号有中文名+英文名（都必填、全局唯一），**键用英文名**；可绑定后台设备字段（导出到 `dataBindings`，其 `node` 为 `null`） |
 
 > ⚠️ 旧版的 `节点id.status` / `节点id.online` 这两个**自动隐藏字段已取消**。运行状态、是否在线等，现在都必须是节点上**显式绑定的数据字段**（中文名 `状态`/`在线`，英文名 `Status`/`Online`），键名用 `节点id.英文名`。这样后端要推哪些键，完全可由画布 JSON 的 `nodes[].data[].key.en` 枚举得到，不存在「画布里看不到、却要推」的隐藏键。
 
@@ -197,6 +198,15 @@ TopoRuntime.mergeSignals({...});  // 增量合并（= topo:merge）
   "label": "运行模式",
   "source": { "deviceType": "EMS", "deviceId": "...", "field": "RunLogs.Mode" }
 }
+
+// 连线标签绑定：node=null、edge=连线 id，signal=「连线id.标签英文名」；后端消费方式与其它条目完全一致
+{
+  "signal": "edge_1.Power",
+  "node": null,
+  "edge": "edge_1",
+  "label": "充电功率",
+  "source": { "deviceType": "PCS", "deviceId": "...", "field": "RunLogs.ActivePower" }
+}
 ```
 
 ### 8.3 字段说明
@@ -234,7 +244,68 @@ TopoRuntime.mergeSignals({...});  // 增量合并（= topo:merge）
 
 ---
 
-## 9. 与其它文档的关系
+## 9. 值字典 `valueDicts` —— code 码值的中/英显示转义
+
+> 后台很多字段的值是 **code 码**（如 `RunStatus=1`）。值字典把 code 转义成中/英文文案后显示在画布字段卡片上；**规则求值与实时数据推送不受影响——信号值永远是原始 code**，转义只发生在渲染显示这一层。
+
+### 9.1 字典结构
+
+```jsonc
+{
+  "type": "bms_status",            // 唯一键（dictType），字段引用它
+  "name": "电池状态",               // 字典名（中文，仅管理界面显示）
+  "nameEn": "Battery Status",
+  "applyTo": [                     // ★ 自动匹配声明：认领的后台字段（deviceType + location.field）
+    { "deviceType": "BCU", "field": "AuxDataLogs.RunStatus" }
+  ],
+  "items": [                       // ★ code → 中/英文案；code 统一按字符串匹配（数字/字符串均可）
+    { "code": "0", "zh": "待机",  "en": "Standby" },
+    { "code": "1", "zh": "充电",  "en": "Charging" },
+    { "code": "2", "zh": "放电",  "en": "Discharging" }
+  ]
+}
+```
+
+### 9.2 怎么关联到画布字段（两条路径）
+
+| 路径 | 配置位置 | 语义 |
+|---|---|---|
+| **自动匹配（主路径）** | 字典的 `applyTo` 认领后台字段 | 画布字段/全局信号**绑定了**被认领的后台字段（`bind.deviceType + bind.field` 命中）即自动转义，画布侧零配置 |
+| **手动指定（兜底/覆盖）** | 字段/信号的 `dict` 属性 | `dict` 缺省=自动匹配；`dict:""`=强制不转义；`dict:"xxx"`=强制用该字典（优先级最高） |
+
+导出的画布 JSON 中：`nodes[].data[].dict` / `signals[].dict` / `edges[].labelDict`（连线标签）携带手动指定；顶层 **`valueDicts[]` 内嵌本图实际用到的字典快照**（自包含，前端无需依赖字典服务）。连线标签的绑定/转义与字段完全同规则：`edges[].labelBind` 命中某字典 `applyTo` 即自动转义。展示内容由 `labelShow` 决定：**缺省 `value`=只显示转义后的值**（标签作辅助信息展示）、`name`=只显示标签文字、`both`=「标签文字: 值」；未绑定后台字段时一律只显示标签文字。其余渲染属性一并导出（`labelEn` 英文文字、`labelValue` 当前值、`labelOffset` 拖拽偏移——拖离连线较远时渲染端应画一条回连线锚点的引导虚线标明归属、`labelRot`/`labelScale` 旋转缩放、`labelDir` 文字走向 h/v，缺省 auto=随线段方向）。
+
+### 9.3 前端（topology-runtime 包）怎么用
+
+```js
+const rt = createTopoRuntime({
+  ...,
+  getLang: () => 'zh',                       // 显示语言：'zh'|'en'，切换后重绘即自动换文案
+  getValueDicts: () => doc.valueDicts || [], // 谁调用谁供数据：默认用导出 JSON 内嵌快照；
+                                             // 有自己的字典源时传自有数据即可覆盖（注入优先）
+});
+// 画字段值时（f=nodes[].data[] 项；值已写入 f.dv）：
+const text = rt.fieldDisplayValue(f);        // → '充电' / 'Charging' / 原始值（未命中字典时）
+// 任意原始值（如变量节点直接从信号取到的 v）：
+const text2 = rt.translateFieldValue(f, v);
+```
+
+### 9.4 转义规则（务必与编辑器一致，皆由包内同一实现保证）
+
+- **匹配**：`String(code)` 比较——后台推 `1`（数字）与字典里 `"1"`（字符串）视为同一 code。
+- **语言**：当前语言取 `zh`/`en` 列。编辑器录入时 **code / 中文 / 英文均必填、code 同字典内唯一**（弹框与 `/api/value-dicts` 双重校验）；运行时对手写/历史字典文件仍保留 **`en` 缺失回退 `zh`** 的容错，不出现空白。
+- **回退**：code 未命中字典项、或字典不存在 → **原样显示原始值**（不吞值）。
+- **规则不受影响**：`visibleWhen`/`dirRules` 等条件比较的是**原始 code**，写规则时用 code 而不是转义文案。
+
+### 9.5 字典数据从哪来
+
+- **编辑器共享字典库**：`value-dicts/` 目录（每个字典一个 `<type>.json`），菜单栏「📖 值字典」增删改，落盘接口 `/api/value-dicts`（GET 清单 / POST 新建 / PUT `/:type` 更新 / DELETE `/:type`），清单 `GET value-dicts/index.json`（目录扫描动态生成，与图标库/模板库同构）。
+- **导出快照**：画布 JSON 顶层 `valueDicts[]` 只内嵌被引用/命中的字典，前端拿到 JSON 即自包含。
+- **前端注入**：`getValueDicts` 由调用方提供，可改传自己后台的字典数据（结构同 9.1），实现运行期覆盖。
+
+---
+
+## 10. 与其它文档的关系
 
 - 信号如何驱动**显隐/流向规则**（条件树结构、运算符表）：见 [`Readme.md` 第 5 节「规则结构参考」](../Readme.md)。
 - **画布 JSON**（拓扑+规则+`dataBindings`）的完整字段：见 [`docs/product-requirements.md` 第 8 章](product-requirements.md) 与 [`Readme.md` 第 6 节](../Readme.md)。

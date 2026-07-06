@@ -8,4 +8,4 @@
 // 若启动代码留在 01，一旦 loadIconLibrary/loadBackendBindingData 在 02–11 加载完成前 resolve，
 // init() 就会抛 ReferenceError。因此把「初始主题 + 启动」统一放到 01→11 之后的本文件执行。
 setTheme('blue_screen');
-Promise.all([loadIconLibrary(),loadBackendBindingData()]).then(init).catch(err=>{console.error('初始化失败：',err);init();});
+Promise.all([loadIconLibrary(),loadBackendBindingData(),loadValueDicts()]).then(init).catch(err=>{console.error('初始化失败：',err);init();});

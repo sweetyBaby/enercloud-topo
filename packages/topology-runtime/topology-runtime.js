@@ -22,7 +22,11 @@
  *   getEdges(): Edge[]            必填。连线数组（宿主持有）
  *   setEdges(edges): void         选填。recomputeAllPaths 清除悬空连线时回写
  *   getZoom(): number             选填，默认 1。仅命中测试 edgeAt 用
- *   getLang(): 'zh'|'en'          选填，默认 'zh'。nodeLabel/dataKey 用
+ *   getLang(): 'zh'|'en'          选填，默认 'zh'。nodeLabel/dataKey/值字典转义 用
+ *   getValueDicts(): ValueDict[]  选填，默认 []。值字典（code 码 → 中/英文案）注册表：
+ *                                   [{type,name,nameEn,applyTo:[{deviceType,field}],items:[{code,zh,en}]}]
+ *                                   编辑器传「共享字典库 + 文档内嵌」合并结果；前端传导出 JSON 的 valueDicts
+ *                                   （或自有后台字典，谁调用谁供数据，天然支持注入覆盖）
  *   getConfig(): {                选填。布线配置（缺省值与编辑器默认一致）
  *     busMergeGap?, busAggregation?, routeStyle?, busOffsets?, busShareTrunk?, ET?
  *   }
@@ -45,6 +49,7 @@ function createTopoRuntime(env) {
   const setEdges = env.setEdges || function () {};
   const getZoom = env.getZoom || function () { return 1; };
   const getLang = env.getLang || function () { return 'zh'; };
+  const getValueDicts = env.getValueDicts || function () { return _EMPTY_ARR; };
   const getConfig = env.getConfig || function () { return {}; };
   const sizeUnit = env.sizeUnit || function () { return 1; };
   const nodeScaleF = env.nodeScale || function () { return 1; };
@@ -53,6 +58,7 @@ function createTopoRuntime(env) {
   const isDragging = env.isDragging || function () { return false; };
   const dragIds = env.dragIds || function () { return _EMPTY_SET; };
   const _EMPTY_SET = new Set();
+  const _EMPTY_ARR = [];
   let _warnedNoET = false;
   function cfg() {
     const c = getConfig() || {};
@@ -77,6 +83,52 @@ function createTopoRuntime(env) {
   // 获取节点当前语言标签
   function nodeLabel(n){ const lang=getLang(); return lang==='en' ? (n.labelEn||n.labelZh||n.id) : (n.labelZh||n.label||n.id); }
   function dataKey(f){ const lang=getLang(); return lang==='en' ? (f.keyEn||f.key) : f.key; }
+
+  // ═════════ 值字典（code 码 → 中/英显示文案；编辑器画布与前端渲染器共用的单一实现）═════════
+  // 字典结构：{type, name, nameEn, applyTo:[{deviceType, field:'location.field'}], items:[{code, zh, en}]}
+  // 解析优先级：字段显式 f.dict（''=强制不转义）> f.bind 命中某字典 applyTo（自动匹配）> 不转义。
+  // 规则引擎不经过这里——signalValues 永远存原始 code，规则比较用 code；转义只发生在展示层。
+  function findValueDict(type){
+    if(!type)return null;
+    const ds=getValueDicts()||[];
+    for(let i=0;i<ds.length;i++){ if(ds[i]&&ds[i].type===type)return ds[i]; }
+    return null;
+  }
+  // f=数据字段/全局信号；deviceType=bind「跟随节点」缺省时的兜底设备类型
+  //   （编辑器传 nodeDeviceType(n)；前端可省略——导出 JSON 的 bind.deviceType 已显式写全）
+  function resolveValueDict(f, deviceType){
+    if(!f)return null;
+    if(f.dict!==undefined&&f.dict!==null) return f.dict===''?null:findValueDict(f.dict);   // 显式指定：''=强制不转义
+    const b=f.bind;
+    if(!b||!b.field)return null;
+    const dt=b.deviceType||deviceType||'';
+    const ds=getValueDicts()||[];
+    for(let i=0;i<ds.length;i++){
+      const d=ds[i];
+      if(!d||!Array.isArray(d.applyTo))continue;
+      if(d.applyTo.some(a=>a&&a.field===b.field&&(a.deviceType||'')===dt))return d;
+    }
+    return null;
+  }
+  // 查字典项：String() 匹配（后台 code 可能是数字/字符串），命中返回当前语言文案（en 缺失回退 zh），未命中返回 null
+  function valueDictLabel(dictOrType, code){
+    const d=typeof dictOrType==='string'?findValueDict(dictOrType):dictOrType;
+    if(!d||code==null||code==='')return null;
+    const it=(d.items||[]).find(i=>i&&String(i.code)===String(code));
+    if(!it)return null;
+    const s=getLang()==='en'?(it.en||it.zh):(it.zh||it.en);
+    return (s==null||s==='')?null:String(s);
+  }
+  // 任意原始值 → 展示文案：命中字典项则转义，否则原样返回（查不到不吞值）；null/空串返回 ''
+  function translateFieldValue(f, v, deviceType){
+    if(v==null||v==='')return '';
+    const d=resolveValueDict(f, deviceType);
+    if(!d)return String(v);
+    const s=valueDictLabel(d, v);
+    return s!=null?s:String(v);
+  }
+  // 字段当前值(f.dv)的展示文案（实时值已由宿主回写进 f.dv）
+  function fieldDisplayValue(f, deviceType){ return translateFieldValue(f, f&&f.dv, deviceType); }
 
   // 节点绘制尺寸（世界坐标）。
   //   · sizeUnit：编辑器的视口自适应基准 (base/600)；前端恒为 1
@@ -1017,6 +1069,8 @@ function createTopoRuntime(env) {
   }
 
   return {
+    // 值字典（code → 中/英文案）
+    findValueDict, resolveValueDict, valueDictLabel, translateFieldValue, fieldDisplayValue,
     // 几何 / 端口
     nodeLabel, dataKey, nsz, nodeBox, anchorPoint, clamp, isLinearBusNode,
     linearBusSpan, linearBusPort, nodePortPoint, nearestNodePort, directionalNodePort,

@@ -261,49 +261,32 @@
     <div id="pbody">
       <div id="pnone">未选中<br><br>点击节点或连线编辑<br><br>💡 快捷键<br>Del删除 · Ctrl+Z撤销<br>Ctrl+Y重做 · 滚轮缩放<br>中键/空格拖拽平移</div>
       <div id="pnode" style="display:none">
-        <div class="pr"><label data-i18n="节点 ID">节点 ID</label><input id="p-id" oninput="applyNP()"></div>
-        <div class="pr"><label data-i18n="中文标签">中文标签</label><input id="p-label-zh" oninput="applyNP()"></div>
-        <div class="pr"><label data-i18n="English Label">English Label</label><input id="p-label-en" oninput="applyNP()"></div>
+        <!-- ── ① 基本：ID / 名称 / 类型 / 画布显示 ── -->
+        <div class="psec" data-i18n="📌 基本">📌 基本</div>
+        <div class="pr cpt"><label data-i18n="节点 ID">节点 ID</label><input id="p-id" oninput="applyNP()"></div>
+        <div class="pr cpt"><label data-i18n="中文标签">中文标签</label><input id="p-label-zh" oninput="applyNP()"></div>
+        <div class="pr cpt"><label data-i18n="English Label">English Label</label><input id="p-label-en" oninput="applyNP()"></div>
+        <div class="pr cpt" id="prow-type"><label data-i18n="类型">类型</label><select id="p-type" onchange="applyNP()"></select></div>
         <div class="pr" id="prow-vis"><label data-i18n="画布显示">画布显示</label>
           <div style="display:flex;gap:16px;flex-wrap:wrap">
             <label id="p-show-label-wrap" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-show-label" onchange="applyVis()" style="width:auto"> <span id="p-show-label-text" data-i18n="显示名称">显示名称</span></label>
             <label id="p-show-fields-wrap" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-show-fields" onchange="applyVis()" style="width:auto"> <span data-i18n="显示数据字段">显示数据字段</span></label>
           </div></div>
-        <div class="pr" id="prow-rule"><label data-i18n="显示条件（数据驱动）">显示条件（数据驱动）</label>
-          <div class="rule-line"><span id="np-rule-sum" class="rule-sum">无（始终显示）</span>
-            <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editNodeRule()" data-i18n="编辑">编辑</button></div></div>
-        <div class="pr" id="prow-iconrule"><label data-i18n="图标规则（数据驱动）">图标规则（数据驱动）</label>
-          <div class="rule-line"><span id="np-icon-sum" class="rule-sum">无（用自身图标）</span>
-            <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editNodeIconRules()" data-i18n="编辑">编辑</button></div></div>
-        <div class="pr" id="prow-action"><label data-i18n="事件绑定">事件绑定</label>
-          <select id="p-action-trigger" onchange="applyNodeAction()">
-            <option value="none" data-i18n="不绑定">不绑定</option>
-            <option value="click" data-i18n="左键点击">左键点击</option>
-            <option value="contextmenu" data-i18n="右键点击">右键点击</option>
-            <option value="dblclick" data-i18n="双击">双击</option>
-          </select>
-          <div class="pr-inline" style="margin-top:6px">
-            <input id="p-action-url" placeholder="/station/detail?id=1" oninput="applyNodeAction()">
-            <select id="p-action-target" style="flex:0 0 92px" onchange="applyNodeAction()">
-              <option value="same" data-i18n="当前页">当前页</option>
-              <option value="blank" data-i18n="新窗口">新窗口</option>
-            </select>
-          </div>
-          <div class="phint" style="margin-top:4px" data-i18n="预览/运行态触发；URL 可填写前端路由路径，如 /station/detail?id=1。">预览/运行态触发；URL 可填写前端路由路径，如 /station/detail?id=1。</div>
-        </div>
-        <div class="pr" id="prow-type"><label data-i18n="类型">类型</label><select id="p-type" onchange="applyNP()"></select></div>
+
+        <!-- ── ② 外观：大小/旋转/字体/盒子样式 ── -->
         <div class="psep"></div>
-        <div class="pr" id="prow-scale"><label data-i18n="图标大小">图标大小</label>
+        <div class="psec" data-i18n="🎨 外观">🎨 外观</div>
+        <div class="pr cpt" id="prow-scale"><label data-i18n="图标大小">图标大小</label>
           <div class="pr-inline"><input type="range" id="p-scale" min="5" max="800" value="100" oninput="pairFromSlider('p-scale');applyNP()">
             <input type="number" id="p-scale-num" class="pnum" min="5" max="800" step="1" value="100" oninput="pairFromNum('p-scale');applyNP()"><span class="punit">%</span></div></div>
-        <div class="pr"><label data-i18n="旋转">旋转</label>
+        <div class="pr cpt"><label data-i18n="旋转">旋转</label>
           <div class="pr-inline"><input type="range" id="p-rot" min="0" max="359" value="0" oninput="pairFromSlider('p-rot');applyNP()">
             <input type="number" id="p-rot-num" class="pnum" min="0" max="359" step="1" value="0" oninput="pairFromNum('p-rot');applyNP()"><span class="punit">°</span>
             <button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="resetRotation()" data-i18n="归零">归零</button></div></div>
-        <div class="pr"><label id="p-fs-label">标签字号</label>
+        <div class="pr cpt"><label id="p-fs-label">标签字号</label>
           <div class="pr-inline"><input type="range" id="p-fs" min="6" max="120" value="14" oninput="pairFromSlider('p-fs');applyNP()">
             <input type="number" id="p-fs-num" class="pnum" min="4" max="300" step="1" value="14" oninput="pairFromNum('p-fs');applyNP()"><span class="punit">px</span></div></div>
-        <div class="pr"><label id="p-fc-label" data-i18n="标签颜色">标签颜色</label>
+        <div class="pr cpt"><label id="p-fc-label" data-i18n="标签颜色">标签颜色</label>
           <div class="pr-inline"><input type="color" id="p-fc" value="#e8f4ff" oninput="applyNP()">
           <input type="text" id="p-fc-hex" style="flex:1" oninput="syncColor('p-fc',this.value)"></div></div>
         <div id="text-style" style="display:none">
@@ -338,7 +321,7 @@
         </div>
         <div id="variable-style" style="display:none">
           <div class="psep"></div>
-          <div class="pr"><label data-i18n="排列方式">排列方式</label>
+          <div class="pr cpt"><label data-i18n="排列方式">排列方式</label>
             <select id="p-var-layout" onchange="applyVarStyle()">
               <option value="h" data-i18n="横排（标签 值）">横排（标签 值）</option>
               <option value="v" data-i18n="竖排（标签上·值下）">竖排（标签上·值下）</option>
@@ -346,10 +329,10 @@
           <div class="pr"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--ui-text)"><input type="checkbox" id="p-label-bold" onchange="applyVarStyle()" style="width:auto"> <span data-i18n="标签(label)加粗">标签(label)加粗</span></label></div>
           <div class="psep"></div>
           <div class="phint" data-i18n="值(value)字体：">值(value)字体：</div>
-          <div class="pr"><label data-i18n="值字号">值字号</label>
+          <div class="pr cpt"><label data-i18n="值字号">值字号</label>
             <div class="pr-inline"><input type="range" id="p-val-fs" min="6" max="120" value="16" oninput="pairFromSlider('p-val-fs');applyVarStyle()">
               <input type="number" id="p-val-fs-num" class="pnum" min="4" max="300" step="1" value="16" oninput="pairFromNum('p-val-fs');applyVarStyle()"><span class="punit">px</span></div></div>
-          <div class="pr"><label data-i18n="值颜色">值颜色</label>
+          <div class="pr cpt"><label data-i18n="值颜色">值颜色</label>
             <div class="pr-inline"><input type="color" id="p-val-color" value="#4dd0ff" oninput="applyVarStyle()">
             <input type="text" id="p-val-color-hex" style="flex:1" oninput="syncVarColor(this.value)"></div></div>
           <div class="pr"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--ui-text)"><input type="checkbox" id="p-val-bold" onchange="applyVarStyle()" style="width:auto"> <span data-i18n="值(value)加粗">值(value)加粗</span></label></div>
@@ -366,7 +349,35 @@
             <div class="pr-inline"><input type="range" id="p-anchor-op" min="0" max="100" value="100" oninput="applyAnchorStyle()"></div></div>
           <div class="phint">💡 把填充设为画布同色、或不透明度调到 0，用户即看不到此点；研发可在「视图 ▾ → 📍 占位点标记」总开关查看/隐藏全部占位点位置。</div>
         </div>
+        <!-- ── ③ 数据驱动：显隐/图标规则/事件 ── -->
+        <div class="psep"></div>
+        <div class="psec" data-i18n="⚡ 数据驱动">⚡ 数据驱动</div>
+        <div class="pr" id="prow-rule"><label data-i18n="显示条件（数据驱动）">显示条件（数据驱动）</label>
+          <div class="rule-line"><span id="np-rule-sum" class="rule-sum">无（始终显示）</span>
+            <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editNodeRule()" data-i18n="编辑">编辑</button></div></div>
+        <div class="pr" id="prow-iconrule"><label data-i18n="图标规则（数据驱动）">图标规则（数据驱动）</label>
+          <div class="rule-line"><span id="np-icon-sum" class="rule-sum">无（用自身图标）</span>
+            <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editNodeIconRules()" data-i18n="编辑">编辑</button></div></div>
+        <div class="pr" id="prow-action"><label data-i18n="事件绑定">事件绑定</label>
+          <select id="p-action-trigger" onchange="applyNodeAction()">
+            <option value="none" data-i18n="不绑定">不绑定</option>
+            <option value="click" data-i18n="左键点击">左键点击</option>
+            <option value="contextmenu" data-i18n="右键点击">右键点击</option>
+            <option value="dblclick" data-i18n="双击">双击</option>
+          </select>
+          <div class="pr-inline" style="margin-top:6px">
+            <input id="p-action-url" placeholder="/station/detail?id=1" oninput="applyNodeAction()">
+            <select id="p-action-target" style="flex:0 0 92px" onchange="applyNodeAction()">
+              <option value="same" data-i18n="当前页">当前页</option>
+              <option value="blank" data-i18n="新窗口">新窗口</option>
+            </select>
+          </div>
+          <div class="phint" style="margin-top:4px" data-i18n="预览/运行态触发；URL 可填写前端路由路径，如 /station/detail?id=1。">预览/运行态触发；URL 可填写前端路由路径，如 /station/detail?id=1。</div>
+        </div>
+
+        <!-- ── ④ 后台绑定与数据字段 ── -->
         <div class="psep" id="prow-devbind-sep"></div>
+        <div class="psec" data-i18n="🔗 后台绑定与数据">🔗 后台绑定与数据</div>
         <div class="pr" id="prow-devbind">
           <label data-i18n="后台设备绑定">后台设备绑定
             <button class="tb" id="p-dev-reload" onclick="reloadBackendBindingData()" title="重新拉取后台设备/字典（增删改后刷新）" style="float:right;padding:1px 7px;font-size:11px">🔄</button>
@@ -420,6 +431,9 @@
       </div>
       <div id="pedge" style="display:none">
         <div style="font-size:12px;color:var(--accent);margin-bottom:8px;font-weight:bold" data-i18n="🔗 连线属性">🔗 连线属性</div>
+
+        <!-- ── ① 外观：类型 / 颜色 / 样式与粗细 ── -->
+        <div class="psec" data-i18n="🎨 外观">🎨 外观</div>
         <div class="pr"><label data-i18n="连线类型">连线类型</label>
           <div id="ep-type-dd" class="etdd">
             <button type="button" id="ep-type-btn" class="etdd-btn" onclick="toggleEpTypeDD(event)">
@@ -429,25 +443,34 @@
             </button>
             <div id="ep-type-list" class="etdd-list"></div>
           </div>
-          <select id="ep-type" onchange="applyEP();refreshEpTypeBtn()" style="display:none"></select></div>
-        <div class="pr"><label>线条颜色</label>
+          <select id="ep-type" onchange="applyEP();refreshEpTypeBtn()" style="display:none"></select>
+          <div class="phint" id="ep-desc" style="margin-top:3px"></div></div>
+        <div class="pr cpt"><label>线条颜色</label>
           <div class="pr-inline"><input type="color" id="ep-color" value="#e74c3c" oninput="applyEP()">
             <input type="text" id="ep-color-hex" style="flex:1" placeholder="跟随类型" oninput="applyEP()">
             <button class="tb" style="flex-shrink:0;padding:5px 8px" onclick="clearEdgeColor()">跟随</button></div></div>
-        <div class="pr"><label>线条样式</label>
-          <select id="ep-style" onchange="applyEP()">
-            <option value="inherit">跟随连线类型</option>
-            <option value="solid">实线</option>
-            <option value="dashed">虚线</option>
-          </select></div>
-        <div class="pr"><label data-i18n="走线方式">走线方式</label><select id="ep-route" onchange="applyEP()">
-          <option value="smart" data-i18n="智能（最短·自动避障）">智能（最短·自动避障）</option><option value="line" data-i18n="直线">直线</option><option value="arc" data-i18n="弧线">弧线</option><option value="manual" data-i18n="手动拐点">手动拐点</option></select></div>
-        <div class="phint" style="margin-bottom:6px">💡 选中连线后：直接拖蓝色方块(拐点)即可对齐/汇合（自动吸附其他节点的水平/垂直线与网格）</div>
+        <div class="pr cpt"><label>线条样式 / 粗细 <span id="ep-w-v">1.0</span>×</label>
+          <div class="pr-inline"><select id="ep-style" onchange="applyEP()" style="flex:0 0 42%">
+              <option value="inherit">跟随连线类型</option>
+              <option value="solid">实线</option>
+              <option value="dashed">虚线</option></select>
+            <input type="range" id="ep-w" min="0.5" max="3" step="0.1" value="1" oninput="applyEP()" style="flex:1"></div></div>
+
+        <!-- ── ② 走线 ── -->
+        <div class="psep"></div>
+        <div class="psec" data-i18n="🛤 走线">🛤 走线</div>
+        <div class="pr cpt"><label data-i18n="走线方式">走线方式</label><select id="ep-route" onchange="applyEP()">
+          <option value="smart" data-i18n="智能（最短·自动避障）">智能（最短·自动避障）</option><option value="line" data-i18n="直线">直线</option><option value="arc" data-i18n="弧线">弧线</option><option value="manual" data-i18n="手动拐点">手动拐点</option></select>
+          <div class="phint" style="margin-top:3px">💡 选中连线后：直接拖蓝色方块(拐点)即可对齐/汇合（自动吸附其他节点的水平/垂直线与网格）</div></div>
         <div class="pr" id="ep-ortho-row" style="display:none"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ep-ortho" checked onchange="applyEP()" style="width:auto"> 拐点强制横平竖直（正交）</label></div>
+
+        <!-- ── ③ 数据驱动：显隐条件 / 流向 ── -->
+        <div class="psep"></div>
+        <div class="psec" data-i18n="⚡ 数据驱动">⚡ 数据驱动</div>
         <div class="pr"><label data-i18n="显示条件（数据驱动）">显示条件（数据驱动）</label>
           <div class="rule-line"><span id="ep-show-sum" class="rule-sum">无（始终显示）</span>
             <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editEdgeShowRule()" data-i18n="编辑">编辑</button></div>
-          <div class="phint" style="margin-top:3px" data-i18n="条件不满足→不画此连线（适合"动态建立的连线"）">条件不满足→不画此连线（适合"动态建立的连线"）</div></div>
+          <div class="phint" style="margin-top:3px" data-i18n="条件不满足→不画此连线（适合「动态建立的连线」）">条件不满足→不画此连线（适合「动态建立的连线」）</div></div>
         <div class="pr"><label data-i18n="流向（按规则确定）">流向（按规则确定）</label>
           <div class="rule-line"><span id="ep-dir-sum" class="rule-sum">无规则（用下面的固定流向）</span>
             <button class="tb" style="padding:4px 9px;flex-shrink:0" onclick="editEdgeDirRules()" data-i18n="编辑">编辑</button></div>
@@ -456,8 +479,11 @@
             <select id="ep-dir" onchange="applyEP()" style="flex:1">
             <option value="forward" data-i18n="正向 →">正向 →</option><option value="reverse" data-i18n="反向 ←">反向 ←</option>
             <option value="both" data-i18n="双向 ↔">双向 ↔</option><option value="none" data-i18n="无流向">无流向</option></select></div></div>
+
+        <!-- ── ④ 标签：文字样式 + 数据绑定（值经值字典转义显示）── -->
         <div class="psep"></div>
-        <div class="pr"><label>🏷 标签 · 文字与样式</label>
+        <div class="psec" data-i18n="🏷 标签">🏷 标签</div>
+        <div class="pr"><label>文字与样式</label>
           <div class="elc-row"><input id="elc-zh" placeholder="中文标签" oninput="applyELbl()">
             <input id="elc-en" placeholder="English（绑定时必填·作信号键）" onchange="applyELblEn(this)"></div>
           <div class="elc-row"><span class="elc-cap">展示内容</span>
@@ -472,7 +498,7 @@
             <input type="number" id="ep-lbl-scale-num" class="pnum" min="5" max="800" step="5" value="100" oninput="pairFromNum('ep-lbl-scale');applyELbl()"><span class="punit">%</span></div>
           <label class="elc-row" style="cursor:pointer"><input type="checkbox" id="elc-visible" checked onchange="applyELbl()" style="width:auto"> 显示本条连线标签（受顶部「全部线标签」总开关控制）</label>
           <div class="phint" style="margin-top:2px">💡 画布上可直接拖动标签（拖远显示归属引导线）；选中后标签带旋转/缩放手柄，与滑杆联动</div></div>
-        <div class="pr"><label>🏷 标签 · 绑定后台字段</label>
+        <div class="pr"><label>绑定后台字段（值=字段实时值；命中值字典自动转义·非强制）</label>
           <div class="elc-row"><span class="elc-cap">设备类型</span><select id="elc-dt" onchange="elcDtChanged()"></select></div>
           <div class="elc-row"><span class="elc-cap">设备实例</span><select id="elc-dev" title="可不指定：导出时黄色提醒，由后台按类型对应设备"></select></div>
           <div class="elc-row"><span class="elc-cap">分类</span><select id="elc-loc" onchange="elcLocChanged()"></select>
@@ -485,10 +511,6 @@
             <button class="tb" style="flex-shrink:0;padding:4px 8px" onclick="var i=document.getElementById('elc-val');i.value='';applyELblVal(i)" title="清空静态值">✕</button></div>
           <div class="elc-row" style="margin-top:4px"><span class="elc-cap">值字典</span><select id="elc-dict" onchange="elcDictChanged()"></select></div>
           <div class="phint" id="elc-valtrace" style="margin-top:3px"></div></div>
-        <div class="pr"><label>线条粗细 <span id="ep-w-v">1.0</span>×</label>
-          <div class="pr-inline"><input type="range" id="ep-w" min="0.5" max="3" step="0.1" value="1" oninput="applyEP()"></div></div>
-        <div class="psep"></div>
-        <div class="phint" id="ep-desc" style="color:var(--accent)"></div>
       </div>
     </div>
   </div>

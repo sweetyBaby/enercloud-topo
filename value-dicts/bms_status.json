@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "vd-1",
+  "type": "bms_status",
+  "name": "电池状态",
+  "nameEn": "Battery Status",
+  "applyTo": [
+    {
+      "deviceType": "BCU",
+      "field": "StringDataLogs.String1State"
+    }
+  ],
+  "items": [
+    {
+      "code": "0",
+      "zh": "待机",
+      "en": "Standby"
+    },
+    {
+      "code": "1",
+      "zh": "充电",
+      "en": "Charging"
+    },
+    {
+      "code": "2",
+      "zh": "放电",
+      "en": "Discharging"
+    },
+    {
+      "code": "3",
+      "zh": "故障",
+      "en": "Fault"
+    }
+  ]
+}

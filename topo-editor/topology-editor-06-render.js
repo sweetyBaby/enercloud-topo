@@ -223,6 +223,12 @@ function pointAt(pts,dist){
     if(dist<=seg){const t=dist/seg;return[pts[i][0]+(pts[i+1][0]-pts[i][0])*t,pts[i][1]+(pts[i+1][1]-pts[i][1])*t];}dist-=seg;}
   return pts[pts.length-1];
 }
+// 路径上 dist 处所在线段的方向角（弧度）；标签「走向:自动」据此判横/竖
+function segAngleAt(pts,dist){
+  for(let i=0;i<pts.length-1;i++){const dx=pts[i+1][0]-pts[i][0],dy=pts[i+1][1]-pts[i][1];const seg=Math.hypot(dx,dy);
+    if(dist<=seg)return Math.atan2(dy,dx);dist-=seg;}
+  const n=pts.length;return Math.atan2(pts[n-1][1]-pts[n-2][1],pts[n-1][0]-pts[n-2][0]);
+}
 function normHex(v){
   v=String(v||'').trim();
   if(v&&v[0]!=='#')v='#'+v;
@@ -238,6 +244,33 @@ function edgeCfg(e){
   return Object.assign({},base,{color,dash});
 }
 
+// 连线标签的显示文本：标签文字(中/英随语言) + 绑定值(实时信号 > 静态 lblVal，经值字典转义)
+// 展示模式 lblShow：'value'=只显示值(默认，标签作辅助展示信息) / 'name'=只显示标签名 / 'both'=「文字: 值」
+// 无绑定时无值可显 → 一律只显示文字
+function edgeLabelText(e){
+  const name=(lang==='en'?(String(e.lblEn||'').trim()||e.lbl):(e.lbl||''))||'';
+  if(!(e.lblBind&&e.lblBind.field))return name;
+  const mode=e.lblShow||'value';
+  if(mode==='name')return name;
+  const sig=edgeLabelSig(e);
+  let v=e.lblVal;
+  if(sig&&Object.prototype.hasOwnProperty.call(signalValues,sig)){const sv=signalValues[sig];if(sv!==''&&sv!=null)v=sv;}
+  const tv=translateFieldValue({bind:e.lblBind,...(e.lblDict!==undefined&&e.lblDict!==null?{dict:e.lblDict}:{})},(v==null?'':v),'');
+  if(mode==='both')return name?(name+': '+tv):tv;
+  return tv;   // 'value'（默认）
+}
+// 连线标签命中测试（拖拽用）：把指针点逆旋转到标签局部坐标，与背板半宽高比较
+function edgeLabelAt(wx,wy){
+  for(let i=edges.length-1;i>=0;i--){
+    const e=edges[i],b=e._lblBox;
+    if(!b)continue;
+    if(previewMode&&_dyn.hiddenEdges.has(e))continue;   // 运行视图下被规则隐藏的连线不可命中
+    const dx=wx-b.cx,dy=wy-b.cy,ca=Math.cos(b.ang),sa=Math.sin(b.ang);
+    const lx=dx*ca+dy*sa, ly=-dx*sa+dy*ca;
+    if(Math.abs(lx)<=b.hw&&Math.abs(ly)<=b.hh)return e;
+  }
+  return null;
+}
 function drawEdge(e){
   const pts=edgePath(e);if(!pts)return;
   const dir=effDir(e);   // ★ 流向由数据驱动规则实时确定（命中规则用规则结果，否则用固定 e.dir 兜底）
@@ -305,13 +338,64 @@ function drawEdge(e){
   const pa=pts[0],pb=pts[1];
   if((dir==='forward'||dir==='both')&&cfg.anim!=='busbar'&&cfg.anim!=='pipe')drawArrowSeg(p1,p2,cfg.color,cfg.w);
   if((dir==='reverse'||dir==='both')&&cfg.anim!=='busbar'&&cfg.anim!=='pipe')drawArrowSeg(pb,pa,cfg.color,cfg.w);
-  // label
-  if((e.lbl||isSel) && showEdgeLabels && !e.hideLabel){
-    const lbl=e.lbl||(isSel?cfg.label:'');
-    if(lbl){const mid=pointAt(pts,polyLen(pts)/2);const fs=13/zoom;ctx.font=fs+"px -apple-system,'Microsoft YaHei',sans-serif";ctx.textAlign='center';
-      const tw=ctx.measureText(lbl).width;ctx.fillStyle=bgPlate();ctx.fillRect(mid[0]-tw/2-4/zoom,mid[1]-fs*0.8,tw+8/zoom,fs+5/zoom);
-      ctx.fillStyle=cfg.color;ctx.fillText(lbl,mid[0],mid[1]+fs*.18);}
-  }
+  // label：文字(中/英随语言) + 绑定值(经值字典转义)；可拖拽偏移/旋转/缩放/横竖走向（走向 auto=随标签所在线段方向）
+  if(showEdgeLabels && !e.hideLabel){
+    let lbl=edgeLabelText(e);
+    // 选中提示（线型名）仅限「完全未配置标签」的连线；已配置文字/绑定的标签解析为空就显示空——
+    // 否则线型名（如“充电中”）会冒充“值”，让人误以为来了数据
+    if(!lbl&&isSel&&!(e.lbl||e.lblEn||(e.lblBind&&e.lblBind.field)))lbl=cfg.label;
+    if(lbl){
+      const half=polyLen(pts)/2, mid=pointAt(pts,half);
+      const sc=e.lblScale||1, fs=13*sc/zoom;
+      // 走向：v=基准旋转90°；auto=标签所在线段偏竖直即竖排；lblRot 在基准上再叠加自由角度
+      let base=0; const dm=e.lblDir||'auto';
+      if(dm==='v')base=90;
+      else if(dm==='auto'){const a=segAngleAt(pts,half);if(Math.abs(Math.sin(a))>Math.abs(Math.cos(a)))base=90;}
+      const ang=((base+(e.lblRot||0))%360)*Math.PI/180;
+      const cx=mid[0]+(e.lblOx||0)/zoom, cy=mid[1]+(e.lblOy||0)/zoom;
+      // 关联引导线：标签被拖离所在连线较远时，用细虚线连回线上锚点(路径中点)，标明归属（与字段卡片同规则）
+      if(Math.hypot(e.lblOx||0,e.lblOy||0)>40){
+        ctx.save();
+        ctx.strokeStyle=isSel?'rgba(77,208,255,0.5)':'rgba(120,150,180,0.32)';
+        ctx.lineWidth=1/zoom;ctx.setLineDash([4/zoom,3/zoom]);
+        ctx.beginPath();ctx.moveTo(mid[0],mid[1]);ctx.lineTo(cx,cy);ctx.stroke();
+        ctx.setLineDash([]);
+        // 锚点小圆，标记标签在连线上的归属点
+        ctx.fillStyle=isSel?'rgba(77,208,255,0.6)':'rgba(120,150,180,0.4)';
+        ctx.beginPath();ctx.arc(mid[0],mid[1],2.5/zoom,0,Math.PI*2);ctx.fill();
+        ctx.restore();
+      }
+      ctx.save();ctx.translate(cx,cy);if(ang)ctx.rotate(ang);
+      ctx.font=fs+"px -apple-system,'Microsoft YaHei',sans-serif";ctx.textAlign='center';
+      const tw=ctx.measureText(lbl).width;
+      const bw=tw+8/zoom, bh=fs+5/zoom, by=-fs*0.8;   // 背板（局部坐标，中心在线上点）
+      ctx.fillStyle=bgPlate();ctx.fillRect(-bw/2,by,bw,bh);
+      if(isSel&&!previewMode){
+        ctx.strokeStyle='rgba(77,208,255,0.75)';ctx.lineWidth=1/zoom;ctx.setLineDash([3/zoom,3/zoom]);
+        ctx.strokeRect(-bw/2,by,bw,bh);ctx.setLineDash([]);
+        // 旋转手柄（背板上方圆点）+ 缩放手柄（右下角方块）：局部坐标绘制，世界坐标另存供命中
+        const rhy=by-14/zoom;
+        ctx.strokeStyle='#4dd0ff';ctx.lineWidth=1.2/zoom;
+        ctx.beginPath();ctx.moveTo(0,by);ctx.lineTo(0,rhy);ctx.stroke();
+        ctx.fillStyle='#4dd0ff';ctx.beginPath();ctx.arc(0,rhy,4/zoom,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,rhy,1.6/zoom,0,Math.PI*2);ctx.fill();
+        const hs=3.5/zoom, sx=bw/2+3/zoom, sy=by+bh+3/zoom;
+        ctx.fillStyle='#fff';ctx.strokeStyle='#4dd0ff';ctx.lineWidth=1.5/zoom;
+        ctx.fillRect(sx-hs,sy-hs,hs*2,hs*2);ctx.strokeRect(sx-hs,sy-hs,hs*2,hs*2);
+        // 世界坐标：p' = 中心 + R(ang)·p
+        const ca0=Math.cos(ang),sa0=Math.sin(ang);
+        e._lblRotHandle=[cx+ca0*0-sa0*rhy, cy+sa0*0+ca0*rhy];
+        e._lblScaleHandle=[cx+ca0*sx-sa0*sy, cy+sa0*sx+ca0*sy];
+      } else { e._lblRotHandle=null; e._lblScaleHandle=null; }
+      ctx.fillStyle=cfg.color;ctx.fillText(lbl,0,fs*.18);
+      ctx.restore();
+      // 命中盒：背板中心（局部 (0, by+bh/2)）旋转回世界坐标 + 半宽高 + 角度，供拖拽命中（edgeLabelAt）；
+      // 另存锚点(线上点)供手柄拖拽的旋转/缩放参考中心
+      const lcy=by+bh/2, ca=Math.cos(ang), sa=Math.sin(ang);
+      e._lblBox={cx:cx-sa*lcy, cy:cy+ca*lcy, hw:bw/2, hh:bh/2, ang};
+      e._lblAnchor=[cx,cy];
+    } else { e._lblBox=null;e._lblRotHandle=null;e._lblScaleHandle=null; }
+  } else { e._lblBox=null;e._lblRotHandle=null;e._lblScaleHandle=null; }
   // 编辑态：带「显示/流向」条件的连线，在中点旁标琥珀色小点
   if(!previewMode){ const m=pointAt(pts,polyLen(pts)/2);
     if(_dyn.hiddenEdges.has(e)) drawHiddenBadge(m[0], m[1]);              // 被规则隐藏：醒目⊘标记，区别于其它虚化/普通线
@@ -439,9 +523,9 @@ function textNodeDisplay(n){
     const sig=fieldSig(n,f);
     if(Object.prototype.hasOwnProperty.call(ctxv,sig)){
       const v=ctxv[sig];
-      if(v!==''&&v!=null)return label?(label+'：'+v):String(v);
+      if(v!==''&&v!=null){const dv=translateFieldValue(f,v,nodeDeviceType(n));return label?(label+'：'+dv):dv;}   // 值字典转义
     }
-    if(f.dv!==''&&f.dv!=null)return label?(label+'：'+f.dv):String(f.dv);
+    if(f.dv!==''&&f.dv!=null){const dv=fieldDisplayValue(f,nodeDeviceType(n));return label?(label+'：'+dv):dv;}
   }
   return label;
 }
@@ -532,9 +616,9 @@ function variableValue(n){
     const sig=fieldSig(n,f);
     if(Object.prototype.hasOwnProperty.call(ctxv,sig)){
       const v=ctxv[sig];
-      if(v!==''&&v!=null)return String(v);
+      if(v!==''&&v!=null)return translateFieldValue(f,v,nodeDeviceType(n));   // 值字典转义
     }
-    if(f.dv!==''&&f.dv!=null)return String(f.dv);
+    if(f.dv!==''&&f.dv!=null)return fieldDisplayValue(f,nodeDeviceType(n));
   }
   return '';
 }
@@ -603,10 +687,10 @@ function fieldChipPos(n,i){
   const ox=(f.ox!=null?f.ox:0), oy=(f.oy!=null?f.oy:0);   // ox/oy 以屏幕像素存储
   return {x:baseX+ox/zoom, y:baseY+oy/zoom, h:cfs*1.5, cfs};
 }
-function fieldChipText(f){
+function fieldChipText(n,f){
   const k=dataKey(f);
-  const v=(f.dv==null||f.dv==='')?'':f.dv;   // 有值就显示（含 0 显示为 0）；无值(null/空串)显示空
-  return k+': '+v;
+  // 值经值字典转义显示（f.dict 显式 > bind 命中 applyTo 自动 > 原样）；有值就显示（含 0）；无值(null/空串)显示空
+  return k+': '+fieldDisplayValue(f,nodeDeviceType(n));
 }
 function drawFieldChips(n,s){
   if(n.hideFields||!showFieldChips||!n.data||n.data.length===0)return;
@@ -620,7 +704,7 @@ function drawFieldChips(n,s){
     if(previewMode&&_bad){ f._chipBox=null; return; }
     const pos=fieldChipPos(n,i);
     // 编辑态下不合法字段显示醒目告警文案（替代丑陋的空「: 」），提示运营端修正
-    const txt=_bad ? ('⚠ '+(((_s.emptyZh||_s.emptyEn)?((dataKey(f)||'未命名')+'·缺名'):(dataKey(f)+'·重名')))) : fieldChipText(f);
+    const txt=_bad ? ('⚠ '+(((_s.emptyZh||_s.emptyEn)?((dataKey(f)||'未命名')+'·缺名'):(dataKey(f)+'·重名')))) : fieldChipText(n,f);
     ctx.font=pos.cfs+"px -apple-system,'Microsoft YaHei',sans-serif";ctx.textAlign='left';ctx.textBaseline='alphabetic';
     const _m=ctx.measureText(txt),tw=_m.width;
     const padX=7/zoom, padY=4/zoom;   // 屏幕固定（随 1/zoom）
@@ -670,7 +754,7 @@ function drawFieldChips(n,s){
       const k=dataKey(f), kw=ctx.measureText(k+': ').width;
       ctx.fillStyle=n.fieldFontColor||'#9fc0dd';ctx.fillText(k+': ',bx+padX,yb);
       const _hv=(f.dv!=null&&f.dv!=='');         // 有值(含 0)→强调色显示；无值→留空
-      const v=_hv?f.dv:'';
+      const v=_hv?fieldDisplayValue(f,nodeDeviceType(n)):'';   // 值字典转义（与 fieldChipText 同源，量宽/绘制一致）
       ctx.fillStyle=_hv?(n.fieldFontColor||'#4dd0ff'):'#6b8299';
       ctx.fillText(''+v,bx+padX+kw,yb);
     }

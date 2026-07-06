@@ -150,8 +150,8 @@ canvas{display:block;cursor:default}
 #props.collapsed{width:0;border-left:none}
 #props h3{font-size:13px;color:var(--ui-accent);letter-spacing:1px;padding:10px 11px 7px;border-bottom:1px solid var(--ui-border);font-weight:bold}
 #pbody{padding:11px;flex:1;overflow-y:auto}
-.pr{margin-bottom:11px}.pr label{display:block;font-size:12px;color:var(--ui-text2);margin-bottom:4px;font-weight:500}
-.pr input,.pr select{width:100%;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:13px;padding:6px 8px;border-radius:4px;outline:none}
+.pr{margin-bottom:7px}.pr label{display:block;font-size:12px;color:var(--ui-text2);margin-bottom:2px;font-weight:500}
+.pr input,.pr select{width:100%;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:4px 7px;border-radius:4px;outline:none}
 .pr input:focus,.pr select:focus{border-color:var(--ui-accent)}
 .pr-inline{display:flex;gap:7px;align-items:center}
 .pr-inline input[type=range]{flex:1}
@@ -476,3 +476,55 @@ canvas{display:block;cursor:default}
 #sim-json{width:100%;min-height:56px;box-sizing:border-box;margin-top:6px;resize:vertical;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:ui-monospace,Consolas,Monaco,monospace;font-size:12px;line-height:1.55;padding:8px 10px;border-radius:7px;tab-size:2}
 #sim-json:focus{outline:none;border-color:var(--ui-accent);box-shadow:0 0 0 1px color-mix(in srgb,var(--ui-accent) 35%,transparent)}
 #sim-foot{display:flex;gap:8px;margin-top:8px}
+
+/* ───── 值字典管理（📖 值字典）：共享字典库 CRUD 弹框 ───── */
+#vdmgr-overlay{display:none;position:fixed;inset:0;background:rgba(4,10,20,.78);z-index:58;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+#vdmgr-overlay.show{display:flex}
+#vdmgr-box{width:min(820px,94vw);max-height:min(760px,86vh);display:flex;flex-direction:column;background:var(--ui-bg);border:1px solid var(--ui-border);border-radius:12px;overflow:hidden;box-shadow:0 18px 60px rgba(0,0,0,.5);padding:0 16px 14px}
+#vdmgr-head{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--ui-border);flex-shrink:0;margin-bottom:8px}
+#vdmgr-head h4{color:var(--ui-accent);font-size:15px;font-weight:bold;flex:1;margin:0}
+#vdmgr-close{border:none;background:transparent;color:var(--ui-text2);font-size:18px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:6px}
+#vdmgr-close:hover{background:var(--ui-hover);color:var(--ui-text)}
+#vdmgr-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-bottom:4px}
+.vd-card{background:var(--ui-bg2);border:1px solid var(--ui-border);border-radius:8px;padding:8px 10px;transition:border-color .12s}
+.vd-card:hover{border-color:color-mix(in srgb,var(--ui-accent) 45%,var(--ui-border))}
+.vd-card.editing{border-color:var(--ui-accent)}
+.vd-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:4px 0}
+.vd-row input,.vd-row select{flex:1;min-width:0;background:var(--ui-input-bg,#060e1a);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:5px 7px;border-radius:5px;outline:none}
+.vd-row input:focus,.vd-row select:focus{border-color:var(--ui-accent)}
+.vd-head-row{flex-wrap:nowrap}
+.vd-name{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--ui-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vd-type{color:var(--ui-text2);font-weight:normal;font-size:12px}
+.vd-sum{flex:0 0 auto;font-size:11px;color:var(--ui-text2)}
+.vd-editor{border-top:1px dashed var(--ui-border);margin-top:6px;padding-top:6px}
+.vd-l{flex:0 0 auto;font-size:12px;color:var(--ui-text2)}
+.vd-sec{font-size:12px;font-weight:600;color:var(--ui-accent);margin:10px 0 4px}
+.vd-secnote{font-weight:normal;color:var(--ui-text2);margin-left:8px;font-size:11px}
+.vd-items-head{display:flex;gap:6px;font-size:11px;color:var(--ui-text2);padding:0 2px}
+.vd-items-head span{flex:1}
+.vd-items-head span:last-child{flex:0 0 26px}
+.vd-item-row .df-del,.vd-apply-row .df-del{flex:0 0 auto}
+.vd-save-row{margin-top:10px;border-top:1px dashed var(--ui-border);padding-top:8px}
+.vd-card .df-del{width:26px;flex:0 0 26px;background:var(--ui-btn-bg);border:1px solid var(--ui-border);color:var(--ui-text2);font-size:12px;padding:4px 0;border-radius:3px;cursor:pointer}
+.vd-card .df-del:hover{border-color:#e06060;color:#e06060}
+/* 📖 值字典按钮：显式指定(强制/不转义)时紫色高亮，与 🔗 绑定(绿)区分 */
+.dfgrid .df-dict.bound,.siggrid .df-dict.bound{border-color:#b38bff;background:color-mix(in srgb,#b38bff 16%,var(--ui-btn-bg))}
+
+/* ───── 属性面板「🏷 标签」分组（连线标签：文字/绑定/字典/展示/走向/旋转缩放 + 当前值溯源）───── */
+.elc-row{display:flex;align-items:center;gap:6px;margin:4px 0}
+.elc-cap{flex:0 0 auto;font-size:12px;color:var(--ui-text2)}
+.pr .elc-row input:not([type=range]):not([type=checkbox]):not(.pnum),.pr .elc-row select{width:auto;flex:1;min-width:0;font-size:12px;padding:5px 7px}
+.pr .elc-row input[type=range]{width:auto;flex:1;min-width:0;padding:0}
+.pr .elc-row .pnum{flex:0 0 58px;width:58px;padding:5px 6px;text-align:center}
+
+/* 属性面板分组标题：外观/走线/数据驱动/标签 等区块导航 */
+.psec{font-size:11px;font-weight:700;color:var(--ui-accent);letter-spacing:1px;margin:8px 0 5px;opacity:.92;display:flex;align-items:center;gap:6px}
+.psec::after{content:'';flex:1;border-top:1px solid color-mix(in srgb,var(--ui-accent) 25%,transparent)}
+
+/* 紧凑行：标签与控件同一行（属性面板减少滚动）；.phint 自动换行占满整行 */
+.pr.cpt{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px}
+.pr.cpt>label{flex:0 0 auto;width:auto;margin:0}
+.pr.cpt>input,.pr.cpt>select{flex:1;width:auto;min-width:0}
+.pr.cpt>.pr-inline{flex:1;min-width:0}
+.pr.cpt>.phint{flex-basis:100%}
+.psec{margin:6px 0 4px}

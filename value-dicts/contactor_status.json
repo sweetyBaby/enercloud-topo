@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "vd-1",
+  "type": "contactor_status",
+  "name": "接触器状态",
+  "nameEn": "contactor status",
+  "applyTo": [
+    {
+      "deviceType": "BCU",
+      "field": "AuxDataLogs.LoContactor"
+    },
+    {
+      "deviceType": "BCU",
+      "field": "AuxDataLogs.PreContactor"
+    },
+    {
+      "deviceType": "BCU",
+      "field": "AuxDataLogs.HiContactor"
+    }
+  ],
+  "items": [
+    {
+      "code": "0",
+      "zh": "断开",
+      "en": "open"
+    },
+    {
+      "code": "1",
+      "zh": "闭合",
+      "en": "closed"
+    }
+  ]
+}

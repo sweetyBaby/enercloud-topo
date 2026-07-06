@@ -325,8 +325,11 @@ function applyLiveSignals(payload){
   Object.keys(payload).forEach(k=>{
     const v=payload[k];
     signalValues[k]=v;                                   // 规则求值用
-    const ps=parseSignal(k);                             // 映射到节点字段→更新显示
-    if(ps&&ps.node&&ps.node!=='@global'){
+    const ps=parseSignal(k);                             // 映射到节点字段/连线标签→更新显示
+    if(ps&&ps.edge){
+      // 连线标签信号（键=连线id.标签英文名）→ 回写 lblVal 用于标签显示
+      const e2=edges.find(x=>x.id===ps.edge); if(e2&&edgeLabelSigKey(e2)===ps.field)e2.lblVal=v;
+    }else if(ps&&ps.node&&ps.node!=='@global'){
       const n=nodes.find(x=>x.id===ps.node); if(!n)return;
       // 仅把实时值映射到节点「数据字段」用于显示；status / online 已移除（任意键仍存入 signalValues 供规则求值）
       const f=(n.data||[]).find(d=>fieldSigKey(d)===ps.field); if(f)f.dv=v;
