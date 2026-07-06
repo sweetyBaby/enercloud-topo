@@ -303,6 +303,8 @@ const text2 = rt.translateFieldValue(f, v);
 - **导出快照**：画布 JSON 顶层 `valueDicts[]` 只内嵌被引用/命中的字典，前端拿到 JSON 即自包含。
 - **前端注入**：`getValueDicts` 由调用方提供，可改传自己后台的字典数据（结构同 9.1），实现运行期覆盖。
 
+> 📑 字典存储 CRUD 接口（`/api/value-dicts` 四个动词、数据模型、导入导出格式、后端重新实现要点）见 [`docs/dict-api.md`](dict-api.md)。
+
 ---
 
 ## 10. 与其它文档的关系
@@ -310,3 +312,4 @@ const text2 = rt.translateFieldValue(f, v);
 - 信号如何驱动**显隐/流向规则**（条件树结构、运算符表）：见 [`Readme.md` 第 5 节「规则结构参考」](../Readme.md)。
 - **画布 JSON**（拓扑+规则+`dataBindings`）的完整字段：见 [`docs/product-requirements.md` 第 8 章](product-requirements.md) 与 [`Readme.md` 第 6 节](../Readme.md)。
 - **模板**的增删改查接口（与实时数据无关）：见 [`docs/template-api.md`](template-api.md)。
+- **值字典**的存储接口与数据模型：见 [`docs/dict-api.md`](dict-api.md)。

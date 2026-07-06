@@ -1,13 +1,13 @@
 # 储能拓扑编辑器 PRD
 
-版本：v1.1
-日期：2026-07-01
+版本：v1.2
+日期：2026-07-06
 适用项目：`topo` 储能拓扑编辑器与运行态渲染器
 维护者：juan.zheng
 
 > 本文是**详细需求文档**，目标是同时支撑三类工作：**功能迭代**（每个功能点有明确边界与数据结构）、**测试**（每个需求有可执行的验收标准，第 12 章为集中用例清单）、**维护**（第 6 章代码结构索引、第 13 章附录把需求映射到 `topology-editor.js` 的函数/行号）。
 >
-> 关联文档：`Readme.md`（运营端+前端接入总览、规则结构参考）、`docs/realtime-data-api.md`（实时数据契约）、`docs/template-api.md`（模板存储 API 契约）。本文尽量不重复上述文档的细节，而是给出汇总与交叉引用。
+> 关联文档：`Readme.md`（运营端+前端接入总览、规则结构参考）、`docs/realtime-data-api.md`（实时数据契约 + 值字典消费）、`docs/template-api.md`（模板存储 API 契约）、`docs/dict-api.md`（值字典存储 API 契约）。本文尽量不重复上述文档的细节，而是给出汇总与交叉引用。
 
 ## 修订记录
 
@@ -15,6 +15,7 @@
 |---|---|---|
 | v1.0 | 2026-07-01 | 首版，梳理编辑器与运行态整体能力 |
 | v1.1 | 2026-07-01 | 依据源码逐项核对：补充快捷键/交互、导出校验（4 阻断+1 风险）、11 个运算符与取值语义、画布 JSON 完整字段、seed/canvas 两种表示、草稿自动保存、元素库包（`runtime.js`/`resolveDynamic`）、URL 参数（`mode=embed/view`、`fit`、`interactive`）、代码结构索引与测试用例章节 |
+| v1.2 | 2026-07-06 | 新增：**值字典**（§7.18，code→中/英转义 + `applyTo` 自动匹配 + 字段/信号/标签三态 `dict` + `/api/value-dicts` 存储 + 导入导出/重扫）、**连线标签数据绑定**（§7.6 扩展，绑后台字段动态显示 + 值字典转义 + 展示模式/走向/旋转缩放/拖拽 + 连线 id 作信号键）；同步 §8.3 edges、§8.4 signals、§8.5 dataBindings、新增 §8.8 valueDicts、§9.4 值字典文件规范；属性面板分组化（节点/连线均按 基本/外观/数据驱动/绑定 分组） |
 
 ---
 
@@ -213,7 +214,9 @@ ElementLibrary ──定义── Node.type 的默认图标/字段/尺寸、Edge
 | `scripts/dev-server.js` | 开发服务器（热重载 + 模板写 + 图标/字典/模板动态扫描路由）|
 | `scripts/server.js` | 生产服务器（托管 `dist/`，读写项目根 `templates/`）|
 | `scripts/template-store.js` | 模板 API 共享逻辑（dev 与生产共用）|
-| `scripts/build.py` | 构建：压缩资源到 `dist/`，扫描生成 `icons/`、`templates/`、`dic/` 的 index.json |
+| `scripts/icon-store.js` | 图标库 API 共享逻辑（dev 与生产共用）|
+| `scripts/dict-store.js` | 值字典 API 共享逻辑（`/api/value-dicts`，dev 与生产共用）|
+| `scripts/build.py` | 构建：压缩资源到 `dist/`，扫描生成 `icons/`、`templates/`、`dic/`、`value-dicts/` 的 index.json |
 
 #### 6.2.1 编辑器 JS 分片（原 `topology-editor.js` 约 5920 行拆分而来）
 
@@ -464,18 +467,36 @@ ElementLibrary ──定义── Node.type 的默认图标/字段/尺寸、Edge
 - 走线方式 `route`：`smart`（智能避障）/`line`（直线）/`arc`（弧线）/`manual`（手动拐点 `waypoints`）。
 - 拖动拐点并吸附对齐（节点线/网格）。
 - 固定流向 `dir`：`forward`/`reverse`/`both`/`none`。
-- 单独显示连线标签 `showLabel` + `label` 文本。
+- 单独显示连线标签 `showLabel` + 标签配置（见「连线标签」子节）。
 - 端口锁定 `fromPort`/`toPort`。
 - 右键重置为智能走线或直线走线。
+- 属性面板分组：**外观 / 走线 / 数据驱动 / 标签**（`.psec` 分组标题）。
+
+#### 连线标签（数据绑定 · 值字典转义 · 可拖拽旋转）
+标签用于在连线上展示辅助信息，能像数据字段一样绑定后台字段动态显示。对应导出字段见 §8.3，值字典机制见 §7.18。
+
+- **文字**：中文 `label` + 英文 `labelEn`（随语言切换）；`labelEn` 兼作信号键段，绑定时必填。
+- **后台绑定** `labelBind`：设备类型（必选，驱动分类/字段级联）→ 设备实例（**可不指定**，未指定时导出为黄色风险提示、由后台按类型对应）→ `location.field`。绑定成立自动生成连线 `id`（`genId('edge')`），信号键 = `连线id.标签英文名`（如 `edge_1.Power`），进 `dataBindings`（条目带 `edge`、`node=null`）。
+- **展示内容** `labelShow`：`value`（默认，只显示值）/ `name`（只显示标签名）/ `both`（`标签名: 值`）；未绑定后台字段时一律只显示文字。
+- **值字典** `labelDict`：与字段同一三态语义（缺省=自动匹配 `applyTo` / `''`=强制不转义 / `'type'`=强制某字典）。
+- **样式**：文字走向 `labelDir`（`auto` 随线段方向 / `h` 横排 / `v` 竖排=基准旋转 90°）；`labelRot` 旋转、`labelScale` 缩放；`labelOffset{x,y}` 拖拽偏移（屏幕像素）。
+- **交互**：画布上直接拖动标签（拖离 >40px 显示回连锚点的引导虚线）；选中连线后标签带旋转手柄（Shift 吸附 15°）与缩放手柄，与面板滑杆联动。
+- **静态默认值 + 当前值溯源**：`labelValue` 为无实时数据时的显示值（也用于模拟后台值）；面板底部实时显示「原始值 → 转义结果 · 来源 · 命中字典」。
+- **渲染实现**：`edgeLabelText`（取值+转义+展示模式）、`edgeLabelAt`（含旋转逆变换的命中盒）、`segAngleAt`（auto 走向判横竖）；实时值经 `applyLiveSignals` 回写 `lblVal`。
 
 #### 规则与限制
 - `route:"smart"` 的实际避障路径**不写入 JSON**；自研渲染（方案 B）需自行实现走线，或改用方案 A 同源渲染。
+- 连线 `id` 与节点 `id` 同一命名空间（都是信号键前缀），不可重复：导出查重把连线一并纳入，导入自动去重。
+- 「选中连线显示线型名」的旧提示仅对**完全未配置标签**的连线生效，避免线型名冒充标签值。
 
 #### 验收标准
 - 可连接两个节点形成可见连线。
 - 选中连线后可改类型和流向。
 - 智能走线尽量避开节点并减少交叉。
 - 手动拐点可被拖动调整并吸附。
+- 标签绑定后台字段后随实时数据/注入值更新；命中值字典时显示转义文案，切语言切中/英。
+- 标签可拖动、旋转、缩放；`labelShow` 三种模式与预期一致；未绑定时只显示文字。
+- 导出/导入往返保留全部标签字段；连线 id 不与节点 id 冲突。
 
 ### 7.7 自动布局与对齐
 
@@ -794,6 +815,46 @@ TopoRuntime.config();               // 返回运行态配置
 - ZIP 可解压得到上述四类内容。
 - `runtime.js` 的 `resolveDynamic` 与编辑器规则引擎行为一致（避免逻辑漂移）。
 
+### 7.18 值字典（code 码转义）
+
+#### 需求描述
+把字段/信号/连线标签的 **code 码值转义成中/英文案**显示在画布上；规则求值与实时数据推送始终用原始 code，转义只在显示层，随语言切换，查不到回退原值。字典为**共享库资产**（跨拓扑复用，类似图标库/模板库），文件化管理。
+
+#### 数据结构
+一张字典 = 一套 `code→中/英文案` 表 + 认领的后台字段，见 §8.8 与 [`docs/dict-api.md`](dict-api.md)：
+```jsonc
+{ "type":"bms_status", "name":"电池状态", "nameEn":"Battery Status",
+  "applyTo":[ {"deviceType":"BCU","field":"StringDataLogs.String1State"} ],
+  "items":[ {"code":"0","zh":"待机","en":"Standby"}, {"code":"1","zh":"充电","en":"Charging"} ] }
+```
+
+#### 关联方式（两条路径）
+- **自动匹配（主）**：字典 `applyTo` 认领后台字段（`deviceType + location.field`）；画布字段/信号/连线标签**绑定了**该后台字段即自动转义（匹配键与设备实例无关，不指定实例也命中）。
+- **手动指定（兜底/覆盖）**：字段/信号的 `dict` 属性、连线标签的 `labelDict`，三态语义：`undefined`=自动匹配 / `''`=强制不转义 / `'type'`=强制某字典（优先级最高）。
+
+#### 转义规则（`packages/topology-runtime`，编辑器与前端同一实现）
+- 匹配：统一 `String(code)` 比较（数字 `1` 与字典 `"1"` 视为同一 code）。
+- 语言：取 `zh`/`en` 列；`en` 缺失回退 `zh`（运行期容错）。
+- 回退：code 未命中 / 字典不存在 → 原样显示原始值（不吞值）。
+- 导出函数：`resolveValueDict`（解析生效字典，优先级同上）、`valueDictLabel`、`translateFieldValue`、`fieldDisplayValue`；env 钩子 `getValueDicts()` 供数据（编辑器传「共享库+文档内嵌」合并结果，前端可传自有字典覆盖）。
+
+#### 功能点
+- **字典管理弹框**（菜单栏「📖 值字典」）：CRUD、`items` 行编辑（code/中/英）、`applyTo` 级联多选（数据源 `DEVICE_DICTS`/`dictLocations`/`dictFields`）；校验字典名中/英文必填、条目 `code·zh·en` 必填、`code` 同字典内唯一。
+- **导入 / 导出**：单个 `<type>.json` / 全部 `{dicts:[…]}` 清单导出；导入兼容单对象/数组/清单三形态，宽松归一化（`nameEn/en` 兜底、`code` 去重、非法项剔除）后过服务端强校验，同名 `type` 询问后覆盖。
+- **动态加载**：清单由服务端实时扫描 `value-dicts/` 目录生成；手改 JSON 文件后「🔄 重新扫描」即时生效（该目录已排除 dev-server 热重载）。
+- **存储 API** `/api/value-dicts`（`GET/POST/PUT/DELETE`，`scripts/dict-store.js`，dev/生产共用；`build.py` 拷贝目录并生成清单）。
+- **导出内嵌**：画布 JSON 顶层 `valueDicts` 只内嵌本图实际用到（显式指定 + `applyTo` 命中）的字典快照，前端零依赖。
+
+#### 规则与限制
+- 字典是「一套码表」的复用单元；码表不同的字段各建一张字典。
+- 存储接口与图标/模板库同姿态，**写接口无鉴权**（内部运营工具），生产环境如需收紧应在网关层统一处理。
+
+#### 验收标准
+- 建字典 → 认领 BCU·StringDataLogs.String1State → 给绑定该字段的画布元素注入 `1`，显示「充电」，切英文显示「Charging」，注入 `9`（未收录）原样显示。
+- 字段行 📖 手动指定「不转义」时强制显示原始 code；「强制某字典」覆盖自动匹配。
+- 导入导出往返、目录手改 + 重扫、同名覆盖询问均按预期。
+- 导出画布 JSON 含 `valueDicts` 快照且仅含用到的字典。
+
 ---
 
 ## 8. 数据需求与画布 JSON Schema（附录级）
@@ -819,6 +880,7 @@ TopoRuntime.config();               // 返回运行态配置
   "nodes": [ /* §8.2 */ ],
   "edges": [ /* §8.3 */ ],
   "signals": [ /* §8.4，有全局信号时 */ ],
+  "valueDicts": [ /* §8.8，本图用到的值字典快照，有则内嵌 */ ],
   "sampleSignals": { "bms_1.SOC(%)": 55 },   /* 有注入样例时 */
   "dataBindings": [ /* §8.5，有绑定时 */ ]
 }
@@ -871,7 +933,7 @@ TopoRuntime.config();               // 返回运行态配置
   "route": "smart",              // smart|line|arc|manual
   "dir": "forward",              // forward|reverse|both|none
   "width": 1,
-  "label": "并网",
+  "label": "并网",               // 标签中文文字
   "showLabel": true,
   "orthoSnap": true,
   "waypoints": [ { "x":300,"y":200 } ],   // manual 路由
@@ -882,7 +944,18 @@ TopoRuntime.config();               // 返回运行态配置
   "fromPort": "right",
   "toPort": "left",
   "showWhen": { /* 条件树 */ },
-  "dirRules": [ { "when": { /* 条件 */ }, "dir":"reverse" } ]
+  "dirRules": [ { "when": { /* 条件 */ }, "dir":"reverse" } ],
+
+  // 可选：连线标签（绑定后台字段时带 id 作信号键前缀；详见 §7.6 连线标签）
+  "id": "edge_1",                          // 标签绑定后自动生成；信号键=id.labelEn
+  "labelEn": "Power",                      // 英文文字，兼作信号键段
+  "labelBind": { "field":"RunLogs.ActivePower", "deviceType":"PCS", "deviceId":"..." },
+  "labelDict": "",                         // 三态：省略=自动匹配 / ''=不转义 / 'type'=强制
+  "labelValue": "1",                       // 静态默认值（无实时数据时显示）
+  "labelShow": "value",                    // value(默认)|name|both
+  "labelDir": "auto",                      // auto(随线)|h|v
+  "labelRot": 0, "labelScale": 1,          // 旋转(度)/缩放(倍)，缺省 0/1 不导出
+  "labelOffset": { "x":12, "y":-8 }        // 拖拽偏移(屏幕像素)
 }
 ```
 
@@ -892,7 +965,8 @@ TopoRuntime.config();               // 返回运行态配置
 {
   "key": { "zh":"运行模式","en":"mode" },   // en = 信号键
   "value": "island",
-  "bind": { "field":"loc.field","deviceType":"EMS","deviceId":"..." }  // 可选
+  "bind": { "field":"loc.field","deviceType":"EMS","deviceId":"..." },  // 可选
+  "dict": "ems_mode"   // 可选：值字典三态（省略=自动匹配 / ''=不转义 / 'type'=强制）
 }
 ```
 
@@ -918,6 +992,14 @@ TopoRuntime.config();               // 返回运行态配置
   "label": "运行模式",
   "source": { "deviceType":"EMS", "deviceId":"...", "field":"RunLogs.Mode" }
 }
+// 连线标签绑定：node 为 null、edge=连线 id，signal=连线id.标签英文名
+{
+  "signal": "edge_1.Power",
+  "node": null,
+  "edge": "edge_1",
+  "label": "充电功率",
+  "source": { "deviceType":"PCS", "deviceId":"...", "field":"RunLogs.ActivePower" }
+}
 ```
 
 ### 8.6 数据字段（node.data[]）
@@ -933,17 +1015,35 @@ TopoRuntime.config();               // 返回运行态配置
     "deviceType": "BCU",
     "deviceId": "e072699f1f8d427b9d81daf4e32b26fc",
     "followNode": false     // true=跟随节点设备（节点改设备它跟着变）；导出时 deviceType/deviceId 仍写全
-  }
+  },
+  "dict": "bms_status"      // 可选：值字典三态（省略=自动匹配 / ''=不转义 / 'type'=强制）
 }
 ```
 
 ### 8.7 画布 JSON 约束（校验依据）
 - 必须含 `schemaVersion`。
-- 节点 `id` 全局唯一且非空。
+- 节点 `id` **与连线 `id`（标签绑定时生成）** 同一命名空间，全局唯一且非空。
 - 节点内字段 `key.zh`、`key.en` 各自唯一且非空。
 - 全局信号 `key.en` 全局唯一且非空。
+- 连线标签绑定后台字段时 `labelEn` 必填（作信号键段）；未指定设备实例为风险提示（不阻断）。
 - 规则为声明式 JSON，不含可执行代码。
-- 导出 JSON 自包含运行态所需的视图设置、连线样式与规则。
+- 导出 JSON 自包含运行态所需的视图设置、连线样式、规则与**用到的值字典 `valueDicts`**。
+
+### 8.8 值字典（valueDicts[]）
+
+导出时内嵌本图实际用到（显式 `dict`/`labelDict` 指定 + `applyTo` 命中）的字典快照，前端零依赖即可转义。单条结构见 §7.18 / [`docs/dict-api.md`](dict-api.md)：
+
+```jsonc
+{
+  "type": "bms_status",
+  "name": "电池状态", "nameEn": "Battery Status",
+  "applyTo": [ { "deviceType":"BCU", "field":"StringDataLogs.String1State" } ],
+  "items":   [ { "code":"0","zh":"待机","en":"Standby" },
+               { "code":"1","zh":"充电","en":"Charging" } ]
+}
+```
+
+> 字段/信号/连线标签的 `dict`/`labelDict` 为**引用**（dictType 字符串）；`valueDicts[]` 为随图内嵌的**定义快照**。前端也可用 `env.getValueDicts()` 传自有字典覆盖。
 
 ---
 
@@ -960,6 +1060,7 @@ TopoRuntime.config();               // 返回运行态配置
 - 增删改图片后，dev-server/build.py 自动扫描合并（见 §7.2）。
 
 ### 9.2 字段字典 `dic/*.json`（构建合并 `dic/index.json`）
+> 注意区分：此处「字段字典」定义**每种设备类型有哪些后台字段**（供绑定时选 `location.field`）；§9.4 的「值字典」定义**字段值 code 如何转义成文案**，两者不同。
 ```jsonc
 [ { "deviceType":"BCU","location":"AuxDataLogs",
     "fields":["AmbientT1","BusVoltage","PackVoltage","SystemSOC", "..."] } ]
@@ -969,6 +1070,16 @@ TopoRuntime.config();               // 返回运行态配置
 ### 9.3 设备档案
 - `device/device-type.json`：字典项数组（`dictLabel`/`dictValue`/`isDefault`/`default` 等）。
 - `device/device-info.json`：设备实例数组（`deviceId`/`deviceName`/`archiveDeviceType`/`projectName`/`delFlag` 等）。
+
+### 9.4 值字典 `value-dicts/*.json`（构建/服务端扫描生成 `value-dicts/index.json`）
+每张字典一个 `<type>.json`（code→中/英文案 + 认领的后台字段），清单由服务端**实时扫描目录**生成（`build.py` 静态部署时预生成）。详见 §7.18 与 [`docs/dict-api.md`](dict-api.md)。
+```jsonc
+{ "schemaVersion":"vd-1", "type":"bms_status", "name":"电池状态", "nameEn":"Battery Status",
+  "applyTo":[ {"deviceType":"BCU","field":"StringDataLogs.String1State"} ],
+  "items":[ {"code":"0","zh":"待机","en":"Standby"}, {"code":"1","zh":"充电","en":"Charging"} ] }
+```
+- 清单 `value-dicts/index.json`：`{ "schemaVersion":"vd-index-1", "dicts":[ … ] }`。
+- 读写 API `/api/value-dicts`（`scripts/dict-store.js`）；增删改文件后编辑器「🔄 重新扫描」即生效（该目录已排除 dev-server 热重载）。
 
 ---
 
@@ -1027,6 +1138,7 @@ npm start       # node scripts/server.js
 - 扫描 `icons/` + 合并清单 → `dist/icons/index.json`。
 - 拷贝 `templates/*.json` + 扫描生成 `dist/templates/index.json`。
 - 拷贝 `dic/*.json` + 合并生成 `dist/dic/index.json`。
+- 拷贝 `value-dicts/*.json` + 扫描生成 `dist/value-dicts/index.json`。
 - 原样拷贝 `device/`。
 
 ---
@@ -1054,6 +1166,10 @@ npm start       # node scripts/server.js
 - [ ] 四种走线（smart/line/arc/manual）可切换；手动拐点可拖动吸附。
 - [ ] 固定流向四态（forward/reverse/both/none）渲染正确。
 - [ ] 右键「智能走线/直线走线」清空拐点。
+- [ ] 连线标签：绑定后台字段后随注入/实时值更新；`labelShow` 三态显示正确；未绑定只显示文字。
+- [ ] 标签可拖动（拖远显示引导线）、旋转手柄（Shift 吸附 15°）、缩放手柄，与面板滑杆联动。
+- [ ] 标签走向 auto/h/v 正确；命中值字典时转义、切语言切中英。
+- [ ] 标签绑定生成的连线 id 不与节点 id 冲突；导出/导入往返保留全部 label* 字段与 `dataBindings` 的 edge 条目。
 
 ### 12.4 规则引擎（P0）
 - [ ] 11 个运算符逐一验证（含 `in`/`between`/`truthy`/`falsy`/`exists`）。
@@ -1099,11 +1215,20 @@ npm start       # node scripts/server.js
 - [ ] 中英切换后节点/字段展示切换，信号键不变。
 - [ ] 编辑后刷新可恢复草稿；清除后不再恢复。
 
-### 12.11 后端联调（P0）
-- [ ] 后端按画布 JSON（`nodes[].id`+`data[].key.en`+`signals[].key.en`）枚举全部信号键。
+### 12.11 值字典（P1）
+- [ ] 建字典 + `applyTo` 认领后台字段；绑定该字段的元素注入 code 后显示转义文案，切语言切中/英。
+- [ ] 字段/信号/连线标签的 `dict`/`labelDict` 三态：自动匹配 / `''` 不转义 / 强制某字典。
+- [ ] 未命中 code、字典不存在 → 原样显示原始值（不吞值）。
+- [ ] 字典名中/英文必填、条目 `code·zh·en` 必填、`code` 同字典内唯一（弹框 + 服务端 400 双校验）。
+- [ ] 导入（单对象/数组/清单三形态）、导出（单个/全部）、同名覆盖询问、手改文件 + 重扫均按预期。
+- [ ] 导出画布 JSON 内嵌 `valueDicts` 且仅含用到的字典。
+
+### 12.12 后端联调（P0）
+- [ ] 后端按画布 JSON（`nodes[].id`+`data[].key.en`+`signals[].key.en`+连线标签 `edges[].id`/`labelEn`）枚举全部信号键。
 - [ ] 返回顶层扁平 JSON；轮询返回全量；增量只推变化。
 - [ ] `0`/`null`/空串语义与文档一致。
 - [ ] 错误键名不更新目标字段。
+- [ ] `dataBindings[]` 覆盖节点字段、全局信号、连线标签三类来源（连线标签条目带 `edge`）。
 
 ---
 
