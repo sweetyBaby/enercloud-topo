@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh">
-<head><meta charset="UTF-8"><title>储能拓扑编辑器 v5</title>
+<head><meta charset="UTF-8"><title>储能拓扑编辑器</title>
 <link rel="stylesheet" href="topo-editor/topology-editor.css">
 </head>
 <body>
@@ -57,6 +57,7 @@
       <button class="tb" id="btn-signals" onclick="toggleSignalPanel()" title="信号：管理全局信号（中英文名/默认值/后台绑定）、注入测试数据、批量样例 JSON" data-i18n="⚡ 信号">⚡ 信号</button>
       <button class="tb" id="btn-rules" onclick="toggleRulePanel()" title="规则：总览全部显隐/图标/流向规则，切换运行视图预览（规则在画布上始终实时生效）" data-i18n="📏 规则">📏 规则</button>
       <button class="tb" id="btn-iconlib" onclick="openIconManager()" title="图标库管理：管理全部图标与分组（增删改，落盘 icons/）" data-i18n="🗂 图标库">🗂 图标库</button>
+      <button class="tb" id="btn-valuedicts" onclick="openDictManager()" title="值字典：把字段/信号的 code 码值转义成中英文案显示在画布上；字典认领后台字段后自动匹配生效（落盘 value-dicts/）" data-i18n="📖 值字典">📖 值字典</button>
       <button class="tb" id="btn-runview" onclick="toggleRunView()" title="预览效果：按规则彻底隐藏不该显示的元素/连线，并应用数据驱动流向，查看整个图的运行效果" data-i18n="▶ 预览效果">▶ 预览效果</button>
        </div>
   </div>
@@ -455,9 +456,35 @@
             <select id="ep-dir" onchange="applyEP()" style="flex:1">
             <option value="forward" data-i18n="正向 →">正向 →</option><option value="reverse" data-i18n="反向 ←">反向 ←</option>
             <option value="both" data-i18n="双向 ↔">双向 ↔</option><option value="none" data-i18n="无流向">无流向</option></select></div></div>
-        <div class="pr"><label>标签（可选）</label><input id="ep-lbl" oninput="applyEP()"></div>
-        <div class="pr"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="ep-showlbl" onchange="applyEP()" style="width:auto"> 单独显示本条连线标签</label>
-          <div class="phint" style="margin-top:3px">提示：受顶部「全部线标签」总开关控制，总开关关闭时本条也不显示</div></div>
+        <div class="psep"></div>
+        <div class="pr"><label>🏷 标签 · 文字与样式</label>
+          <div class="elc-row"><input id="elc-zh" placeholder="中文标签" oninput="applyELbl()">
+            <input id="elc-en" placeholder="English（绑定时必填·作信号键）" onchange="applyELblEn(this)"></div>
+          <div class="elc-row"><span class="elc-cap">展示内容</span>
+            <select id="elc-show" onchange="applyELbl()" title="绑定后台字段后标签显示什么（未绑定时始终只显示标签文字）">
+              <option value="value">只显示值（默认）</option><option value="name">只显示标签名</option><option value="both">标签名: 值</option></select>
+            <span class="elc-cap">走向</span>
+            <select id="elc-dir" onchange="applyELbl()" title="自动=随标签所在线段方向（横线横排、竖线竖排）">
+              <option value="auto">自动（随线）</option><option value="h">横排</option><option value="v">竖排</option></select></div>
+          <div class="elc-row"><span class="elc-cap">旋转</span><input type="range" id="ep-lbl-rot" min="0" max="359" value="0" oninput="pairFromSlider('ep-lbl-rot');applyELbl()">
+            <input type="number" id="ep-lbl-rot-num" class="pnum" min="0" max="359" step="1" value="0" oninput="pairFromNum('ep-lbl-rot');applyELbl()"><span class="punit">°</span></div>
+          <div class="elc-row"><span class="elc-cap">缩放</span><input type="range" id="ep-lbl-scale" min="20" max="400" value="100" oninput="pairFromSlider('ep-lbl-scale');applyELbl()">
+            <input type="number" id="ep-lbl-scale-num" class="pnum" min="5" max="800" step="5" value="100" oninput="pairFromNum('ep-lbl-scale');applyELbl()"><span class="punit">%</span></div>
+          <label class="elc-row" style="cursor:pointer"><input type="checkbox" id="elc-visible" checked onchange="applyELbl()" style="width:auto"> 显示本条连线标签（受顶部「全部线标签」总开关控制）</label>
+          <div class="phint" style="margin-top:2px">💡 画布上可直接拖动标签（拖远显示归属引导线）；选中后标签带旋转/缩放手柄，与滑杆联动</div></div>
+        <div class="pr"><label>🏷 标签 · 绑定后台字段</label>
+          <div class="elc-row"><span class="elc-cap">设备类型</span><select id="elc-dt" onchange="elcDtChanged()"></select></div>
+          <div class="elc-row"><span class="elc-cap">设备实例</span><select id="elc-dev" title="可不指定：导出时黄色提醒，由后台按类型对应设备"></select></div>
+          <div class="elc-row"><span class="elc-cap">分类</span><select id="elc-loc" onchange="elcLocChanged()"></select>
+            <span class="elc-cap">字段</span><select id="elc-fld"></select></div>
+          <div class="elc-row"><button class="tb grn" style="flex-shrink:0;padding:4px 10px" onclick="elcApplyBind()">✓ 应用绑定</button>
+            <button class="tb" style="flex-shrink:0;padding:4px 10px" onclick="elcClearBind()">✕ 清除绑定</button><span style="flex:1"></span></div>
+          <div class="phint" id="elc-bhint" style="margin-top:2px"></div>
+          <div class="elc-row" style="margin-top:4px"><span class="elc-cap">静态默认值</span>
+            <input id="elc-val" placeholder="无（等待实时数据）" oninput="applyELblVal(this)" title="无实时数据时显示的值；也可在此直接填 code 模拟后台值看展示效果（如 1）">
+            <button class="tb" style="flex-shrink:0;padding:4px 8px" onclick="var i=document.getElementById('elc-val');i.value='';applyELblVal(i)" title="清空静态值">✕</button></div>
+          <div class="elc-row" style="margin-top:4px"><span class="elc-cap">值字典</span><select id="elc-dict" onchange="elcDictChanged()"></select></div>
+          <div class="phint" id="elc-valtrace" style="margin-top:3px"></div></div>
         <div class="pr"><label>线条粗细 <span id="ep-w-v">1.0</span>×</label>
           <div class="pr-inline"><input type="range" id="ep-w" min="0.5" max="3" step="0.1" value="1" oninput="applyEP()"></div></div>
         <div class="psep"></div>
