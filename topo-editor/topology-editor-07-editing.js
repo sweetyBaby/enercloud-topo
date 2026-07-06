@@ -110,6 +110,7 @@ function pairVal(id,def){const el=document.getElementById(id+'-num')||document.g
 
 function selectNode(id){
   ensurePropsOpen();
+  _devBindProj='';   // 切换节点重置设备绑定的项目筛选(随新节点已选设备在 refreshDeviceBindUI 内重新派生)
   selNode=id;selEdge=null;const n=nodes.find(x=>x.id===id);if(!n){showPanel('none');return;}
   showPanel('node');
   document.getElementById('p-id').value=n.id;
@@ -473,31 +474,48 @@ function addDF(){const n=nodes.find(x=>x.id===selNode);if(!n)return;n.data=n.dat
   const zhs=document.querySelectorAll('#dfields .df-zh-in');const last=zhs[zhs.length-1];if(last)last.focus();}
 
 // ───── 后台数据绑定 UI ─────
-// 节点级「设备类型 + 设备实例」下拉（该节点字段的默认来源）
+// 设备绑定面板的「项目筛选」——仅 UI 态、不入库；随所选设备实例派生，用于「先选项目→再选项目下设备」的级联
+let _devBindProj='';
+// 节点级「设备类型 → 项目 → 设备实例」级联下拉（该节点字段的默认来源）
 function refreshDeviceBindUI(n){
   const sec=document.getElementById('prow-devbind'),sep=document.getElementById('prow-devbind-sep');
   if(!sec)return;
   const show=n&&n.type!=='anchor';   // 占位点无数据，不显示绑定
   sec.style.display=show?'':'none'; if(sep)sep.style.display=show?'':'none';
   if(!show)return;
-  const tSel=document.getElementById('p-dev-type'),iSel=document.getElementById('p-dev-id');
+  const tSel=document.getElementById('p-dev-type'),pSel=document.getElementById('p-dev-project'),iSel=document.getElementById('p-dev-id');
   const dt=nodeDeviceType(n);
-  tSel.innerHTML='<option value="">（未指定）</option>'+DEVICE_TYPES.map(t=>'<option value="'+tplEsc(t.value)+'"'+(t.value===dt?' selected':'')+'>'+tplEsc(t.label)+'</option>').join('');
-  const list=devicesOfType(dt);
-  iSel.innerHTML='<option value="">（未指定实例）</option>'+list.map(d=>'<option value="'+tplEsc(d.deviceId)+'"'+(d.deviceId===n.deviceId?' selected':'')+'>'+tplEsc(d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</option>').join('');
+  // 设备类型
+  tSel.innerHTML='<option value="">未指定</option>'+DEVICE_TYPES.map(t=>'<option value="'+tplEsc(t.value)+'"'+(t.value===dt?' selected':'')+'>'+tplEsc(t.label)+'</option>').join('');
+  // 项目筛选：已选设备实例时以该设备所属项目为准；否则沿用暂存筛选
+  const selDev=n.deviceId?DEVICE_LIST.find(d=>d.deviceId===n.deviceId):null;
+  if(selDev)_devBindProj=selDev.projectId||'';
+  const projs=projectsOfType(dt);
+  if(_devBindProj&&!projs.some(p=>p.id===_devBindProj))_devBindProj='';   // 换类型后旧项目已不在列表→清空
+  if(pSel)pSel.innerHTML='<option value="">全部项目</option>'+projs.map(p=>'<option value="'+tplEsc(p.id)+'"'+(p.id===_devBindProj?' selected':'')+'>'+tplEsc(p.name)+'</option>').join('');
+  // 设备实例：按类型 + 项目过滤；已选项目时项目名不再重复追加
+  const list=devicesOfType(dt,_devBindProj),showProj=!_devBindProj;
+  iSel.innerHTML='<option value="">未指定实例</option>'+list.map(d=>'<option value="'+tplEsc(d.deviceId)+'"'+(d.deviceId===n.deviceId?' selected':'')+'>'+tplEsc(d.deviceName+(showProj&&d.projectName?(' · '+d.projectName):''))+'</option>').join('');
   const hint=document.getElementById('p-dev-hint');
   if(hint){
     if(!DEVICE_TYPES.length){hint.textContent='未加载到后台设备类型，请确认 device/ 与 dic/ 已就绪并重启服务后点 🔄 刷新。';hint.style.color='#e0a020';}
-    else if(dt&&!n.deviceId){hint.textContent='⚠ 已选设备类型但未指定「设备实例」——跟随本节点的字段将无法关联到具体后台设备，请选择实例。';hint.style.color='#e0a020';}
+    else if(dt&&!n.deviceId){hint.textContent='⚠ 已选设备类型但未指定「设备实例」——可先选项目再选项目下的设备；未指定实例时跟随本节点的字段将无法关联到具体后台设备。';hint.style.color='#e0a020';}
     else {hint.textContent='该节点默认对应的后台设备；下方字段未单独指定来源时即取此设备。';hint.style.color='';}
   }
 }
-function applyDeviceBind(typeChanged){
+// what: 'type' 改设备类型 | 'project' 改项目筛选 | 'device' 选设备实例
+function applyDeviceBind(what){
   const n=nodes.find(x=>x.id===selNode);if(!n)return;snapshot();
-  const dt=document.getElementById('p-dev-type').value;
-  n.deviceType=dt||''; if(!n.deviceType)delete n.deviceType;
-  if(typeChanged){ delete n.deviceId; }   // 改类型 → 实例需重选
-  else { const did=document.getElementById('p-dev-id').value; n.deviceId=did||''; if(!n.deviceId)delete n.deviceId; }
+  if(what==='type'){
+    const dt=document.getElementById('p-dev-type').value;
+    n.deviceType=dt||''; if(!n.deviceType)delete n.deviceType;
+    delete n.deviceId; _devBindProj='';   // 改类型 → 项目/实例都需重选
+  }else if(what==='project'){
+    _devBindProj=document.getElementById('p-dev-project').value||'';
+    delete n.deviceId;                     // 改项目 → 实例需重选
+  }else{ // 'device'
+    const did=document.getElementById('p-dev-id').value; n.deviceId=did||''; if(!n.deviceId)delete n.deviceId;
+  }
   refreshDeviceBindUI(n); renderDFs(n); snapshot();
 }
 // 某字段绑定的可读摘要：跨设备时加 ⮕ 标记

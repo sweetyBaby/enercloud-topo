@@ -487,15 +487,7 @@
       "title_en": "Ungrouped",
       "color": "#8aa8c4",
       "tab": "device",
-      "devices": [
-        {
-          "type": "custom_Snipaste_202",
-          "label": "Snipaste_2025-10-21_13-54-05",
-          "label_en": "Snipaste_202",
-          "badge": "custom_Snipaste_202",
-          "file": "custom_Snipaste_202.png"
-        }
-      ]
+      "devices": []
     }
   ]
 }

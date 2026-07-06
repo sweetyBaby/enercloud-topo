@@ -371,8 +371,9 @@
             <button class="tb" id="p-dev-reload" onclick="reloadBackendBindingData()" title="重新拉取后台设备/字典（增删改后刷新）" style="float:right;padding:1px 7px;font-size:11px">🔄</button>
           </label>
           <div class="pr-inline" style="gap:6px">
-            <select id="p-dev-type" onchange="applyDeviceBind(true)" style="flex:0 0 38%" title="后台设备类型"></select>
-            <select id="p-dev-id" onchange="applyDeviceBind(false)" style="flex:1" title="后台设备实例（该节点对应的物理设备）"></select>
+            <select id="p-dev-type" onchange="applyDeviceBind('type')" style="flex:0 0 26%;min-width:0" title="后台设备类型"></select>
+            <select id="p-dev-project" onchange="applyDeviceBind('project')" style="flex:1 1 0;min-width:0" title="所属项目（先选项目再选设备）"></select>
+            <select id="p-dev-id" onchange="applyDeviceBind('device')" style="flex:1 1 0;min-width:0" title="后台设备实例（该节点对应的物理设备）"></select>
           </div>
           <div class="phint" id="p-dev-hint" data-i18n="该节点默认对应的后台设备；下方字段未单独指定来源时即取此设备。">该节点默认对应的后台设备；下方字段未单独指定来源时即取此设备。</div>
         </div>

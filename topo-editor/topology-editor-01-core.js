@@ -113,14 +113,16 @@ async function loadBackendBindingData(){
   if(Array.isArray(types))DEVICE_TYPES=types.filter(t=>t&&t.dictValue&&(t.status==null||String(t.status)==='0'))
     .map(t=>({value:t.dictValue,label:t.dictLabel||t.dictValue}));
   if(Array.isArray(list))DEVICE_LIST=list.filter(d=>d&&d.deviceId&&d.delFlag!=='2')
-    .map(d=>({deviceId:d.deviceId,deviceName:d.deviceName||d.deviceId,deviceType:d.deviceType||d.archiveDeviceType||'',projectName:d.projectName||''}));
+    .map(d=>({deviceId:d.deviceId,deviceName:d.deviceName||d.deviceId,deviceType:d.deviceType||d.archiveDeviceType||'',projectId:d.projectId||'',projectName:d.projectName||''}));
   if(dicts&&typeof dicts==='object'&&!Array.isArray(dicts))DEVICE_DICTS=dicts;
 }
 // 字典查询助手
 function nodeDeviceType(n){ return (n&&n.deviceType)||CANVAS_TYPE_TO_DEVICE[n&&n.type]||''; }
 function dictLocations(dt){ return (DEVICE_DICTS[dt]||[]).map(g=>g.location); }
 function dictFields(dt,loc){ const g=(DEVICE_DICTS[dt]||[]).find(x=>x.location===loc); return g?g.fields:[]; }
-function devicesOfType(dt){ return DEVICE_LIST.filter(d=>!dt||d.deviceType===dt); }
+function devicesOfType(dt,projId){ return DEVICE_LIST.filter(d=>(!dt||d.deviceType===dt)&&(!projId||d.projectId===projId)); }
+// 某设备类型下「有设备」的项目列表(按项目分组用):去重，保持出现顺序
+function projectsOfType(dt){ const seen={},out=[]; DEVICE_LIST.forEach(d=>{ if((!dt||d.deviceType===dt)&&d.projectId&&!seen[d.projectId]){seen[d.projectId]=1;out.push({id:d.projectId,name:d.projectName||d.projectId});} }); return out; }
 function deviceNameOf(id){ const d=DEVICE_LIST.find(x=>x.deviceId===id); return d?(d.deviceName+(d.projectName?(' · '+d.projectName):'')):(id||''); }
 function deviceTypeLabel(v){ const t=DEVICE_TYPES.find(x=>x.value===v); return t?t.label:(v||''); }
 // 后台绑定数据动态刷新：重新拉取设备/字典并刷新当前节点面板
