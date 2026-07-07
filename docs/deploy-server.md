@@ -1,8 +1,8 @@
-# 部署到公司服务器（223.107.76.50，经现有 nginx 以 /topo/ 子路径接入）
+# 部署到公司服务器（223.107.76.50，经现有 nginx 以 /topo-editor/ 子路径接入）
 
 > 服务器无 git、无空余端口。方案：本地构建镜像 → 导出 tar 上传 → `docker load` →
 > 加入现有 compose 栈（不占宿主端口，走 `backend` 内部网络）→ 现有 nginx 加一段 `location`。
-> 访问地址：**http://223.107.76.50:8126/topo/topo.html**（输入 `/topo.html` 会自动 301 跳转）。
+> 访问地址：**http://223.107.76.50:8126/topo-editor/topo.html**（输入 `/topo.html` 会自动 301 跳转）。
 > 前端所有资源与 API 均为相对路径，子路径部署无需改任何业务代码。
 
 ## 1. 本地构建并导出镜像
@@ -20,7 +20,7 @@ scp -P 8119 enercloud-topo-1.0.tar bms@223.107.76.50:/home/bms/base_docker/data/
 ## 2. 服务器导入镜像
 
 ```bash
-docker load -i /home/bms/base_docker/data/myapp/front/enercloud-topo-1.0.tar
+sudo docker load -i /home/bms/base_docker/data/myapp/front/enercloud-topo-1.0.tar
 ```
 
 ## 3. 现有 docker-compose.yml 追加服务
