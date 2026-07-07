@@ -281,7 +281,8 @@ if vd_src.is_dir():
             "name": doc.get("name") or t,
             "nameEn": doc.get("nameEn") or doc.get("name") or t,
             "applyTo": [a for a in (doc.get("applyTo") or []) if isinstance(a, dict) and a.get("field")],
-            "items": [it for it in (doc.get("items") or []) if isinstance(it, dict) and it.get("code") is not None],
+            # 等值条目(code)与条件条目(when，含 else 兜底)都保留——与 dict-store.buildIndexFromDir 的过滤一致
+            "items": [it for it in (doc.get("items") or []) if isinstance(it, dict) and (it.get("code") is not None or isinstance(it.get("when"), dict))],
         })
     (dist_vd / "index.json").write_text(
         json.dumps({"schemaVersion": "vd-index-1", "dicts": vd_dicts}, ensure_ascii=False, indent=2), encoding="utf-8"

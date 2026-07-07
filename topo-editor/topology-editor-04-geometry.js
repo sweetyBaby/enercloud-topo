@@ -102,6 +102,17 @@ function addNode(type,x,y){
 // 英文名为必填项（见字段校验）；为防内部报错，缺失时暂兜底中文名。字段卡片显示仍走 dataKey（中文标签）。
 function fieldSigKey(f){ return (f&&(f.keyEn||f.key))||''; }
 function fieldSig(n,f){ return n.id+'.'+fieldSigKey(f); }
+// ───── 计算绑定（bind.calc）helpers ─────
+// 绑定两种形态：单字段 bind={field,deviceType?,deviceId?}；计算 bind={calc:{operands:[{field,...}|{const:v}],operators:[op,...]}}
+// 计算语义：操作数左→右链式结合（无优先级）；比较结果 1/0；求值单一实现在 TopoRules.calcValue。
+function bindIsCalc(b){ return !!(b&&b.calc&&Array.isArray(b.calc.operands)); }
+function bindHasSource(b){ return !!(b&&(b.field||(bindIsCalc(b)&&b.calc.operands.some(o=>o&&o.field)))); }
+// 计算绑定的「字段操作数」清单（常量操作数不占信号键）：[{i:操作数下标, o:操作数}]
+function calcFieldOperands(b){ return bindIsCalc(b)?b.calc.operands.map((o,i)=>({i,o})).filter(x=>x.o&&x.o.field):[]; }
+// 操作数信号键 = 主信号键@操作数下标：后台按它推送原始值，主信号值由前端 calcValue 算出（不直推）
+function calcOperandSig(sig,i){ return sig+'@'+i; }
+// 运算符的人读符号（摘要/预览用）
+function calcOpText(op){ return ({'+':'＋','-':'－','*':'×','/':'÷','>=':'≥','<=':'≤','==':'=','!=':'≠'})[op]||op; }
 // ───── 连线标签信号：连线可选 id（绑定后台字段时自动生成，如 edge_1），信号键=「连线id.标签英文名」 ─────
 function edgeById(id){ return id?edges.find(e=>e.id===id):null; }
 function edgeLabelSigKey(e){ return (e&&String(e.lblEn||'').trim())||''; }

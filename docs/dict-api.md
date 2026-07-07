@@ -20,14 +20,16 @@
   "applyTo": [                     // ★ 自动匹配：认领的后台字段(deviceType + location.field)
     { "deviceType": "BCU", "field": "StringDataLogs.String1State" }
   ],
-  "items": [                       // ★ code → 中/英文案；code 统一按字符串匹配(数字/字符串均可)
-    { "code": "0", "zh": "待机", "en": "Standby" },
+  "items": [                       // ★ 转义条目：等值(code)与条件(when)两种可并存
+    { "code": "0", "zh": "待机", "en": "Standby" },               // 等值：code 按字符串精确匹配(数字/字符串均可)
     { "code": "1", "zh": "充电", "en": "Charging" },
-    { "code": "2", "zh": "放电", "en": "Discharging" }
+    { "code": "2", "zh": "放电", "en": "Discharging" },
+    { "when": { "op": ">", "val": "80" }, "zh": "高", "en": "High" }   // 条件：字段值与常量比较/区间
   ]
 }
 ```
 
+- **条件条目**：`when.op` ∈ `> >= < <= == != in between else`（`in`/`between` 的 `val` 逗号分隔）。`between` 区间端点可选是否包含：纯 `"a,b"`=含两端（兼容旧数据），括号写法 `"[a,b)"`/`"(a,b]"`/`"(a,b)"` 按括号语义（`[ ]`=含、`( )`=不含）。`else`=兜底条目（无 `val`）：任何未被之前条目命中的值都归入，建议放最后。求值顺序：**code 精确匹配优先 → 条件按 items 顺序首中即用 → 都不中原样显示（有 `else` 则归入 `else`）**。比较语义与规则引擎同一实现（宽松数值/字符串比较，见 `packages/topology-runtime/rules.js` 的 `cmpOp`）。
 - **一张字典可认领多个后台字段**（`applyTo` 多项）：状态码相同的字段共用一份码表。
 - **码表不同的字段** → 各建一张字典。字典是「一套码表」的复用单元，与 Ruoyi 的 `dictType` 语义一致。
 - 画布字段/信号/连线标签**绑定了**被 `applyTo` 认领的后台字段 → 自动转义（零配置）；也可在元素上手动指定字典/强制不转义（见 realtime-data-api.md 第 9 节的三态 `dict` 属性）。
@@ -89,7 +91,8 @@
   "name": "电池状态",               // 必填
   "nameEn": "Battery Status",      // 必填
   "applyTo": [ {"deviceType":"BCU","field":"StringDataLogs.String1State"} ],  // 选填
-  "items": [ {"code":"0","zh":"待机","en":"Standby"}, … ]                      // 选填
+  "items": [ {"code":"0","zh":"待机","en":"Standby"},                          // 选填；等值/条件条目可并存
+             {"when":{"op":">","val":"80"},"zh":"高","en":"High"}, … ]
 }
 ```
 
@@ -98,7 +101,7 @@
 | 状态码 | 含义 |
 |---|---|
 | `200` | 成功 |
-| `400` | 缺 `type` / 缺 `name` / 缺 `nameEn` / 某条目 `code`、`zh`、`en` 缺失 / 同字典内 `code` 重复 |
+| `400` | 缺 `type` / 缺 `name` / 缺 `nameEn` / 等值条目 `code`、`zh`、`en` 缺失 / 同字典内 `code` 重复 / 条件条目 `when.op` 不在白名单（`> >= < <= == != in between`）、`zh`/`en` 缺失，或 `when.val` 格式不合法（`> >= < <=` 需数字；`between` 需两个数字（可带括号写法）；`in` 至少一个值；`== !=` 允许任意文本） |
 | `409` | `type` 已存在 / `name` 或 `nameEn` 与其它字典重复 |
 
 ### PUT `/api/value-dicts/:type`
@@ -115,7 +118,7 @@
 | 状态码 | 含义 |
 |---|---|
 | `200` | 成功 |
-| `400` | `name`/`nameEn` 为空 / 条目 `code·zh·en` 缺失 / `code` 重复 |
+| `400` | `name`/`nameEn` 为空 / 条目校验不过（同 POST：等值缺 `code·zh·en`、`code` 重复；条件缺 `when.val·zh·en` 或 `op` 非法） |
 | `404` | `type` 不存在 |
 | `409` | `name` / `nameEn` 与其它字典重复 |
 
@@ -147,7 +150,8 @@
   "name": "电池状态",
   "nameEn": "Battery Status",
   "applyTo": [ { "deviceType": "BCU", "field": "location.field" } ],
-  "items":   [ { "code": "0", "zh": "待机", "en": "Standby" } ]
+  "items":   [ { "code": "0", "zh": "待机", "en": "Standby" },
+               { "when": { "op": "between", "val": "20,80" }, "zh": "正常", "en": "Normal" } ]
 }
 ```
 
@@ -163,7 +167,7 @@
 | **导出全部** | `value-dicts.json`（`{schemaVersion:'vd-index-1',dicts:[…]}` 清单） |
 | **导入** | 多选文件；每个文件兼容 **单个字典对象 / 字典数组 / `{dicts:[…]}` 清单** 三种形态 |
 
-导入时前端做**宽松归一化**（`nameEn←name`、条目 `en←zh` 互兜底、`type` 非法字符清洗、无 `code` 条目剔除、同字典内 `code` 去重、`applyTo` 只保留合法 `location.field`），再逐条走 POST/PUT，因此手写的不完整 JSON 也能通过服务端强校验。同名 `type` 统一询问一次是否覆盖（覆盖走 PUT，跳过则只导新增）。
+导入时前端做**宽松归一化**（`nameEn←name`、条目 `en←zh` 互兜底、`type` 非法字符清洗、无 `code`/条件残缺（`op` 非法或缺 `val`）条目剔除、同字典内 `code` 去重、`applyTo` 只保留合法 `location.field`），再逐条走 POST/PUT，因此手写的不完整 JSON 也能通过服务端强校验。同名 `type` 统一询问一次是否覆盖（覆盖走 PUT，跳过则只导新增）。
 
 ---
 

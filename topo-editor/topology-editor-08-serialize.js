@@ -31,6 +31,36 @@ function buildLibraryObj(){
   };
 }
 
+// 计算绑定 calc 的导出形态：字段操作数逐个显式化（写全 deviceType/deviceId + followNode），常量原样；n=null 时不做节点兜底（全局信号）
+function serCalc(calc,n){
+  return {
+    operands:(calc.operands||[]).map(o=>{
+      if(o&&o.const!==undefined)return {const:o.const};
+      if(!o||!o.field)return null;
+      const follow=!(o.deviceType||o.deviceId);
+      return {field:o.field,
+        deviceType:o.deviceType||(n?(nodeDeviceType(n)||''):''),
+        deviceId:o.deviceId||(n?(n.deviceId||''):''),
+        followNode:follow};
+    }).filter(Boolean),
+    operators:(calc.operators||[]).slice(),
+    ...(calc.decimals!=null?{decimals:calc.decimals}:{})   // 数值结果小数位（缺省 2 不落字段）
+  };
+}
+// 计算绑定 → dataBindings 展开：每个字段操作数一条（signal=主信号键@操作数下标，calcOf=主信号键）。
+// 后端消费方式与普通条目完全一致：取 source → 以 signal 为键输出；主信号本身不推（前端按 calc 定义计算）。
+// 仅数据字段(nodeId=节点id)与全局信号(nodeId=null)支持计算绑定，连线标签不支持。
+function pushCalcBindings(out,sig,nodeId,label,calc,n){
+  (calc.operands||[]).forEach((o,i)=>{
+    if(!o||!o.field)return;
+    const deviceType=o.deviceType||(n?(nodeDeviceType(n)||''):'');
+    const deviceId=o.deviceId||(n?(n.deviceId||''):'');
+    const dev=deviceId?DEVICE_LIST.find(d=>d.deviceId===deviceId):null;
+    const source={deviceType,deviceId,field:o.field};
+    if(dev&&dev.deviceName)source.deviceName=dev.deviceName;
+    out.push({signal:calcOperandSig(sig,i), node:nodeId, label:label+' · 操作数'+(i+1), calcOf:sig, source});
+  });
+}
 // ───── 画布 JSON（每张图各一份）：轻量，只引用元素库版本，不内嵌整套库 ─────
 function buildJSON(){
   // 完整序列化每个节点（实例信息；图标/默认值由元素库按 type 解析）
@@ -66,7 +96,11 @@ function buildJSON(){
           // 值字典显式指定（undefined=自动匹配不导出；''=强制不转义；'xxx'=强制用该字典）
           ...(f.dict!==undefined&&f.dict!==null?{dict:f.dict}:{})
         };
-        if(f.bind&&f.bind.field){
+        if(f.bind&&bindIsCalc(f.bind)){
+          // ★ 计算绑定：导出 calc 定义（操作数逐个显式化，同单字段的 followNode 语义）；
+          //   主信号值由前端按公式计算，后台只推各操作数原始值（见 dataBindings 的 calcOf 条目）
+          fo.bind={calc:serCalc(f.bind.calc,n)};
+        }else if(f.bind&&f.bind.field){
           // 后台字段绑定：导出时把来源「显式化」——总是写全 deviceType/deviceId，并用 followNode 标明是否跟随本节点设备
           const follow=!(f.bind.deviceType||f.bind.deviceId);
           fo.bind={
@@ -158,7 +192,8 @@ function buildJSON(){
   if(customSignals&&customSignals.length) obj.signals=customSignals.map(s=>{
     // key.en 用真实英文名（空则保留空）——不兜底成中文名，否则草稿/导出重载后会掩盖「缺英文名」使校验失效
     const o={key:{zh:s.key||'', en:(s.keyEn||'')}, value:(s.dv==null?'':s.dv)};
-    if(s.bind&&s.bind.field)o.bind={field:s.bind.field, deviceType:s.bind.deviceType||'', deviceId:s.bind.deviceId||''};
+    if(s.bind&&bindIsCalc(s.bind))o.bind={calc:serCalc(s.bind.calc,null)};   // ★ 计算绑定（全局信号操作数已显式带设备）
+    else if(s.bind&&s.bind.field)o.bind={field:s.bind.field, deviceType:s.bind.deviceType||'', deviceId:s.bind.deviceId||''};
     if(s.dict!==undefined&&s.dict!==null)o.dict=s.dict;   // 值字典显式指定（同数据字段语义）
     return o;
   });
@@ -183,7 +218,10 @@ function buildJSON(){
   const dataBindings=[];
   nodes.forEach(n=>{
     (n.data||[]).forEach(f=>{
-      if(!f.bind||!f.bind.field||!fieldSigKey(f))return;
+      if(!f.bind||!fieldSigKey(f))return;
+      // ★ 计算绑定：展开为「每个字段操作数一条」（signal=主信号键@下标，calcOf=主信号键）；主信号不推、由前端计算
+      if(bindIsCalc(f.bind)){pushCalcBindings(dataBindings,fieldSig(n,f),n.id,f.key||fieldSigKey(f),f.bind.calc,n);return;}
+      if(!f.bind.field)return;
       const deviceType=f.bind.deviceType||nodeDeviceType(n)||'';
       const deviceId=f.bind.deviceId||n.deviceId||'';
       const dev=deviceId?DEVICE_LIST.find(d=>d.deviceId===deviceId):null;
@@ -204,7 +242,9 @@ function buildJSON(){
   });
   // 全局信号的后台绑定：signal=英文名(无节点前缀)，node=null 表示全局量
   (customSignals||[]).forEach(s=>{
-    if(!s.bind||!s.bind.field||!fieldSigKey(s))return;
+    if(!s.bind||!fieldSigKey(s))return;
+    if(bindIsCalc(s.bind)){pushCalcBindings(dataBindings,fieldSigKey(s),null,sigDisplayName(s),s.bind.calc,null);return;}
+    if(!s.bind.field)return;
     const deviceId=s.bind.deviceId||'';
     const dev=deviceId?DEVICE_LIST.find(d=>d.deviceId===deviceId):null;
     const source={deviceType:s.bind.deviceType||'', deviceId, field:s.bind.field};
@@ -221,21 +261,32 @@ function unboundBindingReport(){
   const miss=[];
   const haveDevices=DEVICE_LIST.length>0;
   const add=(n,f,reason)=>miss.push({node:n.id,label:nodeLabel(n),key:f.key,reason});
+  // 单个来源(设备+字段)的存在性检查：返回失败原因或 null（与单字段绑定同一套判定，计算绑定逐操作数复用）
+  const srcIssue=(dt,did,field)=>{
+    if(!did)return '缺设备实例';
+    if(haveDevices&&!DEVICE_LIST.some(d=>d.deviceId===did))return '设备实例不存在';
+    const dict=DEVICE_DICTS[dt];
+    if(dict&&dict.length){                              // 该类型字典已加载 → 校验字段确实存在
+      const p=String(field).split('.'),fld=p.pop(),loc=p.join('.');
+      const g=dict.find(x=>x.location===loc);
+      if(!g||!(g.fields||[]).includes(fld))return '字段不在字典';
+    }
+    return null;
+  };
   nodes.forEach(n=>{
     if(n.type==='anchor')return;                       // 占位点无数据
     (n.data||[]).forEach(f=>{
       if(!f.key)return;
-      if(!(f.bind&&f.bind.field)){add(n,f,'未绑定字段');return;}
-      const dt=f.bind.deviceType||nodeDeviceType(n)||'';
-      const did=f.bind.deviceId||n.deviceId||'';
-      if(!did){add(n,f,'缺设备实例');return;}
-      if(haveDevices&&!DEVICE_LIST.some(d=>d.deviceId===did)){add(n,f,'设备实例不存在');return;}
-      const dict=DEVICE_DICTS[dt];
-      if(dict&&dict.length){                            // 该类型字典已加载 → 校验字段确实存在
-        const p=String(f.bind.field).split('.'),fld=p.pop(),loc=p.join('.');
-        const g=dict.find(x=>x.location===loc);
-        if(!g||!(g.fields||[]).includes(fld)){add(n,f,'字段不在字典');return;}
+      if(!bindHasSource(f.bind)){add(n,f,'未绑定字段');return;}
+      if(bindIsCalc(f.bind)){                          // ★ 计算绑定：逐个字段操作数校验来源
+        for(const x of calcFieldOperands(f.bind)){
+          const r=srcIssue(x.o.deviceType||nodeDeviceType(n)||'', x.o.deviceId||n.deviceId||'', x.o.field);
+          if(r){add(n,f,'计算操作数'+(x.i+1)+'：'+r);return;}
+        }
+        return;
       }
+      const r=srcIssue(f.bind.deviceType||nodeDeviceType(n)||'', f.bind.deviceId||n.deviceId||'', f.bind.field);
+      if(r)add(n,f,r);
     });
   });
   // 连线标签绑定的完整性：绑定成立必须有 英文名(信号键段) + 设备实例（UI 已拦，此处兜手改/导入文件）
@@ -407,6 +458,26 @@ function syncToggle(onchangeAttr,checked){
   if(el)el.checked=!!checked;
 }
 // 把导出节点(serNode 的产物 / 内部节点)还原为内部节点对象
+// 导入的 calc 定义 → 内部形态：followNode（或缺省来源）操作数只存 field（跟随节点），显式来源固化 deviceType/deviceId。
+// 剔除无效操作数时，它「前面的那个运算符」一并剔除（与弹窗删除操作数同一语义），避免剩余操作数与运算符错位拼出另一条公式。
+function parseImportedCalc(calc){
+  const rawOps=Array.isArray(calc.operands)?calc.operands:[];
+  const rawOprs=Array.isArray(calc.operators)?calc.operators:[];
+  const operands=[],operators=[];
+  rawOps.forEach((o,i)=>{
+    let norm=null;
+    if(o&&o.const!==undefined)norm={const:o.const};
+    else if(o&&o.field)norm=(o.followNode||!(o.deviceType||o.deviceId))?{field:o.field}
+      :{field:o.field, ...(o.deviceType?{deviceType:o.deviceType}:{}), ...(o.deviceId?{deviceId:o.deviceId}:{})};
+    if(!norm)return;
+    if(operands.length>0)operators.push((i>0&&rawOprs[i-1]!=null)?rawOprs[i-1]:'+');   // 保留「紧挨本操作数之前」的运算符
+    operands.push(norm);
+  });
+  if(!operands.some(x=>x.field))return null;   // 没有任何字段操作数 → 无效计算绑定，丢弃
+  const out={operands,operators};
+  if(calc.decimals!=null)out.decimals=Math.max(0,Math.min(3,calc.decimals|0));   // 数值结果小数位（0~3，缺省 2）
+  return out;
+}
 function parseImportedNode(o){
   if(!o||!o.type)return null;
   const pos=o.position||{};
@@ -453,7 +524,11 @@ function parseImportedNode(o){
     if(f.chipBorderWidth!=null)fld.chipBorderWidth=+f.chipBorderWidth;
     if(f.chipRadius!=null)fld.chipRadius=(typeof f.chipRadius==='string'&&f.chipRadius.trim().endsWith('%'))?f.chipRadius:+f.chipRadius;
     if(f.dict!==undefined&&f.dict!==null)fld.dict=String(f.dict);   // 值字典显式指定（''=强制不转义）
-    if(f.bind&&f.bind.field){
+    if(f.bind&&f.bind.calc&&Array.isArray(f.bind.calc.operands)){
+      // ★ 计算绑定还原：followNode 操作数退回「跟随节点」（只存 field），显式来源固化 deviceType/deviceId
+      const c=parseImportedCalc(f.bind.calc);
+      if(c)fld.bind={calc:c};
+    }else if(f.bind&&f.bind.field){
       // followNode=true（或旧格式缺省 device）→ 内部只存 field 保持「跟随节点」；否则固化显式来源
       if(f.bind.followNode||!(f.bind.deviceType||f.bind.deviceId)) fld.bind={field:f.bind.field};
       else fld.bind={field:f.bind.field, ...(f.bind.deviceType?{deviceType:f.bind.deviceType}:{}), ...(f.bind.deviceId?{deviceId:f.bind.deviceId}:{})};

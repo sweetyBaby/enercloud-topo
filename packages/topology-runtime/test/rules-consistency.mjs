@@ -17,7 +17,7 @@ if (!m) { console.error("✗ 10-library-export.js 中找不到 RUNTIME_JS 模板
 const runtimeJs = m[1]
 
 // 按函数名抽体并归一化(去注释/空白/export 前缀/var|const 差异)比较
-const FNS = ["_num", "_looseEq", "_toList", "cmpOp", "evalCond", "buildContext", "resolveDynamic"]
+const FNS = ["_num", "_looseEq", "_toList", "cmpOp", "evalCond", "calcValue", "applyCalcSignals", "buildContext", "resolveDynamic"]
 function extractFn(src, name) {
   const re = new RegExp(`function\\s+${name}\\s*\\(`)
   const mm = re.exec(src)
