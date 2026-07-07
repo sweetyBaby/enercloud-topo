@@ -32,15 +32,52 @@ function readBody(req) {
     req.on('error', reject);
   });
 }
-// 条目校验（与编辑器弹框校验一致）：code/中文/英文三项必填、code 同字典内唯一；命中返回错误消息，否则 null
+// 条目两种形态（与编辑器弹框一致，可并存）：
+//   等值 {code,zh,en}；条件 {when:{op,val},zh,en}（op ∈ WHEN_OPS，与常量比较/区间，求值在 topology-runtime）
+// 'else' = 其他（兜底）：任何未被之前条目命中的值都归入，无比较值（按 items 顺序首中即用，建议放最后）
+const WHEN_OPS = new Set(['>', '>=', '<', '<=', '==', '!=', 'in', 'between', 'else']);
+function isWhenItem(it) { return !!(it && it.when && typeof it.when === 'object'); }
+// 条件条目「比较值」格式校验（与编辑器 _vdWhenValError 一致）：
+// > >= < <= 需数字；between 需两个数字（可带括号写法 [a,b) 等）；in 至少一个值；== != 允许任意文本。
+function whenValError(op, val) {
+  if (op === 'else') return null;   // 兜底条目无比较值
+  const s = String(val == null ? '' : val).trim();
+  if (!s) return 'when.val required';
+  const num = (v) => /^-?\d+(\.\d+)?$/.test(String(v).trim());
+  if (op === '>' || op === '>=' || op === '<' || op === '<=') return num(s) ? null : 'when.val must be a number for ' + op;
+  if (op === 'between') {
+    let body = s;
+    if (body.length > 1) {
+      const c0 = body.charAt(0), c1 = body.charAt(body.length - 1);
+      if ((c0 === '[' || c0 === '(') && (c1 === ']' || c1 === ')')) body = body.slice(1, -1);
+    }
+    const parts = body.split(',').map((x) => x.trim()).filter((x) => x !== '');
+    return (parts.length === 2 && parts.every(num)) ? null : 'when.val for between must be two numbers "a,b" (optionally bracketed like "[a,b)")';
+  }
+  if (op === 'in') {
+    const parts = s.split(',').map((x) => x.trim()).filter((x) => x !== '');
+    return parts.length ? null : 'when.val for in must list at least one value';
+  }
+  return null;
+}
+// 条目校验（与编辑器弹框校验一致）：等值条目 code/中文/英文必填、code 在等值条目内唯一；
+// 条件条目 op 需在白名单、比较值需通过格式校验、中文/英文必填。命中返回错误消息，否则 null
 function itemsError(items) {
   if (!Array.isArray(items)) return null;
   const seen = new Set();
   for (let i = 0; i < items.length; i++) {
     const it = items[i] || {};
-    const code = String(it.code == null ? '' : it.code).trim();
     const zh = String(it.zh || '').trim();
     const en = String(it.en || '').trim();
+    if (isWhenItem(it)) {
+      const op = String(it.when.op || '');
+      if (!WHEN_OPS.has(op)) return `item #${i + 1}: invalid when.op "${op}" (allowed: ${[...WHEN_OPS].join(' ')})`;
+      const vErr = whenValError(op, it.when.val);
+      if (vErr) return `item #${i + 1}: ${vErr}`;
+      if (!zh || !en) return `item #${i + 1}: zh/en are required`;
+      continue;
+    }
+    const code = String(it.code == null ? '' : it.code).trim();
     if (!code || !zh || !en) return `item #${i + 1}: code/zh/en are all required`;
     if (seen.has(code)) return `duplicate code: ${code}`;
     seen.add(code);
@@ -50,8 +87,10 @@ function itemsError(items) {
 // 归一化一份字典（POST/PUT 入库前统一清洗；items/applyTo 非法项静默剔除）
 function normalizeDict(type, body) {
   const items = (Array.isArray(body.items) ? body.items : [])
-    .filter((it) => it && it.code !== undefined && it.code !== null && String(it.code) !== '')
-    .map((it) => ({ code: String(it.code), zh: String(it.zh || ''), en: String(it.en || '') }));
+    .filter((it) => it && (isWhenItem(it) || (it.code !== undefined && it.code !== null && String(it.code) !== '')))
+    .map((it) => isWhenItem(it)
+      ? { when: { op: String(it.when.op), val: String(it.when.val == null ? '' : it.when.val) }, zh: String(it.zh || ''), en: String(it.en || '') }
+      : { code: String(it.code), zh: String(it.zh || ''), en: String(it.en || '') });
   const applyTo = (Array.isArray(body.applyTo) ? body.applyTo : [])
     .filter((a) => a && a.field)
     .map((a) => ({ deviceType: String(a.deviceType || ''), field: String(a.field) }));
@@ -83,7 +122,7 @@ function buildIndexFromDir(dir) {
       name: doc.name || type,
       nameEn: doc.nameEn || doc.name || type,
       applyTo: Array.isArray(doc.applyTo) ? doc.applyTo.filter((a) => a && a.field) : [],
-      items: Array.isArray(doc.items) ? doc.items.filter((it) => it && it.code !== undefined) : [],
+      items: Array.isArray(doc.items) ? doc.items.filter((it) => it && (it.code !== undefined || isWhenItem(it))) : [],
     });
   }
   return out;

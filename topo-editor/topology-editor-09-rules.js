@@ -10,7 +10,7 @@ const _OPT={'>=':'≥','<=':'≤','>':'>','<':'<','==':'=','!=':'≠','in':'∈'
 // 此处落回原全局名，编辑器预览与线上求值逐字同一套逻辑。
 const _num=TopoRules._num, _looseEq=TopoRules._looseEq, _toList=TopoRules._toList,
       cmpOp=TopoRules.cmpOp, evalCond=TopoRules.evalCond;
-['_num','_looseEq','_toList','cmpOp','evalCond'].forEach(k=>{
+['_num','_looseEq','_toList','cmpOp','evalCond','calcValue'].forEach(k=>{
   if(typeof TopoRules[k]!=='function')throw new Error('topology-runtime/rules 接线断言失败:缺少「'+k+'」');
 });
 function autoNum(v){if(typeof v!=='string')return v;const t=v.trim();if(t==='')return '';if(t==='true')return true;if(t==='false')return false;if(/^-?\d+(\.\d+)?$/.test(t))return parseFloat(t);return v;}
@@ -18,29 +18,50 @@ function autoNum(v){if(typeof v!=='string')return v;const t=v.trim();if(t==='')r
 function collectSignals(){
   const out=[],seen=new Set();
   const add=(name,label)=>{if(name&&!seen.has(name)){seen.add(name);out.push({name,label:label||name});}};
+  // 计算绑定的操作数信号（主信号键@下标）：后台按它推原始值 → 注入面板可模拟；主信号本身由公式算出
+  const addCalcOps=(sig,label,b)=>{calcFieldOperands(b).forEach(x=>add(calcOperandSig(sig,x.i),label+' · 操作数'+(x.i+1)+'（'+x.o.field+'）'));};
   nodes.forEach(n=>{
     // 节点的可用信号 = 仅它「合法的数据字段」；不合法(空名/同节点重名)字段不作为可用信号，避免选到半成品或重名冲突键
     const iss=fieldNameIssues(n);
-    (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i]))add(fieldSig(n,f),nodeLabel(n)+' · '+(f.key||fieldSigKey(f)));});
+    (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i])){
+      add(fieldSig(n,f),nodeLabel(n)+' · '+(f.key||fieldSigKey(f)));
+      addCalcOps(fieldSig(n,f),nodeLabel(n)+' · '+(f.key||fieldSigKey(f)),f.bind);
+    }});
   });
   // 连线标签信号：有 id + 英文名的连线标签（键=连线id.标签英文名）
   edges.forEach(e=>{const s=edgeLabelSig(e);if(s)add(s,edgeLabelDisplayName(e));});
   const gi=globalSigIssues();   // 全局信号：信号键=英文名，仅合法(中英文名必填且唯一)的入列
-  (customSignals||[]).forEach((s,i)=>{if(fieldSigKey(s)&&fieldNameOk(gi[i]))add(fieldSigKey(s),sigDisplayName(s));});
+  (customSignals||[]).forEach((s,i)=>{if(fieldSigKey(s)&&fieldNameOk(gi[i])){
+    add(fieldSigKey(s),sigDisplayName(s));
+    addCalcOps(fieldSigKey(s),sigDisplayName(s),s.bind);
+  }});
   return out;
 }
-// 构造求值上下文：静态默认值(节点字段dv/自定义样例) 叠加注入的样例值
+// 构造求值上下文：静态默认值(节点字段dv/自定义样例) 叠加注入的样例值，最后落计算绑定
+// （calc 清单在既有遍历里顺手收集——buildCtx 每帧被多次调用，避免为计算绑定再全量扫一遍 nodes/customSignals）
 function buildCtx(values){
-  const ctx={};
+  const ctx={},calcs=[];
   nodes.forEach(n=>{
     // 仅以节点「合法数据字段」的默认值入栈；不合法(空名/同节点重名)字段不参与求值，避免重名键相互覆盖
     const iss=fieldNameIssues(n);
-    (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i]))ctx[fieldSig(n,f)]=f.dv;});
+    (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i])){
+      const sig=fieldSig(n,f);ctx[sig]=f.dv;
+      if(bindIsCalc(f.bind))calcs.push([sig,f.bind]);
+    }});
   });
   edges.forEach(e=>{const s=edgeLabelSig(e);if(s&&e.lblVal!==undefined)ctx[s]=e.lblVal;});   // 连线标签信号的静态默认值
   const gi=globalSigIssues();
-  (customSignals||[]).forEach((s,i)=>{if(fieldSigKey(s)&&fieldNameOk(gi[i])&&s.dv!==undefined)ctx[fieldSigKey(s)]=s.dv;});
+  (customSignals||[]).forEach((s,i)=>{if(fieldSigKey(s)&&fieldNameOk(gi[i])){
+    if(s.dv!==undefined)ctx[fieldSigKey(s)]=s.dv;
+    if(bindIsCalc(s.bind))calcs.push([fieldSigKey(s),s.bind]);
+  }});
   if(values)Object.keys(values).forEach(k=>{ctx[k]=values[k];});
+  // ★ 计算绑定：由操作数信号(sig@i，来自注入/实时)算出主信号值；算不出保留静态默认/注入值
+  //   （求值单一实现 TopoRules.calcValue，与前端 buildContext→applyCalcSignals 同源）
+  calcs.forEach(([sig,b])=>{
+    const v=TopoRules.calcValue(b.calc,(o,i)=>ctx[calcOperandSig(sig,i)]);
+    if(v!==undefined)ctx[sig]=v;
+  });
   return ctx;
 }
 // 连线有效流向：按 dirRules 顺序匹配，首个命中生效，否则用 e.dir
@@ -615,7 +636,16 @@ function pruneInvalidInjections(){
 }
 // 某元素的「字段」可选项
 function fieldOptionsFor(node){
-  if(node==='@global'){const gi=globalSigIssues();return (customSignals||[]).map((s,i)=>({v:fieldSigKey(s),t:sigDisplayName(s),_bad:!fieldNameOk(gi[i])})).filter(o=>o.v&&!o._bad).map(o=>({v:o.v,t:o.t}));}
+  // 计算绑定：暴露各操作数信号（键段=字段英文名@下标）供注入模拟；主信号由公式算出，不直接注入
+  const calcOpts=(sigKey,label,b)=>calcFieldOperands(b).map(x=>({v:calcOperandSig(sigKey,x.i),t:label+' · 操作数'+(x.i+1)+'（'+x.o.field+'）'}));
+  if(node==='@global'){
+    const gi=globalSigIssues(),opts=[];
+    (customSignals||[]).forEach((s,i)=>{if(fieldSigKey(s)&&fieldNameOk(gi[i])){
+      opts.push({v:fieldSigKey(s),t:sigDisplayName(s)});
+      if(bindIsCalc(s.bind))opts.push(...calcOpts(fieldSigKey(s),sigDisplayName(s),s.bind));   // 主信号(=公式结果，注入操作数后被计算覆盖)+各操作数
+    }});
+    return opts;
+  }
   const ed=edgeById(node);   // 连线标签信号：一条连线只有一个标签字段（键段=标签英文名）
   if(ed)return edgeLabelSigKey(ed)?[{v:edgeLabelSigKey(ed),t:(ed.lbl||edgeLabelSigKey(ed))}]:[];
   const n=nodes.find(x=>x.id===node);if(!n)return [];
@@ -623,7 +653,10 @@ function fieldOptionsFor(node){
   // 信号值(v)=英文名(端到端信号键)；显示(t)=中文名，便于运营端识别
   const iss=fieldNameIssues(n);
   const opts=[];
-  (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i]))opts.push({v:fieldSigKey(f),t:(f.key||fieldSigKey(f))});});
+  (n.data||[]).forEach((f,i)=>{if(fieldSigKey(f)&&fieldNameOk(iss[i])){
+    opts.push({v:fieldSigKey(f),t:(f.key||fieldSigKey(f))});
+    if(bindIsCalc(f.bind))opts.push(...calcOpts(fieldSigKey(f),(f.key||fieldSigKey(f)),f.bind));   // 主信号(=公式结果，注入操作数后被计算覆盖)+各操作数
+  }});
   return opts;
 }
 // 某行「值」的下拉建议（在线→true/false；状态→常见状态；数值→当前静态值）
@@ -802,14 +835,16 @@ function normalizeSignal(s){
     if(!zh&&!en)return null;
     const o={key:zh, keyEn:en, dv:(s.value!==undefined?s.value:''), type:s.type};
     if(Array.isArray(s.options))o.options=s.options.slice();
-    if(s.bind&&s.bind.field)o.bind={field:s.bind.field, deviceType:s.bind.deviceType||'', deviceId:s.bind.deviceId||''};
+    if(s.bind&&s.bind.calc&&Array.isArray(s.bind.calc.operands)){const c=parseImportedCalc(s.bind.calc);if(c)o.bind={calc:c};}   // ★ 计算绑定
+    else if(s.bind&&s.bind.field)o.bind={field:s.bind.field, deviceType:s.bind.deviceType||'', deviceId:s.bind.deviceId||''};
     if(s.dict!==undefined&&s.dict!==null)o.dict=String(s.dict);   // 值字典显式指定（''=强制不转义）
     return o;
   }
   if(typeof s.key==='string'||s.keyEn){               // 已是内部格式
     const o={key:s.key||'', keyEn:s.keyEn||'', dv:(s.dv!==undefined?s.dv:''), type:s.type};
     if(Array.isArray(s.options))o.options=s.options.slice();
-    if(s.bind&&s.bind.field)o.bind={field:s.bind.field, deviceType:s.bind.deviceType||'', deviceId:s.bind.deviceId||''};
+    if(s.bind&&s.bind.calc&&Array.isArray(s.bind.calc.operands)){const c=parseImportedCalc(s.bind.calc);if(c)o.bind={calc:c};}   // ★ 计算绑定
+    else if(s.bind&&s.bind.field)o.bind={field:s.bind.field, deviceType:s.bind.deviceType||'', deviceId:s.bind.deviceId||''};
     if(s.dict!==undefined&&s.dict!==null)o.dict=String(s.dict);
     return o;
   }
@@ -843,7 +878,7 @@ function renderCustomSignals(){
     // 默认值：与数据字段一致的普通输入框（类型按值自动推断，无需单列）
     const dv=document.createElement('input');dv.className='df-val-in';dv.value=(s.dv==null?'':String(s.dv));dv.placeholder='--';dv.title='默认值（可留空）';dv.oninput=e=>{s.dv=e.target.value;invalidateRouting();};
     const acts=document.createElement('span');acts.className='df-acts';
-    const bound=!!(s.bind&&s.bind.field);
+    const bound=bindHasSource(s.bind);   // 单字段绑定或计算绑定（bind.calc）均视为已绑定
     const bindBtn=document.createElement('button');bindBtn.type='button';bindBtn.className='df-bind'+(bound?' bound':'');bindBtn.textContent='🔗';bindBtn.title=bound?'已绑定后台字段，点击修改':'绑定后台字段';bindBtn.onclick=()=>openGlobalBind(idx);
     // 值字典：显式指定(强制/不转义)高亮；默认自动匹配（bind 命中某字典 applyTo 即转义）
     const hasDict=(s.dict!==undefined&&s.dict!==null);
@@ -856,7 +891,8 @@ function renderCustomSignals(){
     acts.appendChild(bindBtn);acts.appendChild(dictBtn);acts.appendChild(del);
     wrap.appendChild(zh);wrap.appendChild(en);wrap.appendChild(dv);wrap.appendChild(acts);
     if(bound){
-      const bl=document.createElement('div');bl.className='df-bindline'+((s.bind.deviceId)?'':' warn');
+      const _ok=bindIsCalc(s.bind)?calcFieldOperands(s.bind).every(x=>!!x.o.deviceId):!!s.bind.deviceId;
+      const bl=document.createElement('div');bl.className='df-bindline'+(_ok?'':' warn');
       const sum=document.createElement('span');sum.className='df-bindsum';sum.textContent='↳ '+(sigDisplayName(s)||('信号'+(idx+1)))+'  ←  '+globalBindSummary(s);sum.onclick=()=>openGlobalBind(idx);sum.title='点击编辑绑定';
       const clr=document.createElement('button');clr.type='button';clr.className='df-bindclr';clr.textContent='✕';clr.title='清除此信号的绑定';clr.onclick=()=>clearGlobalBind(idx);
       bl.appendChild(sum);bl.appendChild(clr);wrap.appendChild(bl);
@@ -869,9 +905,11 @@ function refreshGlobalSigValidity(){
   const zhs=document.querySelectorAll('#sim-custom .df-zh-in'), ens=document.querySelectorAll('#sim-custom .df-en-in');
   gi.forEach((s,i)=>{ if(zhs[i])zhs[i].classList.toggle('df-invalid',s.emptyZh||s.dupZh); if(ens[i])ens[i].classList.toggle('df-invalid',s.emptyEn||s.dupEn); });
 }
-// 全局信号后台绑定摘要
+// 全局信号后台绑定摘要（计算绑定显示整条公式）
 function globalBindSummary(s){
-  if(!s.bind||!s.bind.field)return '';
+  if(!s.bind)return '';
+  if(bindIsCalc(s.bind))return calcBindSummary(s.bind.calc,null);
+  if(!s.bind.field)return '';
   const did=s.bind.deviceId||'', dt=s.bind.deviceType||'';
   if(!did)return '⚠ 未指定设备实例 · '+s.bind.field;
   return (dt?deviceTypeLabel(dt)+'·':'')+deviceNameOf(did)+' / '+s.bind.field;

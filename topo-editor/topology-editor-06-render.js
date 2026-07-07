@@ -716,10 +716,19 @@ function fieldChipPos(n,i){
   const ox=(f.ox!=null?f.ox:0), oy=(f.oy!=null?f.oy:0);   // ox/oy 以屏幕像素存储
   return {x:baseX+ox/zoom, y:baseY+oy/zoom, h:cfs*1.5, cfs};
 }
+// 字段卡片显示的原始值：计算绑定按操作数信号(注入/实时)现算（TopoRules.calcValue 单一实现），算不出回退静态默认 f.dv
+function fieldChipRawValue(n,f){
+  if(bindIsCalc(f.bind)){
+    const sig=fieldSig(n,f);
+    const v=TopoRules.calcValue(f.bind.calc,(o,i)=>signalValues[calcOperandSig(sig,i)]);
+    if(v!==undefined)return v;
+  }
+  return f.dv;
+}
 function fieldChipText(n,f){
   const k=dataKey(f);
   // 值经值字典转义显示（f.dict 显式 > bind 命中 applyTo 自动 > 原样）；有值就显示（含 0）；无值(null/空串)显示空
-  return k+': '+fieldDisplayValue(f,nodeDeviceType(n));
+  return k+': '+translateFieldValue(f,fieldChipRawValue(n,f),nodeDeviceType(n));
 }
 function drawFieldChips(n,s){
   if(n.hideFields||!showFieldChips||!n.data||n.data.length===0)return;
@@ -732,8 +741,12 @@ function drawFieldChips(n,s){
     // 预览/运行态：不合法字段不展示给终端用户（半成品/信号键冲突字段不入图）
     if(previewMode&&_bad){ f._chipBox=null; return; }
     const pos=fieldChipPos(n,i);
+    // 每个 chip 一帧只求值一次（量宽与下方绘制共用）：计算绑定的公式求值/字典转义不便宜，不重复算
+    const _raw=_bad?null:fieldChipRawValue(n,f);
+    const _hv=(_raw!=null&&_raw!=='');         // 有值(含 0)→强调色显示；无值→留空
+    const _val=_hv?translateFieldValue(f,_raw,nodeDeviceType(n)):'';   // 值字典转义（与 fieldChipText 同源）
     // 编辑态下不合法字段显示醒目告警文案（替代丑陋的空「: 」），提示运营端修正
-    const txt=_bad ? ('⚠ '+(((_s.emptyZh||_s.emptyEn)?((dataKey(f)||'未命名')+'·缺名'):(dataKey(f)+'·重名')))) : fieldChipText(n,f);
+    const txt=_bad ? ('⚠ '+(((_s.emptyZh||_s.emptyEn)?((dataKey(f)||'未命名')+'·缺名'):(dataKey(f)+'·重名')))) : (dataKey(f)+': '+_val);
     ctx.font=pos.cfs+"px -apple-system,'Microsoft YaHei',sans-serif";ctx.textAlign='left';ctx.textBaseline='alphabetic';
     const _m=ctx.measureText(txt),tw=_m.width;
     const padX=7/zoom, padY=4/zoom;   // 屏幕固定（随 1/zoom）
@@ -782,10 +795,8 @@ function drawFieldChips(n,s){
       // 文字：字段名浅色，值强调色；节点设了 fieldFontColor（统一设置·数据字段）则整条用该色
       const k=dataKey(f), kw=ctx.measureText(k+': ').width;
       ctx.fillStyle=n.fieldFontColor||'#9fc0dd';ctx.fillText(k+': ',bx+padX,yb);
-      const _hv=(f.dv!=null&&f.dv!=='');         // 有值(含 0)→强调色显示；无值→留空
-      const v=_hv?fieldDisplayValue(f,nodeDeviceType(n)):'';   // 值字典转义（与 fieldChipText 同源，量宽/绘制一致）
-      ctx.fillStyle=_hv?(n.fieldFontColor||'#4dd0ff'):'#6b8299';
-      ctx.fillText(''+v,bx+padX+kw,yb);
+      ctx.fillStyle=_hv?(n.fieldFontColor||'#4dd0ff'):'#6b8299';   // 值复用循环顶部算好的 _hv/_val（量宽/绘制一致）
+      ctx.fillText(''+_val,bx+padX+kw,yb);
     }
     ctx.shadowBlur=0;   // 复位，避免阴影影响后续绘制
     f._chipBox={x:bx,y:by,w:bw,h:bh};
