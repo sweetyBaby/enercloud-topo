@@ -82,14 +82,14 @@ var TopoRules = (function () {
       var v=(o.const!==undefined)?o.const:get(o,i);
       if(v==null||v==='')return undefined;
       if(i===0){acc=v;continue;}
-      var op=ops[i-1]||'+';
+      var op=ops[i-1];
       if(op==='+'||op==='-'||op==='*'||op==='/'||op==='%'){
         var a=_num(acc),b=_num(v);
         acc=(op==='+')?a+b:(op==='-')?a-b:(op==='*')?a*b:(op==='/')?a/b:a%b;
       }else if(op==='>'||op==='>='||op==='<'||op==='<='||op==='=='||op==='!='){
         acc=cmpOp(acc,op,v)?1:0;
       }else{
-        return undefined;   // 未知运算符（手改/坏数据）：不猜语义，与操作数缺值同一降级——保留静态默认值
+        return undefined;   // 未知/缺失/空串运算符（手改/坏数据）：不猜语义，与操作数缺值同一降级——保留静态默认值
       }
     }
     if(typeof acc==='number'){
