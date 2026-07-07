@@ -67,6 +67,8 @@ export function calcValue(calc, get){
     if(op==='+'||op==='-'||op==='*'||op==='/'||op==='%'){
       var a=_num(acc),b=_num(v);
       acc=(op==='+')?a+b:(op==='-')?a-b:(op==='*')?a*b:(op==='/')?a/b:a%b;
+      // 算术中间结果非有限数（非数字操作数/除零）：立即降级——否则 NaN/Infinity 流入后续比较会得出假 1/0
+      if(!isFinite(acc))return undefined;
     }else if(op==='>'||op==='>='||op==='<'||op==='<='||op==='=='||op==='!='){
       acc=cmpOp(acc,op,v)?1:0;
     }else{
