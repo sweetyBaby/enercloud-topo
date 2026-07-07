@@ -164,6 +164,8 @@ export interface TopoRuntime {
   anchorPoint(n: TopoRuntimeNode, tx: number, ty: number): Pt
   clamp(v: number, min: number, max: number): number
   isLinearBusNode(n: TopoRuntimeNode | null | undefined): boolean
+  /** 标注类元素（text/variable/anchor）不参与连线避障；此谓词为 false 即不作障碍 */
+  isRouteObstacle(n: TopoRuntimeNode | null | undefined): boolean
   linearBusSpan(n: TopoRuntimeNode): { y: number; left: number; right: number; cx: number }
   linearBusPort(n: TopoRuntimeNode, wx: number): PortHit
   nodePortPoint(n: TopoRuntimeNode, port: string | undefined): Pt | null
@@ -204,6 +206,14 @@ export interface TopoRuntime {
   computeSmartEdge(e: TopoRuntimeEdge): Pt[] | null
   edgePath(e: TopoRuntimeEdge): Pt[] | null
   edgeAt(wx: number, wy: number): TopoRuntimeEdge | null
+  /** edgeAt 的增强版：返回连线上离 (wx,wy) 最近的点及所在段（占位点吸附/分接用）。
+   *  tol：世界坐标容差（缺省 9/zoom）；skip(e)：返回 true 的连线跳过 */
+  edgeHitInfo(
+    wx: number,
+    wy: number,
+    tol?: number | null,
+    skip?: (e: TopoRuntimeEdge) => boolean,
+  ): { edge: TopoRuntimeEdge; point: Pt; segIndex: number; dist: number } | null
   segsCross(a: Pt, b: Pt, c: Pt, d: Pt): boolean
   pathsCross(p1: Pt[], p2: Pt[]): boolean
   _pathLen(p: Pt[] | null): number
