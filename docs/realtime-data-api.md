@@ -242,6 +242,37 @@ TopoRuntime.mergeSignals({...});  // 增量合并（= topo:merge）
 - **键必须逐字对齐**：`signal` 与画布里的 `节点id`、字段英文名逐字一致（含大小写、括号如 `(kW)`/`(%)`）；对不上的键前端静默丢弃、不更新卡片。
 - `dataBindings` 与实时数据「同源不同用」：`dataBindings` 是**配置期**的映射清单（后端据此建采集/映射），实时 JSON 是**运行期**每帧推送的值；后端最终推的仍是第 1 节那份扁平对象。
 
+### 8.6 计算绑定（多字段/常量的计算或比较）—— `calcOf` 操作数条目
+
+画布字段/全局信号可绑定为**多操作数链式计算/比较**（如 `总功率 = pcs1.P + pcs2.P`、`过载 = P > 100`）。此时该信号在 `dataBindings[]` 里**不是一条，而是每个「字段操作数」各一条**，用 `calcOf` 标记归属：
+
+```jsonc
+// 字段「pcs_1.TotalP」绑定为  d1 的 Logs.P ＋ d2 的 Logs.P（常量操作数不产生条目）
+{ "signal": "pcs_1.TotalP@0", "node": "pcs_1", "label": "总功率 · 操作数1",
+  "calcOf": "pcs_1.TotalP",
+  "source": { "deviceType": "PCS", "deviceId": "d1", "field": "Logs.P" } },
+{ "signal": "pcs_1.TotalP@1", "node": "pcs_1", "label": "总功率 · 操作数2",
+  "calcOf": "pcs_1.TotalP",
+  "source": { "deviceType": "PCS", "deviceId": "d2", "field": "Logs.P" } }
+```
+
+- **后端零新逻辑**：这些条目的消费方式与普通条目**完全一致**——取 `source` → 以 `signal` 为键输出原始值。`calcOf` 仅是标记，可忽略。
+- **主信号不推**：`pcs_1.TotalP` 本身**不在** `dataBindings` 里、后端**不用**推它——前端/画布按导出 JSON 里的计算定义（`nodes[].data[].bind.calc`，见下）用操作数实时值算出主信号，再走规则求值与显示。
+- **操作数键命名**：`主信号键@操作数下标`（下标为计算式里操作数的位置，常量操作数占位但不产生条目）。
+- 计算定义结构（随画布 JSON 的字段/信号导出）：
+  ```jsonc
+  "bind": { "calc": {
+    "operands": [                                   // 操作数：后台字段 或 常量（const）
+      { "field":"Logs.P","deviceType":"PCS","deviceId":"d1","followNode":false },
+      { "field":"Logs.P","deviceType":"PCS","deviceId":"d2","followNode":false },
+      { "const": 0.95 }
+    ],
+    "operators": ["+","*"],                         // 长度=operands-1；左→右依次结合（无括号/优先级）
+    "decimals": 3                                   // 可选：数值结果保留小数位（0~3，缺省 2）
+  } }
+  ```
+  运算符集合：算术 `+ - * / %`；比较 `> >= < <= == !=`（结果为 `1/0`，可再配值字典转文案，见第 9 节）。数值结果按 `decimals` 四舍五入（缺省 2 位；中间步骤全精度，只在最终结果取整；比较结果 `1/0` 不受影响）。求值单一实现在 `topology-runtime/rules.js` 的 `calcValue`（`buildContext` 内自动落值），前端与编辑器预览同源。
+
 ---
 
 ## 9. 值字典 `valueDicts` —— code 码值的中/英显示转义
@@ -258,13 +289,32 @@ TopoRuntime.mergeSignals({...});  // 增量合并（= topo:merge）
   "applyTo": [                     // ★ 自动匹配声明：认领的后台字段（deviceType + location.field）
     { "deviceType": "BCU", "field": "AuxDataLogs.RunStatus" }
   ],
-  "items": [                       // ★ code → 中/英文案；code 统一按字符串匹配（数字/字符串均可）
-    { "code": "0", "zh": "待机",  "en": "Standby" },
+  "items": [                       // ★ 转义条目：等值（code）与条件（when）两种可并存
+    { "code": "0", "zh": "待机",  "en": "Standby" },              // 等值：code 统一按字符串匹配（数字/字符串均可）
     { "code": "1", "zh": "充电",  "en": "Charging" },
     { "code": "2", "zh": "放电",  "en": "Discharging" }
   ]
 }
 ```
+
+条目也可以是**条件项**——字段原始值与常量比较/区间命中即转义（如 SOC 档位、阈值告警）：
+
+```jsonc
+"items": [
+  { "code": "0",                            "zh": "停机", "en": "Down"   },   // 等值优先
+  { "when": { "op": "<",       "val": "20"    }, "zh": "低",   "en": "Low"    },
+  { "when": { "op": "between", "val": "20,80"  }, "zh": "正常", "en": "Normal" },   // 区间：纯 "a,b" = 含两端
+  { "when": { "op": "between", "val": "(80,95]" }, "zh": "偏高", "en": "Highish" },  // 括号写法：( )=不含端点、[ ]=含端点
+  { "when": { "op": ">",       "val": "95"     }, "zh": "高",   "en": "High"   },
+  { "when": { "op": "else"                     }, "zh": "未知", "en": "Unknown" }    // 兜底：任何未命中的值（建议放最后）
+]
+```
+
+- `when.op` ∈ `> >= < <= == != in between else`（`in`/`between` 的 `val` 用逗号分隔；`else`=兜底、无 `val`），比较语义与规则引擎同一实现（宽松数值/字符串比较）。
+- **兜底条目 `else`**：任何未被之前条目命中的值都归入（含非数字/异常值），文案自定义。不配 `else` 时未命中回退原样显示（不吞值，利于排错）——按需选择。
+- **区间端点**：`between` 的 `val` 支持四种写法——`"a,b"`（含两端，兼容旧数据）、`"[a,b)"`（含左不含右）、`"(a,b]"`（含右不含左）、`"(a,b)"`（不含两端）。编辑器条件行选「∈ 区间」后出现端点下拉，自动拼写法；规则条件（`visibleWhen`/`dirRules` 等）的 `between` 同样支持该写法（同一 `cmpOp` 实现）。
+- **求值顺序**：`code` 精确匹配优先 → 条件项按 `items` 顺序**首中即用** → 都不中回退原样显示。
+- 「与**另一后台字段**的计算/比较结果转义」：用第 8.6 节的**计算绑定**把比较结果（`1/0`）绑到字段上，再配普通枚举字典（`1→过载 / 0→正常`）。字典本身不引用其它字段，保持跨拓扑共享、与画布解耦。注意：计算绑定无单一「认领字段」，**不参与 `applyTo` 自动匹配**——需要转义时在字段上显式指定 `dict`。
 
 ### 9.2 怎么关联到画布字段（两条路径）
 
@@ -292,9 +342,9 @@ const text2 = rt.translateFieldValue(f, v);
 
 ### 9.4 转义规则（务必与编辑器一致，皆由包内同一实现保证）
 
-- **匹配**：`String(code)` 比较——后台推 `1`（数字）与字典里 `"1"`（字符串）视为同一 code。
-- **语言**：当前语言取 `zh`/`en` 列。编辑器录入时 **code / 中文 / 英文均必填、code 同字典内唯一**（弹框与 `/api/value-dicts` 双重校验）；运行时对手写/历史字典文件仍保留 **`en` 缺失回退 `zh`** 的容错，不出现空白。
-- **回退**：code 未命中字典项、或字典不存在 → **原样显示原始值**（不吞值）。
+- **匹配**：等值项 `String(code)` 比较——后台推 `1`（数字）与字典里 `"1"`（字符串）视为同一 code；条件项（`when`）在等值项都未命中后按顺序求值，首中即用。
+- **语言**：当前语言取 `zh`/`en` 列。编辑器录入时 **code（或条件比较值）/ 中文 / 英文均必填、code 同字典内唯一**（弹框与 `/api/value-dicts` 双重校验）；运行时对手写/历史字典文件仍保留 **`en` 缺失回退 `zh`** 的容错，不出现空白。
+- **回退**：原始值未命中任何条目、或字典不存在 → **原样显示原始值**（不吞值）。
 - **规则不受影响**：`visibleWhen`/`dirRules` 等条件比较的是**原始 code**，写规则时用 code 而不是转义文案。
 
 ### 9.5 字典数据从哪来

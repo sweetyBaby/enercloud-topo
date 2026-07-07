@@ -72,14 +72,37 @@ export interface BusTrunk {
   _shared?: boolean
 }
 
-/** 值字典条目：一个 code 码的中/英显示文案 */
+/** 值字典条目：等值项（code）与条件项（when）二选一，可在同一字典内并存。
+ *  求值顺序：code 精确匹配优先 → 条件项按 items 顺序首中即用 → 都不中回退原样显示。 */
 export interface ValueDictItem {
-  /** code 码（后台原始值；匹配时统一 String() 比较，数字/字符串均可） */
-  code: string | number
+  /** 等值项：code 码（后台原始值；匹配时统一 String() 比较，数字/字符串均可） */
+  code?: string | number
+  /** 条件项：字段原始值与常量比较/区间（op ∈ > >= < <= == != in between else；between/in 的 val 逗号分隔；
+   *  else=兜底、无 val——任何未被之前条目命中的值归入，建议放最后） */
+  when?: { op: string; val?: string | number }
   /** 中文文案 */
   zh?: string
   /** 英文文案（缺失时回退中文） */
   en?: string
+}
+
+/** 计算绑定操作数：后台字段（field）或常量（const）二选一 */
+export interface CalcOperand {
+  field?: string
+  deviceType?: string
+  deviceId?: string
+  /** 常量操作数 */
+  const?: string | number
+}
+
+/** 计算绑定：多操作数链式计算/比较（左→右依次结合，无优先级）。
+ *  operators.length = operands.length-1；op ∈ + - * / % > >= < <= == !=（比较结果 1/0）。
+ *  字段操作数的实时值按「主信号键@操作数下标」推送（dataBindings 带 calcOf 的条目）。 */
+export interface CalcBind {
+  operands: CalcOperand[]
+  operators: string[]
+  /** 数值结果保留小数位（0~3，缺省 2；比较结果 1/0 不受影响，中间步骤保持全精度） */
+  decimals?: number
 }
 
 /** 值字典：code 码 → 显示文案 的转义表（编辑器与前端渲染器共用） */
@@ -102,7 +125,8 @@ export interface ValueDictField {
   dv?: unknown
   /** 显式字典指定：undefined=自动匹配；''=强制不转义；'xxx'=强制用该字典 */
   dict?: string
-  bind?: { field?: string; deviceType?: string; deviceId?: string }
+  /** 单字段绑定（field）或计算绑定（calc）；计算绑定不参与 applyTo 自动匹配（需转义时显式指定 dict） */
+  bind?: { field?: string; deviceType?: string; deviceId?: string; calc?: CalcBind }
 }
 
 export interface TopoRuntimeConfig {

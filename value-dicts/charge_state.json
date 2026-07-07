@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "vd-1",
+  "type": "charge_state",
+  "name": "充放电状态",
+  "nameEn": "charge_state",
+  "applyTo": [
+    {
+      "deviceType": "BCU",
+      "field": "AuxDataLogs.PackCurrent"
+    }
+  ],
+  "items": [
+    {
+      "when": {
+        "op": ">",
+        "val": "1"
+      },
+      "zh": "充电",
+      "en": "Charging"
+    },
+    {
+      "when": {
+        "op": "<",
+        "val": "-1"
+      },
+      "zh": "放电",
+      "en": "Discharging"
+    },
+    {
+      "when": {
+        "op": "else",
+        "val": ""
+      },
+      "zh": "待机",
+      "en": "Standby"
+    }
+  ]
+}

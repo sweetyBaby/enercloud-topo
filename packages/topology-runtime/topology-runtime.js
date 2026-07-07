@@ -85,9 +85,25 @@ function createTopoRuntime(env) {
   function dataKey(f){ const lang=getLang(); return lang==='en' ? (f.keyEn||f.key) : f.key; }
 
   // ═════════ 值字典（code 码 → 中/英显示文案；编辑器画布与前端渲染器共用的单一实现）═════════
-  // 字典结构：{type, name, nameEn, applyTo:[{deviceType, field:'location.field'}], items:[{code, zh, en}]}
+  // 字典结构：{type, name, nameEn, applyTo:[{deviceType, field:'location.field'}], items:[条目...]}
+  //   条目两种形态可并存：
+  //   · 等值：{code, zh, en} —— code 按字符串精确匹配（现状语义）
+  //   · 条件：{when:{op,val}, zh, en} —— 字段原始值与常量比较/区间命中即转义
+  //     （op ∈ > >= < <= == != in between，求值复用规则引擎 TopoRules.cmpOp，宽松数值/字符串比较）
+  //   求值顺序：code 精确匹配优先 → 条件项按 items 顺序首中即用 → 都不中回退原样显示。
   // 解析优先级：字段显式 f.dict（''=强制不转义）> f.bind 命中某字典 applyTo（自动匹配）> 不转义。
+  //   计算绑定(bind.calc)无单一「认领字段」，不参与 applyTo 自动匹配——比较结果(1/0)等需转义时显式指定 f.dict。
   // 规则引擎不经过这里——signalValues 永远存原始 code，规则比较用 code；转义只发生在展示层。
+  // 条件项比较算子复用 packages/topology-runtime/rules.js 的 cmpOp（单一事实源）：
+  //   浏览器 <script> 场景取全局 TopoRules（本文件先于 rules.js 加载，但调用发生在运行期，届时已就绪）；
+  //   Node/打包器场景 require('./rules')。都取不到时条件项跳过（仅等值生效）并告警一次。
+  let _warnedNoRules=false;
+  function _dictCmp(){
+    if(typeof TopoRules!=='undefined'&&TopoRules&&typeof TopoRules.cmpOp==='function')return TopoRules.cmpOp;
+    if(typeof require==='function'){try{const r=require('./rules');if(r&&typeof r.cmpOp==='function')return r.cmpOp;}catch(e){}}
+    if(!_warnedNoRules){_warnedNoRules=true;if(typeof console!=='undefined'&&console.warn)console.warn('[topology-runtime] 未找到 TopoRules(rules.js)，值字典条件项(when)将被跳过——请与 rules.js 一同加载');}
+    return null;
+  }
   function findValueDict(type){
     if(!type)return null;
     const ds=getValueDicts()||[];
@@ -110,11 +126,21 @@ function createTopoRuntime(env) {
     }
     return null;
   }
-  // 查字典项：String() 匹配（后台 code 可能是数字/字符串），命中返回当前语言文案（en 缺失回退 zh），未命中返回 null
+  // 条件项 op 白名单：未知 op（手改/坏数据）直接视为不命中——cmpOp 对未知 op 的 default 分支返回 true，
+  // 若不拦会把畸形条目变成吞掉一切的兜底；显式兜底请用 op:'else'
+  const _VD_WHEN_OPS={'>':1,'>=':1,'<':1,'<=':1,'==':1,'!=':1,'in':1,'between':1};
+  // 查字典项：等值项 String() 精确匹配优先（后台 code 可能是数字/字符串），
+  // 再按 items 顺序扫条件项（when={op,val}，首中即用）；命中返回当前语言文案（en 缺失回退 zh），未命中返回 null
   function valueDictLabel(dictOrType, code){
     const d=typeof dictOrType==='string'?findValueDict(dictOrType):dictOrType;
     if(!d||code==null||code==='')return null;
-    const it=(d.items||[]).find(i=>i&&String(i.code)===String(code));
+    const items=d.items||[];
+    let it=items.find(i=>i&&i.code!==undefined&&i.code!==null&&String(i.code)===String(code));
+    if(!it){
+      const cmp=_dictCmp();
+      // 'else' = 兜底条目：任何未被之前条目命中的值都归入（按 items 顺序首中即用，建议放最后）
+      if(cmp)it=items.find(i=>i&&i.when&&i.when.op&&(i.when.op==='else'||(_VD_WHEN_OPS[i.when.op]&&cmp(code,i.when.op,i.when.val))));
+    }
     if(!it)return null;
     const s=getLang()==='en'?(it.en||it.zh):(it.zh||it.en);
     return (s==null||s==='')?null:String(s);

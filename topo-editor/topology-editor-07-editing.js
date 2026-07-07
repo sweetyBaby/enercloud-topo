@@ -549,7 +549,7 @@ function renderDFs(n){const c=document.getElementById('dfields');c.className='df
   const _issues=fieldNameIssues(n);
   (n.data||[]).forEach((f,i)=>{
     const dvVal=(f.dv==null||f.dv==='')?'':String(f.dv);   // 原始值；下方统一用 tplEsc 转义
-    const bound=!!(f.bind&&f.bind.field);
+    const bound=bindHasSource(f.bind);   // 单字段绑定或计算绑定（bind.calc）均视为已绑定
     // 值字典状态：显式指定(强制/不转义)高亮；否则按 bind 自动匹配（title 提示当前生效字典）
     const hasDict=(f.dict!==undefined&&f.dict!==null);
     const effDict=resolveValueDict(f,nodeDeviceType(n));
@@ -575,7 +575,9 @@ function renderDFs(n){const c=document.getElementById('dfields');c.className='df
     }
     // 已绑定 → 整行(跨全部列)紧贴显示来源（前缀字段名，杜绝歧义）+ ✕ 快速清除
     if(bound){
-      const noInst=!(f.bind.deviceId||n.deviceId);
+      const noInst=bindIsCalc(f.bind)
+        ?calcFieldOperands(f.bind).some(x=>!(x.o.deviceId||n.deviceId))   // 计算绑定：任一字段操作数解析不到设备实例即告警
+        :!(f.bind.deviceId||n.deviceId);
       html+='<div class="df-bindline'+(noInst?' warn':'')+'">'+
         '<span class="df-bindsum" onclick="openFieldBind('+i+')" title="点击编辑绑定">↳ '+tplEsc((f.key||('字段'+(i+1)))+'  ←  '+fieldBindSummary(n,f))+'</span>'+
         '<button class="df-bindclr" onclick="clearFieldBind('+i+')" title="清除此字段的绑定">✕</button></div>';
@@ -644,15 +646,192 @@ function applyDeviceBind(what){
   }
   refreshDeviceBindUI(n); renderDFs(n); snapshot();
 }
-// 某字段绑定的可读摘要：跨设备时加 ⮕ 标记
+// 计算绑定的可读摘要：= 操作数1 op 操作数2 …（字段操作数带设备名，常量原样；n 为空时不做「跟随节点」兜底）
+function calcBindSummary(calc,n){
+  const parts=[];
+  (calc.operands||[]).forEach((o,i)=>{
+    if(i>0)parts.push(calcOpText((calc.operators||[])[i-1]||'+'));
+    if(o&&o.const!==undefined){parts.push(String(o.const));return;}
+    if(!o||!o.field){parts.push('?');return;}
+    const dt=o.deviceType||(n?nodeDeviceType(n):'');
+    const did=o.deviceId||(n?(n.deviceId||''):'');
+    parts.push((dt?deviceTypeLabel(dt)+'·':'')+(did?deviceNameOf(did):'⚠未指定实例')+'/'+o.field);
+  });
+  return '= '+parts.join(' ');
+}
+// 某字段绑定的可读摘要：跨设备时加 ⮕ 标记；计算绑定显示整条公式
 function fieldBindSummary(n,f){
-  if(!f.bind||!f.bind.field)return '';
+  if(!f.bind)return '';
+  if(bindIsCalc(f.bind))return calcBindSummary(f.bind.calc,n);
+  if(!f.bind.field)return '';
   const dt=f.bind.deviceType||nodeDeviceType(n);
   const did=f.bind.deviceId||n.deviceId||'';
   const cross=(f.bind.deviceType&&f.bind.deviceType!==nodeDeviceType(n))||(f.bind.deviceId&&f.bind.deviceId!==(n.deviceId||''));
   if(!did)  // 没解析到设备实例 → 绑定不完整，明确提示
     return '⚠ 未指定设备实例 · '+(dt?deviceTypeLabel(dt)+'·':'')+f.bind.field;
   return (cross?'⮕ ':'')+(dt?deviceTypeLabel(dt)+'·':'')+deviceNameOf(did)+' / '+f.bind.field;
+}
+// ───── 计算绑定编辑器（绑定弹窗「计算/比较」模式，数据字段/全局信号共用）─────
+// 工作副本 _fbCalc={operands:[{kind:'field',deviceId,deviceType,loc,fld}|{kind:'const',v}],operators:[op,...]}，
+// 确定时经 _fbCalcCollect 校验并固化为 bind={calc:{operands,operators}}。求值单一实现在 TopoRules.calcValue。
+const CALC_OPS=['+','-','*','/','%','>','>=','<','<=','==','!='];
+const CALC_CMP_OPS=['>','>=','<','<=','==','!='];
+const CALC_NUM_OPS=['+','-','*','/','%','>','>=','<','<='];   // 这些运算符两侧的常量必须是数字（==/!= 允许文本）
+let _fbCalc=null,_fbCalcOpt=null;   // 工作副本 / 当前弹窗上下文（followLbl/defType/hasNodeDev）
+function _fbCalcInit(b){
+  const st={operands:[],operators:[],decimals:2};   // decimals=数值结果保留小数位（0~3，缺省 2）
+  if(bindIsCalc(b)){
+    b.calc.operands.forEach(o=>{
+      if(o&&o.const!==undefined)st.operands.push({kind:'const',v:String(o.const)});
+      else if(o&&o.field){const p=String(o.field).split('.');const fld=p.pop(),loc=p.join('.');
+        st.operands.push({kind:'field',deviceId:o.deviceId||'',deviceType:o.deviceType||'',loc,fld});}
+    });
+    st.operators=(Array.isArray(b.calc.operators)?b.calc.operators:[]).slice();
+    if(b.calc.decimals!=null)st.decimals=Math.max(0,Math.min(3,b.calc.decimals|0));
+  }
+  while(st.operands.length<2)st.operands.push({kind:'field',deviceId:'',deviceType:'',loc:'',fld:''});
+  st.operators.length=st.operands.length-1;
+  for(let i=0;i<st.operators.length;i++)if(!CALC_OPS.includes(st.operators[i]))st.operators[i]='+';
+  return st;
+}
+// 计算模式区块（两个绑定弹窗共用）：操作数行 + 底部「添加操作数 / 结果小数位」+ 公式摘要
+function _fbCalcBlockHTML(){
+  return '<div id="fb-calc" style="display:none"><div id="fb-calc-rows"></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'+
+    '<button class="tb" type="button" id="fb-calc-add">＋ 添加操作数</button><span style="flex:1"></span>'+
+    '<label class="fb-l" style="margin:0;flex:0 0 auto" title="数值结果四舍五入保留的小数位（比较结果 1/0 不受影响）">结果小数位</label>'+
+    '<select id="fb-calc-dp" style="width:88px;flex:0 0 auto">'+
+    [0,1,2,3].map(d=>'<option value="'+d+'"'+(d===2?' selected':'')+'>'+d+(d===2?'（默认）':'')+'</option>').join('')+'</select></div>'+
+    '<div class="phint" id="fb-calc-sum" style="margin-top:6px"></div></div>';
+}
+// 行内「来源设备」选项：followLbl 非 null 时提供「跟随本节点」空值项（数据字段）；全局信号必须显式选设备
+function _fbCalcDevHTML(o,followLbl){
+  const opts=[followLbl!=null?('<option value="">跟随本节点：'+tplEsc(followLbl)+'</option>'):'<option value="">请选择设备实例</option>'];
+  DEVICE_LIST.forEach(d=>{opts.push('<option value="'+tplEsc(d.deviceId)+'" data-dt="'+tplEsc(d.deviceType)+'"'+(o.deviceId===d.deviceId?' selected':'')+'>'+tplEsc(deviceTypeLabel(d.deviceType)+' · '+d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</option>');});
+  return opts.join('');
+}
+// opt={followLbl:string|null, defType:string（跟随节点时的兜底设备类型）, hasNodeDev:bool（「跟随本节点」能否解析到实例）}
+function _fbCalcRender(opt){
+  _fbCalcOpt=opt;
+  const host=document.getElementById('fb-calc-rows');if(!host)return;
+  const st=_fbCalc;host.innerHTML='';
+  st.operands.forEach((o,i)=>{
+    if(i>0){
+      const orow=document.createElement('div');orow.className='fb-calc-oprow';
+      const osel=document.createElement('select');
+      CALC_OPS.forEach(v=>{const x=document.createElement('option');x.value=v;x.textContent=calcOpText(v)+(CALC_CMP_OPS.includes(v)?'（比较→1/0）':'');osel.appendChild(x);});
+      osel.value=st.operators[i-1]||'+';
+      osel.onchange=e=>{st.operators[i-1]=e.target.value;_fbCalcSum();};
+      orow.appendChild(osel);host.appendChild(orow);
+    }
+    const row=document.createElement('div');row.className='fb-calc-row';
+    const kind=document.createElement('select');kind.className='fb-calc-kind';
+    [['field','后台字段'],['const','常量']].forEach(([v,t])=>{const x=document.createElement('option');x.value=v;x.textContent=t;kind.appendChild(x);});
+    kind.value=o.kind;
+    kind.onchange=e=>{st.operands[i]=(e.target.value==='const')?{kind:'const',v:''}:{kind:'field',deviceId:'',deviceType:'',loc:'',fld:''};_fbCalcRender(opt);};
+    row.appendChild(kind);
+    if(o.kind==='const'){
+      const inp=document.createElement('input');inp.className='fb-calc-const';inp.placeholder='常量值（数字或文本）';inp.value=(o.v!=null?o.v:'');
+      inp.oninput=e=>{o.v=e.target.value;_fbCalcSum();};
+      row.appendChild(inp);
+    }else{
+      const dev=document.createElement('select');dev.className='fb-calc-dev';dev.innerHTML=_fbCalcDevHTML(o,opt.followLbl);
+      const loc=document.createElement('select');loc.className='fb-calc-loc';
+      const fld=document.createElement('select');fld.className='fb-calc-fld';
+      const effType=()=>{const x=dev.selectedOptions[0];return (x&&x.getAttribute('data-dt'))||opt.defType||'';};
+      const fillFld=cur=>{const fs=dictFields(effType(),loc.value);fld.innerHTML=fs.length?fs.map(x=>'<option'+(x===cur?' selected':'')+'>'+tplEsc(x)+'</option>').join(''):'<option value="">无字段</option>';};
+      const fillLoc=(cl,cf)=>{const ls=dictLocations(effType());loc.innerHTML=ls.length?ls.map(l=>'<option'+(l===cl?' selected':'')+'>'+tplEsc(l)+'</option>').join(''):'<option value="">该类型无字典</option>';fillFld(cf);};
+      const save=()=>{const x=dev.selectedOptions[0];o.deviceId=dev.value;o.deviceType=dev.value?((x&&x.getAttribute('data-dt'))||''):'';o.loc=loc.value;o.fld=fld.value;_fbCalcSum();};
+      dev.onchange=()=>{fillLoc('','');save();};
+      loc.onchange=()=>{fillFld('');save();};
+      fld.onchange=save;
+      fillLoc(o.loc,o.fld);save();
+      row.appendChild(dev);row.appendChild(loc);row.appendChild(fld);
+    }
+    if(st.operands.length>2){
+      const del=document.createElement('button');del.type='button';del.className='df-del';del.textContent='✕';del.title='移除该操作数';
+      del.onclick=()=>{st.operands.splice(i,1);st.operators.splice(i>0?i-1:0,1);_fbCalcRender(opt);};   // 删操作数=连带删它前面的运算符，长度不变量自持
+      row.appendChild(del);
+    }
+    host.appendChild(row);
+  });
+  const add=document.getElementById('fb-calc-add');
+  if(add)add.onclick=()=>{st.operands.push({kind:'field',deviceId:'',deviceType:'',loc:'',fld:''});st.operators.push('+');_fbCalcRender(opt);};
+  const dp=document.getElementById('fb-calc-dp');
+  if(dp){dp.value=String(st.decimals!=null?st.decimals:2);dp.onchange=e=>{st.decimals=Math.max(0,Math.min(3,(+e.target.value)|0));_fbCalcSum();};}
+  _fbCalcSum();
+}
+// 逐操作数校验：字段操作数必须能解析到设备实例（显式选择，或「跟随本节点」且节点已设实例）且分类/字段已选；
+// 常量必填，参与算术/大小比较的常量必须是数字，除法/取模的除数常量不能为 0；至少一个字段操作数。
+// 返回 {rows:[{dev?,fld?,const?}], err:首个错误文案|null}
+function _fbCalcIssues(){
+  const st=_fbCalc,opt=_fbCalcOpt||{};
+  const rows=[];let firstErr=null,hasField=false;
+  if(!st)return {rows,err:null};
+  st.operands.forEach((o,i)=>{
+    const r={};
+    if(o.kind==='const'){
+      const s=String(o.v||'').trim();
+      const adj=[i>0?st.operators[i-1]:null, i<st.operands.length-1?st.operators[i]:null].filter(Boolean);
+      if(!s)r.const='常量值必填';
+      else if(adj.some(op=>CALC_NUM_OPS.includes(op))&&!/^-?\d+(\.\d+)?$/.test(s))r.const='参与算术/大小比较的常量必须是数字（仅 = ≠ 允许文本）';
+      else if(i>0&&(st.operators[i-1]==='/'||st.operators[i-1]==='%')&&parseFloat(s)===0)r.const='除法/取模的除数不能为 0';
+    }else{
+      hasField=true;
+      if(!o.deviceId&&!opt.hasNodeDev)r.dev='必须确定设备实例——选具体来源设备，或先为本节点指定「设备实例」';
+      if(!o.loc||!o.fld)r.fld='请选择分类与字段';
+    }
+    const msg=r.dev||r.fld||r.const;
+    if(msg&&!firstErr)firstErr='第'+(i+1)+'个操作数：'+msg;
+    rows.push(r);
+  });
+  if(!firstErr&&!hasField)firstErr='至少需要一个「后台字段」操作数（全常量无需绑定后台）';
+  return {rows,err:firstErr};
+}
+// 公式摘要 + 实时校验：非法输入红框、fb-hint 显示首个错误、「确定」按钮门禁（合法才可点）
+function _fbCalcSum(){
+  const el=document.getElementById('fb-calc-sum');if(!el||!_fbCalc)return;
+  const parts=[];
+  _fbCalc.operands.forEach((o,i)=>{
+    if(i>0)parts.push(calcOpText(_fbCalc.operators[i-1]||'+'));
+    if(o.kind==='const')parts.push(String(o.v||'').trim()===''?'?':String(o.v).trim());
+    else parts.push(o.fld?((o.deviceId?deviceNameOf(o.deviceId)+'/':'')+o.fld):'?');
+  });
+  el.textContent='公式：'+parts.join(' ')+'　（按顺序从左到右依次结合，无括号/优先级；比较结果为 1/0；数值结果保留 '+(_fbCalc.decimals!=null?_fbCalc.decimals:2)+' 位小数）';
+  // 实时校验标红 + 门禁
+  const {rows,err}=_fbCalcIssues();
+  const host=document.getElementById('fb-calc-rows');
+  if(host)host.querySelectorAll('.fb-calc-row').forEach((rowEl,i)=>{
+    const r=rows[i]||{};
+    const mark=(sel,bad)=>{const x=rowEl.querySelector(sel);if(x)x.classList.toggle('df-invalid',!!bad);};
+    mark('.fb-calc-const',r.const);
+    mark('.fb-calc-dev',r.dev);
+    mark('.fb-calc-loc',r.fld);mark('.fb-calc-fld',r.fld);
+  });
+  if(_fbMode()==='calc'){
+    const cb=document.getElementById('fb-confirm');
+    if(cb){cb.disabled=!!err;cb.style.opacity=err?'.45':'';cb.style.cursor=err?'not-allowed':'';}
+    const h=document.getElementById('fb-hint');
+    if(h){
+      if(err){h.textContent='⚠ '+err;h.style.color='#e0a020';}
+      else{h.textContent='操作数按从上到下依次结合（无括号/优先级）；比较运算结果为 1/0，可再配值字典转成文案。后台只推各操作数原始值，计算在画布/前端完成。';h.style.color='';}
+    }
+  }
+}
+// 校验并固化（确定时的最终关卡，与实时校验同一套 _fbCalcIssues）。返回 {calc} 或 {err}
+function _fbCalcCollect(){
+  const chk=_fbCalcIssues();
+  if(chk.err)return {err:chk.err};
+  const st=_fbCalc,operands=[];
+  st.operands.forEach(o=>{
+    if(o.kind==='const'){operands.push({const:autoNum(String(o.v).trim())});return;}
+    const op={field:o.loc+'.'+o.fld};
+    if(o.deviceId){op.deviceId=o.deviceId;if(o.deviceType)op.deviceType=o.deviceType;}
+    operands.push(op);
+  });
+  const calc={operands,operators:st.operators.slice(0,operands.length-1)};
+  if(st.decimals!=null&&st.decimals!==2)calc.decimals=st.decimals;   // 缺省 2 不落字段，JSON 保持精简
+  return {calc};
 }
 // 字段来源选择弹窗：设备(默认本节点/可跨设备) + 分类(location) + 字段(field)
 function openFieldBind(i){
@@ -664,15 +843,21 @@ function openFieldBind(i){
   if(_iss.dupZh||_iss.dupEn){flashHint(lang==='en'?'Field name duplicated in this node — make it unique before binding':'该字段名在本节点内重复（中/英文名需唯一），请先修正再绑定');return;}
   closeFieldBind();
   const b=f.bind||{};
+  const isCalc0=bindIsCalc(b);
   const ov=document.createElement('div');ov.id='fb-overlay';ov.onclick=e=>{if(e.target===ov)closeFieldBind();};
   // 设备选项：空=跟随本节点；否则具体设备(携带其 deviceType)
   const followLbl=n.deviceId?deviceNameOf(n.deviceId):(nodeDeviceType(n)?('⚠ 未指定实例·'+deviceTypeLabel(nodeDeviceType(n))):'⚠ 未指定设备');
   const devOpts=['<option value="">跟随本节点：'+tplEsc(followLbl)+'</option>']
-    .concat(DEVICE_LIST.map(d=>{const sel=(b.deviceId===d.deviceId)?' selected':'';return '<option value="'+tplEsc(d.deviceId)+'" data-dt="'+tplEsc(d.deviceType)+'"'+sel+'>'+tplEsc(deviceTypeLabel(d.deviceType)+' · '+d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</option>';}));
-  ov.innerHTML='<div id="fb-box"><button class="dlg-close" onclick="closeFieldBind()" title="关闭" aria-label="关闭">✕</button><div id="fb-title">绑定后台字段：'+tplEsc(f.key||('字段'+(i+1)))+'</div>'+
+    .concat(DEVICE_LIST.map(d=>{const sel=(!isCalc0&&b.deviceId===d.deviceId)?' selected':'';return '<option value="'+tplEsc(d.deviceId)+'" data-dt="'+tplEsc(d.deviceType)+'"'+sel+'>'+tplEsc(deviceTypeLabel(d.deviceType)+' · '+d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</option>';}));
+  ov.innerHTML='<div id="fb-box"'+(isCalc0?' class="fb-wide"':'')+'><button class="dlg-close" onclick="closeFieldBind()" title="关闭" aria-label="关闭">✕</button><div id="fb-title">绑定后台字段：'+tplEsc(f.key||('字段'+(i+1)))+'</div>'+
+    '<div class="fb-mode"><label><input type="radio" name="fb-mode" value="simple"'+(isCalc0?'':' checked')+'> 单字段</label>'+
+    '<label><input type="radio" name="fb-mode" value="calc"'+(isCalc0?' checked':'')+'> 计算/比较（多字段与常量）</label></div>'+
+    '<div id="fb-simple">'+
     '<label class="fb-l">来源设备</label><select id="fb-dev">'+devOpts.join('')+'</select>'+
     '<label class="fb-l">分类(location)</label><select id="fb-loc"></select>'+
     '<label class="fb-l">字段(field)</label><select id="fb-field"></select>'+
+    '</div>'+
+    _fbCalcBlockHTML()+
     '<div id="fb-acts"><button class="tb" onclick="clearFieldBind('+i+')">清除绑定</button><span style="flex:1"></span>'+
     '<button class="tb" onclick="closeFieldBind()">取消</button><button class="tb grn" id="fb-confirm" onclick="confirmFieldBind('+i+')">确定</button></div>'+
     '<div class="phint" id="fb-hint" style="margin-top:6px"></div></div>';
@@ -691,8 +876,9 @@ function openFieldBind(i){
     fillField(curField);
     updateGate();
   };
-  // 无法解析设备实例 → 禁用分类/字段/确定，避免存下无法关联后台的"残缺绑定"
+  // 无法解析设备实例 → 禁用分类/字段/确定，避免存下无法关联后台的"残缺绑定"（仅单字段模式；计算模式确定时逐操作数校验）
   const updateGate=()=>{
+    if(_fbMode()==='calc')return;
     const ok=resolvable();
     ['fb-loc','fb-field'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=!ok;});
     const cb=document.getElementById('fb-confirm');if(cb){cb.disabled=!ok;cb.style.opacity=ok?'':'.45';cb.style.cursor=ok?'':'not-allowed';}
@@ -700,17 +886,40 @@ function openFieldBind(i){
     if(!ok){h.textContent='⚠ 未确定设备实例：请在上方为本节点选「设备实例」，或在此「来源设备」直接选择具体设备，否则无法绑定。';h.style.color='#e0a020';}
     else{const dt=effType();h.textContent='字典：'+(dt?deviceTypeLabel(dt):'—')+'（'+dictLocations(dt).length+' 个分类）';h.style.color='';}
   };
+  // 模式切换：单字段 ⇄ 计算/比较（计算模式的校验/门禁由 _fbCalcSum 实时维护）
+  const calcOpt={followLbl, defType:nodeDeviceType(n), hasNodeDev:!!n.deviceId};
+  const setMode=m=>{
+    document.getElementById('fb-simple').style.display=(m==='calc')?'none':'';
+    document.getElementById('fb-calc').style.display=(m==='calc')?'':'none';
+    document.getElementById('fb-box').classList.toggle('fb-wide',m==='calc');
+    if(m==='calc'){
+      if(!_fbCalc)_fbCalc=_fbCalcInit(f.bind);
+      _fbCalcRender(calcOpt);
+    }else updateGate();
+  };
+  document.querySelectorAll('input[name="fb-mode"]').forEach(r=>{r.onchange=e=>setMode(e.target.value);});
   // 解析当前 bind 的初值
   let curLoc='',curField='';
-  if(b.field){const p=String(b.field).split('.');curField=p.pop();curLoc=p.join('.');}
+  if(!isCalc0&&b.field){const p=String(b.field).split('.');curField=p.pop();curLoc=p.join('.');}
   document.getElementById('fb-dev').onchange=()=>fillLoc('','');
   document.getElementById('fb-loc').onchange=()=>{fillField('');};
   fillLoc(curLoc,curField);
+  if(isCalc0)setMode('calc');
 }
-function closeFieldBind(){const ov=document.getElementById('fb-overlay');if(ov)ov.remove();}
+function _fbMode(){const r=document.querySelector('input[name="fb-mode"]:checked');return r?r.value:'simple';}
+function closeFieldBind(){const ov=document.getElementById('fb-overlay');if(ov)ov.remove();_fbCalc=null;_fbCalcOpt=null;}
 function clearFieldBind(i){const n=nodes.find(x=>x.id===selNode);if(!n)return;const f=(n.data||[])[i];if(f){snapshot();delete f.bind;snapshot();}closeFieldBind();renderDFs(n);}
 function confirmFieldBind(i){
   const n=nodes.find(x=>x.id===selNode);if(!n)return;const f=(n.data||[])[i];if(!f)return;
+  if(_fbMode()==='calc'){   // 计算/比较模式：校验操作数并固化 bind={calc:{operands,operators}}
+    const r=_fbCalcCollect();
+    if(r.err){flashHint(r.err);_fbCalcSum();return;}
+    const hasCmp=(r.calc.operators||[]).some(op=>CALC_CMP_OPS.includes(op));
+    snapshot();f.bind={calc:r.calc};snapshot();
+    closeFieldBind();renderDFs(n);
+    flashHint('已保存计算绑定：后台推送各操作数原始值，画布/前端按公式实时计算'+(hasCmp?'（比较结果为 1/0，可在 📖 里配值字典转文案）':''));
+    return;
+  }
   const devSel=document.getElementById('fb-dev'),loc=document.getElementById('fb-loc').value,field=document.getElementById('fb-field').value;
   if(!devSel.value&&!n.deviceId){flashHint('请先确定设备实例：为本节点选「设备实例」或在弹窗里选具体来源设备');return;}  // 无实例不允许保存
   if(!loc||!field){flashHint('请选择分类与字段');return;}
@@ -730,13 +939,19 @@ function openGlobalBind(idx){
   if(gi.dupZh||gi.dupEn){flashHint(lang==='en'?'Signal name duplicated — make it unique before binding':'该信号名重复（中/英文名需全局唯一），请先修正再绑定');return;}
   closeFieldBind();
   const b=s.bind||{};
+  const isCalc0=bindIsCalc(b);
   const ov=document.createElement('div');ov.id='fb-overlay';ov.onclick=e=>{if(e.target===ov)closeFieldBind();};
   const devOpts=['<option value="">请选择设备实例</option>']
-    .concat(DEVICE_LIST.map(d=>{const sel=(b.deviceId===d.deviceId)?' selected':'';return '<option value="'+tplEsc(d.deviceId)+'" data-dt="'+tplEsc(d.deviceType)+'"'+sel+'>'+tplEsc(deviceTypeLabel(d.deviceType)+' · '+d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</option>';}));
-  ov.innerHTML='<div id="fb-box"><button class="dlg-close" onclick="closeFieldBind()" title="关闭" aria-label="关闭">✕</button><div id="fb-title">绑定后台字段（全局信号）：'+tplEsc(sigDisplayName(s)||('信号'+(idx+1)))+'</div>'+
+    .concat(DEVICE_LIST.map(d=>{const sel=(!isCalc0&&b.deviceId===d.deviceId)?' selected':'';return '<option value="'+tplEsc(d.deviceId)+'" data-dt="'+tplEsc(d.deviceType)+'"'+sel+'>'+tplEsc(deviceTypeLabel(d.deviceType)+' · '+d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</option>';}));
+  ov.innerHTML='<div id="fb-box"'+(isCalc0?' class="fb-wide"':'')+'><button class="dlg-close" onclick="closeFieldBind()" title="关闭" aria-label="关闭">✕</button><div id="fb-title">绑定后台字段（全局信号）：'+tplEsc(sigDisplayName(s)||('信号'+(idx+1)))+'</div>'+
+    '<div class="fb-mode"><label><input type="radio" name="fb-mode" value="simple"'+(isCalc0?'':' checked')+'> 单字段</label>'+
+    '<label><input type="radio" name="fb-mode" value="calc"'+(isCalc0?' checked':'')+'> 计算/比较（多字段与常量）</label></div>'+
+    '<div id="fb-simple">'+
     '<label class="fb-l">来源设备</label><select id="fb-dev">'+devOpts.join('')+'</select>'+
     '<label class="fb-l">分类(location)</label><select id="fb-loc"></select>'+
     '<label class="fb-l">字段(field)</label><select id="fb-field"></select>'+
+    '</div>'+
+    _fbCalcBlockHTML()+
     '<div id="fb-acts"><button class="tb" onclick="clearGlobalBind('+idx+')">清除绑定</button><span style="flex:1"></span>'+
     '<button class="tb" onclick="closeFieldBind()">取消</button><button class="tb grn" id="fb-confirm" onclick="confirmGlobalBind('+idx+')">确定</button></div>'+
     '<div class="phint" id="fb-hint" style="margin-top:6px"></div></div>';
@@ -745,21 +960,44 @@ function openGlobalBind(idx){
   const resolvable=()=>!!document.getElementById('fb-dev').value;
   const fillField=(curField)=>{const dt=effType();const loc=document.getElementById('fb-loc').value;const fields=dictFields(dt,loc);
     document.getElementById('fb-field').innerHTML=fields.length?fields.map(x=>'<option'+(x===curField?' selected':'')+'>'+tplEsc(x)+'</option>').join(''):'<option value="">无字段</option>';};
-  const updateGate=()=>{const ok=resolvable();['fb-loc','fb-field'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=!ok;});
+  const updateGate=()=>{if(_fbMode()==='calc')return;
+    const ok=resolvable();['fb-loc','fb-field'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=!ok;});
     const cb=document.getElementById('fb-confirm');if(cb){cb.disabled=!ok;cb.style.opacity=ok?'':'.45';cb.style.cursor=ok?'':'not-allowed';}
     const h=document.getElementById('fb-hint');if(!ok){h.textContent='⚠ 请选择具体设备实例（全局信号无所属节点，必须指定来源设备）。';h.style.color='#e0a020';}
     else{const dt=effType();h.textContent='字典：'+(dt?deviceTypeLabel(dt):'—')+'（'+dictLocations(dt).length+' 个分类）';h.style.color='';}};
   const fillLoc=(curLoc,curField)=>{const dt=effType();const locs=dictLocations(dt);const loc=document.getElementById('fb-loc');
     loc.innerHTML=locs.length?locs.map(l=>'<option'+(l===curLoc?' selected':'')+'>'+tplEsc(l)+'</option>').join(''):'<option value="">该类型无字典</option>';
     fillField(curField);updateGate();};
-  let curLoc='',curField='';if(b.field){const p=String(b.field).split('.');curField=p.pop();curLoc=p.join('.');}
+  // 模式切换：全局信号无所属节点 → 操作数必须显式选设备（followLbl=null、hasNodeDev=false）
+  const calcOpt={followLbl:null, defType:'', hasNodeDev:false};
+  const setMode=m=>{
+    document.getElementById('fb-simple').style.display=(m==='calc')?'none':'';
+    document.getElementById('fb-calc').style.display=(m==='calc')?'':'none';
+    document.getElementById('fb-box').classList.toggle('fb-wide',m==='calc');
+    if(m==='calc'){
+      if(!_fbCalc)_fbCalc=_fbCalcInit(s.bind);
+      _fbCalcRender(calcOpt);
+    }else updateGate();
+  };
+  document.querySelectorAll('input[name="fb-mode"]').forEach(r=>{r.onchange=e=>setMode(e.target.value);});
+  let curLoc='',curField='';if(!isCalc0&&b.field){const p=String(b.field).split('.');curField=p.pop();curLoc=p.join('.');}
   document.getElementById('fb-dev').onchange=()=>fillLoc('','');
   document.getElementById('fb-loc').onchange=()=>fillField('');
   fillLoc(curLoc,curField);
+  if(isCalc0)setMode('calc');
 }
 function clearGlobalBind(idx){const s=(customSignals||[])[idx];if(s)delete s.bind;closeFieldBind();renderCustomSignals();invalidateRouting();}
 function confirmGlobalBind(idx){
   const s=(customSignals||[])[idx];if(!s)return;
+  if(_fbMode()==='calc'){   // 计算/比较模式（全局信号：操作数必须显式指定设备）
+    const r=_fbCalcCollect();
+    if(r.err){flashHint(r.err);_fbCalcSum();return;}
+    const hasCmp=(r.calc.operators||[]).some(op=>CALC_CMP_OPS.includes(op));
+    s.bind={calc:r.calc};
+    closeFieldBind();renderCustomSignals();invalidateRouting();
+    flashHint('已保存计算绑定：后台推送各操作数原始值，画布/前端按公式实时计算'+(hasCmp?'（比较结果为 1/0，可在 📖 里配值字典转文案）':''));
+    return;
+  }
   const devSel=document.getElementById('fb-dev'),loc=document.getElementById('fb-loc').value,field=document.getElementById('fb-field').value;
   if(!devSel.value){flashHint('请选择具体设备实例（全局信号必须指定来源设备）');return;}
   if(!loc||!field){flashHint('请选择分类与字段');return;}
@@ -780,7 +1018,9 @@ function openValueDictPicker(f,deviceType,title,onDone){
   const dicts=effectiveValueDicts();
   const cur=(f.dict!==undefined&&f.dict!==null)?(f.dict===''?'@none':f.dict):'@auto';
   const auto=resolveValueDict({bind:f.bind},deviceType);   // 忽略显式指定，看自动匹配会命中谁
-  const autoLbl='自动匹配（默认）'+(auto?('：当前命中「'+vdDisplayName(auto.type)+'」'):'：当前未命中（未绑定后台字段或无字典认领）');
+  const autoLbl='自动匹配（默认）'+(auto?('：当前命中「'+vdDisplayName(auto.type)+'」')
+    :(bindIsCalc(f.bind)?'：计算绑定无单一认领字段，不参与自动匹配——需转义请在下方强制指定字典'
+      :'：当前未命中（未绑定后台字段或无字典认领）'));
   const opts=['<option value="@auto"'+(cur==='@auto'?' selected':'')+'>'+tplEsc(autoLbl)+'</option>',
     '<option value="@none"'+(cur==='@none'?' selected':'')+'>不转义（原样显示 code）</option>']
     .concat(dicts.map(d=>'<option value="'+tplEsc(d.type)+'"'+(cur===d.type?' selected':'')+'>强制：'+
@@ -2182,6 +2422,44 @@ const LIBRARY_NAME='energy-topology';
 //  · items：code 码 → 中/英文案；显示语言随编辑器语言切换，en 缺失回退 zh，查不到回退原始值。
 // 转义逻辑在 packages/topology-runtime（fieldDisplayValue），此处只管字典数据的增删改。
 let _vdList=null,_vdEdit=null,_vdAdding=false;   // 服务端清单 / 展开编辑中的工作副本 / 新建表单是否展开
+// 条件条目（when）可用比较算子（求值复用 TopoRules.cmpOp，与规则引擎同一实现）。
+// 「其他(兜底)」是独立的条目类型（存储为 when:{op:'else'}）：任何未被之前条目命中的值都归入，无比较值，建议放最后
+const VD_WHEN_OPS=[['>','>'],['>=','≥'],['<','<'],['<=','≤'],['==','='],['!=','≠'],['in','∈ 列表'],['between','∈ 区间']];
+// 区间端点选项：含两端存纯 "a,b"（兼容旧数据），其余按括号写法存（"[a,b)"/"(a,b]"/"(a,b)"，cmpOp 按括号求值）
+const VD_BETWEEN_BRS=[['[]','[a,b] 含两端'],['[)','[a,b) 含左'],['(]','(a,b] 含右'],['()','(a,b) 不含两端']];
+function _vdParseBetween(val){
+  const s=String(val==null?'':val).trim();
+  if(s.length>1){
+    const c0=s.charAt(0),c1=s.charAt(s.length-1);
+    if((c0==='['||c0==='(')&&(c1===']'||c1===')'))return {br:c0+c1,body:s.slice(1,-1)};
+  }
+  return {br:'[]',body:s};
+}
+function _vdComposeBetween(br,body){
+  const b=String(body||'').trim();
+  if(!b)return '';                                  // 比较值未填 → 存空（校验会拦）
+  return br==='[]'?b:(br.charAt(0)+b+br.charAt(1)); // 含两端存纯 a,b，其余带括号
+}
+// 条件条目「比较值」格式校验（与服务端 dict-store 一致）：> ≥ < ≤ 需数字；区间需两个数字；列表至少一个值；= ≠ 允许任意文本。
+// 命中返回错误文案，合法返回 null。
+function _vdWhenValError(op,val){
+  if(op==='else')return null;   // 兜底条目无比较值
+  if(!VD_WHEN_OPS.some(x=>x[0]===op))return '不支持的运算符「'+op+'」';   // 手改文件/导入的未知 op：与服务端白名单一致，拦下而非静默放行
+  const s=String(val==null?'':val).trim();
+  if(!s)return '比较值必填';
+  const num=v=>/^-?\d+(\.\d+)?$/.test(String(v).trim());
+  if(op==='>'||op==='>='||op==='<'||op==='<=')return num(s)?null:'阈值必须是数字';
+  if(op==='between'){
+    const body=_vdParseBetween(s).body;
+    const parts=body.split(',').map(x=>x.trim()).filter(x=>x!=='');
+    return (parts.length===2&&parts.every(num))?null:'区间需为两个数字（a,b）';
+  }
+  if(op==='in'){
+    const parts=s.split(',').map(x=>x.trim()).filter(x=>x!=='');
+    return parts.length?null:'列表至少填一个值（逗号分隔）';
+  }
+  return null;   // == / != 允许任意文本
+}
 function _vdOverlayEnsure(){
   if(document.getElementById('vdmgr-overlay'))return;
   const ov=document.createElement('div');ov.id='vdmgr-overlay';
@@ -2222,7 +2500,7 @@ async function _vdFetch(){
 async function _vdAfterWrite(){ await _vdFetch(); await reloadValueDicts(); _vdRender(); }
 function _vdApplySummary(d){
   const n=(d.applyTo||[]).length,m=(d.items||[]).length;
-  return (n?('认领 '+n+' 个后台字段'):'未认领后台字段（仅可手动指定）')+' · '+m+' 个 code';
+  return (n?('认领 '+n+' 个后台字段'):'未认领后台字段（仅可手动指定）')+' · '+m+' 个条目';
 }
 function _vdRender(){
   const list=document.getElementById('vdmgr-list');if(!list)return;
@@ -2299,7 +2577,7 @@ function _vdEditorHTML(){
   h+='<div class="vd-row"><label class="vd-l">字典名</label><input id="vd-e-name" value="'+tplEsc(d.name||'')+'" placeholder="中文名（必填）">'+
      '<input id="vd-e-nameen" value="'+tplEsc(d.nameEn||'')+'" placeholder="English（必填）"></div>';
   // 适用后台字段（applyTo）：设备类型 → 分类 → 字段 级联；绑定了这些后台字段的画布字段/信号自动用本字典
-  h+='<div class="vd-sec">适用后台字段（自动匹配）<span class="vd-secnote">绑定了这些后台字段的画布字段/全局信号将自动转义</span></div>';
+  h+='<div class="vd-sec">适用后台字段（自动匹配）<span class="vd-secnote">绑定了这些后台字段的画布字段/全局信号将自动转义——多个字段是「码表相同、共用本表」，各自独立求值，不会相互比较；码表不同的字段请各建一张字典</span></div>';
   (d.applyTo||[]).forEach((a,i)=>{
     const p=String(a.field||'').split('.'),fld=p.pop()||'',loc=p.join('.');
     const dts=DEVICE_TYPES.map(t=>t.value);if(a.deviceType&&!dts.includes(a.deviceType))dts.push(a.deviceType);
@@ -2312,13 +2590,35 @@ function _vdEditorHTML(){
       '<button class="df-del" data-apdel="'+i+'" title="移除">✕</button></div>';
   });
   h+='<button class="tb" id="vd-e-addap">＋ 添加适用字段</button>';
-  // code 条目表
-  h+='<div class="vd-sec">code 转义条目<span class="vd-secnote">code/中文/英文均必填；code 按字符串匹配（数字/字符串均可）、同字典内唯一</span></div>';
-  h+='<div class="vd-items-head"><span>code</span><span>中文文案</span><span>English</span><span></span></div>';
+  // 转义条目表：「code 等值」与「条件」（与常量比较/区间）两种条目可并存
+  h+='<div class="vd-sec">转义条目<span class="vd-secnote">每个绑定字段拿「自己的当前值」独立查本表：code 按字符串精确匹配；条件=该值与常量比较/区间（in/between 逗号分隔）。求值顺序：code 精确匹配优先 → 条件按顺序首中即用 → 都不中原样显示。多个后台字段之间的计算/比较请在字段的 🔗 绑定里用「计算/比较」模式</span></div>';
+  h+='<div class="vd-items-head"><span style="flex:0 0 74px">类型</span><span>code / 条件</span><span>中文文案</span><span>English</span><span></span></div>';
   (d.items||[]).forEach((it,i)=>{
+    const isElse=!!(it.when&&it.when.op==='else');
+    const isW=!!it.when&&!isElse;
     h+='<div class="vd-row vd-item-row">'+
-      '<input data-it="'+i+'" data-k="code" value="'+tplEsc(it.code==null?'':String(it.code))+'" placeholder="如 0 / 1 / FAULT（必填）">'+
-      '<input data-it="'+i+'" data-k="zh" value="'+tplEsc(it.zh||'')+'" placeholder="如 待机（必填）">'+
+      '<select data-it="'+i+'" data-k="_kind" style="flex:0 0 96px" title="code=等值精确匹配；条件=与常量比较/区间；其他=兜底，任何未命中的值归入">'+
+        '<option value="code"'+((isW||isElse)?'':' selected')+'>code</option>'+
+        '<option value="when"'+(isW?' selected':'')+'>条件</option>'+
+        '<option value="else"'+(isElse?' selected':'')+'>其他(兜底)</option></select>';
+    if(isElse){   // 兜底：无比较值——任何未被之前条目命中的值都显示本条文案
+      h+='<input disabled value="" placeholder="任何未命中的值都归入本条（建议放最后）" style="opacity:.6;cursor:not-allowed">';
+    }else if(isW){
+      const op=(it.when&&it.when.op)||'>';
+      h+='<select data-it="'+i+'" data-k="wop" style="flex:0 0 80px">'+
+        VD_WHEN_OPS.map(([v,t])=>'<option value="'+v+'"'+(v===op?' selected':'')+'>'+t+'</option>').join('')+'</select>';
+      if(op==='between'){   // 区间：端点是否包含（含两端/含左/含右/不含两端），输入框只填 a,b
+        const pb=_vdParseBetween(it.when&&it.when.val);
+        h+='<select data-it="'+i+'" data-k="wbr" style="flex:0 0 118px" title="区间端点是否包含（[ ]=含、( )=不含）">'+
+          VD_BETWEEN_BRS.map(([v,t])=>'<option value="'+v+'"'+(v===pb.br?' selected':'')+'>'+t+'</option>').join('')+'</select>'+
+          '<input data-it="'+i+'" data-k="wval" value="'+tplEsc(pb.body)+'" placeholder="a,b（必填）">';
+      }else{
+        h+='<input data-it="'+i+'" data-k="wval" value="'+tplEsc(it.when&&it.when.val!=null?String(it.when.val):'')+'" placeholder="'+(op==='in'?'值1,值2,…':'阈值（必填）')+'">';
+      }
+    }else{
+      h+='<input data-it="'+i+'" data-k="code" value="'+tplEsc(it.code==null?'':String(it.code))+'" placeholder="如 0 / 1 / FAULT（必填）">';
+    }
+    h+='<input data-it="'+i+'" data-k="zh" value="'+tplEsc(it.zh||'')+'" placeholder="如 待机（必填）">'+
       '<input data-it="'+i+'" data-k="en" value="'+tplEsc(it.en||'')+'" placeholder="如 Standby（必填）">'+
       '<button class="df-del" data-itdel="'+i+'" title="删除条目">✕</button></div>';
   });
@@ -2349,7 +2649,37 @@ function _vdBindEditor(){
     _vdRender();
   };
   box.querySelectorAll('[data-it]').forEach(inp=>{
-    inp.oninput=()=>{const i=+inp.getAttribute('data-it'),k=inp.getAttribute('data-k'),it=d.items[i];if(it)it[k]=inp.value;inp.classList.remove('df-invalid');};
+    const k=inp.getAttribute('data-k');
+    if(k==='_kind'){   // 条目类型切换：code 等值 / 条件 / 其他(兜底)（转换时清空另一形态的字段）
+      inp.onchange=()=>{const i=+inp.getAttribute('data-it'),it=d.items[i];if(!it)return;
+        if(inp.value==='when'){delete it.code;it.when={op:'>',val:''};}
+        else if(inp.value==='else'){delete it.code;it.when={op:'else',val:''};}
+        else{delete it.when;it.code='';}
+        _vdRender();};
+      return;
+    }
+    if(k==='wop'){
+      inp.onchange=()=>{const i=+inp.getAttribute('data-it'),it=d.items[i];if(it&&it.when){
+        // 切换运算符时把旧值归一成裸值（区间→其它运算符去掉括号），避免括号残留
+        if(it.when.op==='between'&&inp.value!=='between')it.when.val=_vdParseBetween(it.when.val).body;
+        it.when.op=inp.value;_vdRender();}};
+      return;
+    }
+    if(k==='wbr'){   // 区间端点切换：按当前 a,b 重新拼写法（含两端存纯 a,b，其余带括号）
+      inp.onchange=()=>{const i=+inp.getAttribute('data-it'),it=d.items[i];if(it&&it.when)it.when.val=_vdComposeBetween(inp.value,_vdParseBetween(it.when.val).body);};
+      return;
+    }
+    inp.oninput=()=>{const i=+inp.getAttribute('data-it'),it=d.items[i];if(!it)return;
+      if(k==='wval'){
+        if(it.when){
+          if(it.when.op==='between'){   // 区间：输入框只填 a,b，端点写法由同行 wbr 下拉拼出
+            const br=document.querySelector('.vd-card.editing [data-it="'+i+'"][data-k="wbr"]');
+            it.when.val=_vdComposeBetween(br?br.value:'[]',inp.value);
+          }else it.when.val=inp.value;
+        }
+      }
+      else it[k]=inp.value;
+      inp.classList.remove('df-invalid');};
   });
   box.querySelectorAll('[data-itdel]').forEach(b=>{b.onclick=()=>{d.items.splice(+b.getAttribute('data-itdel'),1);_vdRender();};});
   box.querySelector('#vd-e-additem').onclick=()=>{d.items.push({code:'',zh:'',en:''});_vdRender();
@@ -2357,22 +2687,28 @@ function _vdBindEditor(){
   box.querySelector('#vd-e-cancel').onclick=()=>{_vdEdit=null;_vdRender();};
   box.querySelector('#vd-e-save').onclick=_vdSave;
 }
-// 保存前校验（与服务端校验一致）：字典名中/英文必填；条目 code/中文/英文三项必填、code 唯一。
-// 全空行（三项均空）视为「没填完的空白行」自动剔除，不算错误；有任一项内容的行必须补全。
+// 保存前校验（与服务端校验一致）：字典名中/英文必填；
+// code 条目：code/中文/英文均必填、code 在同字典 code 条目内唯一；条件条目：比较值/中文/英文均必填。
+// 全空行（各内容项均空）视为「没填完的空白行」自动剔除，不算错误；有任一项内容的行必须补全。
+function _vdItemBlank(it){
+  const key=it.when?String(it.when.val==null?'':it.when.val):String(it.code==null?'':it.code);
+  return key.trim()===''&&!String(it.zh||'').trim()&&!String(it.en||'').trim();
+}
 function _vdValidate(d){
   if(!String(d.name||'').trim())return '字典名（中文）必填';
   if(!String(d.nameEn||'').trim())return '字典名（English）必填';
-  const rows=(d.items||[]).filter(it=>it&&(String(it.code==null?'':it.code).trim()!==''||String(it.zh||'').trim()!==''||String(it.en||'').trim()!==''));
+  const rows=(d.items||[]).filter(it=>it&&!_vdItemBlank(it));
   const bad=[];
   rows.forEach((it,i)=>{
     const miss=[];
-    if(!String(it.code==null?'':it.code).trim())miss.push('code');
-    if(!String(it.zh||'').trim())miss.push('中文文案');
-    if(!String(it.en||'').trim())miss.push('英文文案');
-    if(miss.length)bad.push('第'+(i+1)+'条缺 '+miss.join('、'));
+    if(it.when){ const e=_vdWhenValError(it.when.op||'>',it.when.val); if(e)miss.push(e); }
+    else if(!String(it.code==null?'':it.code).trim())miss.push('缺 code');
+    if(!String(it.zh||'').trim())miss.push('缺中文文案');
+    if(!String(it.en||'').trim())miss.push('缺英文文案');
+    if(miss.length)bad.push('第'+(i+1)+'条：'+miss.join('、'));
   });
-  if(bad.length)return '转义条目不完整（code/中文/英文均必填）：'+bad.join('；');
-  const codes=rows.map(it=>String(it.code).trim());
+  if(bad.length)return '转义条目不合法：'+bad.join('；');
+  const codes=rows.filter(it=>!it.when).map(it=>String(it.code).trim());
   const dup=[...new Set(codes.filter((c,i)=>codes.indexOf(c)!==i))];
   if(dup.length)return 'code 重复：'+dup.join('、')+'（同一字典内 code 需唯一）';
   return null;
@@ -2385,10 +2721,15 @@ function _vdMarkInvalid(d){
   mark(box.querySelector('#vd-e-nameen'),!String(d.nameEn||'').trim());
   const codeSeen={};
   (d.items||[]).forEach((it,i)=>{
-    const code=String(it.code==null?'':it.code).trim(),zh=String(it.zh||'').trim(),en=String(it.en||'').trim();
-    const blank=!code&&!zh&&!en;   // 全空行不标红（保存时自动剔除）
-    const dupC=code&&codeSeen[code];if(code)codeSeen[code]=1;
-    mark(box.querySelector('[data-it="'+i+'"][data-k="code"]'),!blank&&(!code||dupC));
+    const zh=String(it.zh||'').trim(),en=String(it.en||'').trim();
+    const blank=_vdItemBlank(it);   // 全空行不标红（保存时自动剔除）
+    if(it.when){
+      mark(box.querySelector('[data-it="'+i+'"][data-k="wval"]'),!blank&&!!_vdWhenValError(it.when.op||'>',it.when.val));
+    }else{
+      const code=String(it.code==null?'':it.code).trim();
+      const dupC=code&&codeSeen[code];if(code)codeSeen[code]=1;
+      mark(box.querySelector('[data-it="'+i+'"][data-k="code"]'),!blank&&(!code||dupC));
+    }
     mark(box.querySelector('[data-it="'+i+'"][data-k="zh"]'),!blank&&!zh);
     mark(box.querySelector('[data-it="'+i+'"][data-k="en"]'),!blank&&!en);
   });
@@ -2398,8 +2739,9 @@ async function _vdSave(){
   const err=_vdValidate(d);
   if(err){_vdMarkInvalid(d);flashHint(err);return;}
   _vdMarkInvalid(d);   // 清除历史标红
-  const items=(d.items||[]).filter(it=>it&&String(it.code==null?'':it.code).trim()!=='')
-    .map(it=>({code:String(it.code).trim(),zh:String(it.zh||'').trim(),en:String(it.en||'').trim()}));
+  const items=(d.items||[]).filter(it=>it&&!_vdItemBlank(it)).map(it=>it.when
+    ?({when:{op:it.when.op||'>',val:String(it.when.val==null?'':it.when.val).trim()},zh:String(it.zh||'').trim(),en:String(it.en||'').trim()})
+    :({code:String(it.code).trim(),zh:String(it.zh||'').trim(),en:String(it.en||'').trim()}));
   const applyTo=(d.applyTo||[]).filter(a=>a&&a.field&&a.field.indexOf('.')>0);
   try{
     const r=await fetch(VD_API+'/'+encodeURIComponent(d.type),{method:'PUT',headers:{'Content-Type':'application/json'},
@@ -2440,7 +2782,7 @@ async function _vdRescan(){
   catch(err){ console.warn(err); flashHint('重新扫描失败：'+(err.message||err)); }
 }
 function _vdImportClick(){ const fi=document.getElementById('vd-import-fi'); if(fi){fi.value='';fi.click();} }
-// 归一化一份待导入字典：type 合法化、名称/文案兜底（en←zh）、剔除无 code 条目、同字典内 code 去重（保留先出现者）
+// 归一化一份待导入字典：type 合法化、名称/文案兜底（en←zh）、剔除无 code/条件残缺条目、同字典内 code 去重（保留先出现者）
 function _vdNormalizeImport(o){
   if(!o||typeof o!=='object')return null;
   const type=String(o.type||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64);
@@ -2448,13 +2790,22 @@ function _vdNormalizeImport(o){
   const name=String(o.name||type).trim()||type;
   const nameEn=String(o.nameEn||name).trim()||name;
   const seen=new Set(),items=[];
+  const wopSet=new Set(VD_WHEN_OPS.map(x=>x[0]).concat(['else']));   // 'else'=兜底条目（UI 里是独立条目类型）
   (Array.isArray(o.items)?o.items:[]).forEach(it=>{
-    if(!it||it.code===undefined||it.code===null||String(it.code).trim()==='')return;
+    if(!it)return;
+    const zh=String(it.zh||it.en||'').trim(),en=String(it.en||it.zh||'').trim();
+    if(!zh&&!en)return;
+    if(it.when&&it.when.op){   // 条件条目：op 需在白名单内、比较值需通过格式校验（数字阈值/两数区间/非空列表）
+      const op=String(it.when.op);
+      const val=String(it.when.val==null?'':it.when.val).trim();
+      if(!wopSet.has(op)||_vdWhenValError(op,val))return;
+      items.push({when:{op,val},zh:zh||en,en:en||zh});
+      return;
+    }
+    if(it.code===undefined||it.code===null||String(it.code).trim()==='')return;
     const code=String(it.code).trim();
     if(seen.has(code))return;
     seen.add(code);
-    const zh=String(it.zh||it.en||'').trim(),en=String(it.en||it.zh||'').trim();
-    if(!zh&&!en)return;
     items.push({code,zh:zh||en,en:en||zh});
   });
   const applyTo=(Array.isArray(o.applyTo)?o.applyTo:[]).filter(a=>a&&a.field&&String(a.field).indexOf('.')>0)

@@ -2,7 +2,7 @@
   "schemaVersion": "tpl-1",
   "template": {
     "id": "tpl_3",
-    "name": "jintan",
+    "name": "金坛",
     "nameEn": "jintan",
     "desc": "",
     "builtin": false
@@ -11,7 +11,7 @@
     "schemaVersion": "2.0",
     "meta": {
       "app": "储能拓扑编辑器",
-      "generatedAt": "2026-07-01T08:54:33.266Z",
+      "generatedAt": "2026-07-07T07:07:31.539Z",
       "lang": "zh",
       "libraryRef": {
         "name": "energy-topology",
@@ -20,8 +20,8 @@
       "canvas": {
         "bgColor": "#0a1f40",
         "zoom": 0.143,
-        "panX": 283.3,
-        "panY": 62.3,
+        "panX": 64,
+        "panY": 57.7,
         "grid": {
           "show": true,
           "stepPx": 40
@@ -82,7 +82,7 @@
           "x": 2301.2,
           "y": 990.3
         },
-        "sizeWorld": 737,
+        "sizeWorld": 542,
         "scale": 1,
         "rotation": 0,
         "fontSize": 14,
@@ -100,8 +100,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -15,
-              "y": -61
+              "x": -18,
+              "y": -57
             },
             "bind": {
               "field": "AuxDataLogs.AmbientT1",
@@ -118,8 +118,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -16,
-              "y": -65
+              "x": -20,
+              "y": -56
             },
             "bind": {
               "field": "CellStatisticsLogs.MaxCellTemp",
@@ -136,8 +136,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -207,
-              "y": -127
+              "x": -227,
+              "y": -135
             },
             "bind": {
               "field": "AuxDataLogs.AmbientT1",
@@ -154,8 +154,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -205,
-              "y": -131
+              "x": -227,
+              "y": -137
             },
             "bind": {
               "field": "AuxDataLogs.AmbientT2",
@@ -172,8 +172,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -207,
-              "y": -134
+              "x": -229,
+              "y": -140
             },
             "bind": {
               "field": "AuxDataLogs.BusVoltage",
@@ -193,9 +193,9 @@
         },
         "position": {
           "x": 2301.2,
-          "y": 2554.9
+          "y": 2499
         },
-        "sizeWorld": 737,
+        "sizeWorld": 542,
         "scale": 1,
         "rotation": 0,
         "fontSize": 14,
@@ -210,14 +210,14 @@
               "zh": "电压(v)",
               "en": "U(V)"
             },
-            "value": 60,
+            "value": "",
             "hidden": false,
             "offset": {
-              "x": 16,
-              "y": 14
+              "x": 2,
+              "y": -88
             },
             "bind": {
-              "field": "AuxDataLogs.BusVoltage",
+              "field": "AuxDataLogs.PackVoltage",
               "deviceType": "BCU",
               "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
               "followNode": true
@@ -228,14 +228,14 @@
               "zh": "电流(A)",
               "en": "I(A)"
             },
-            "value": 26,
+            "value": "",
             "hidden": false,
             "offset": {
-              "x": 16,
-              "y": 11
+              "x": 2,
+              "y": -92
             },
             "bind": {
-              "field": "StringDataLogs.String1Current",
+              "field": "AuxDataLogs.PackCurrent",
               "deviceType": "BCU",
               "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
               "followNode": true
@@ -249,14 +249,29 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": 15,
-              "y": 6
+              "x": 2,
+              "y": -96
             },
             "bind": {
-              "field": "AuxDataLogs.PackCurrent",
-              "deviceType": "BCU",
-              "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
-              "followNode": true
+              "calc": {
+                "operands": [
+                  {
+                    "field": "AuxDataLogs.PackCurrent",
+                    "deviceType": "BCU",
+                    "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
+                    "followNode": true
+                  },
+                  {
+                    "field": "AuxDataLogs.PackVoltage",
+                    "deviceType": "BCU",
+                    "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
+                    "followNode": true
+                  }
+                ],
+                "operators": [
+                  "*"
+                ]
+              }
             }
           },
           {
@@ -267,8 +282,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": 15,
-              "y": -143
+              "x": 2,
+              "y": -100
             },
             "bind": {
               "field": "AuxDataLogs.SystemSOC",
@@ -285,11 +300,11 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": 14,
-              "y": -144
+              "x": 2,
+              "y": -101
             },
             "bind": {
-              "field": "AuxDataLogs.HiContactor",
+              "field": "AuxDataLogs.PackCurrent",
               "deviceType": "BCU",
               "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
               "followNode": true
@@ -303,7 +318,7 @@
             "when": {
               "var": "bms_1.I(A)",
               "op": ">",
-              "val": 0
+              "val": 1
             },
             "icon": "bms_charge"
           },
@@ -311,7 +326,7 @@
             "when": {
               "var": "bms_1.I(A)",
               "op": "<",
-              "val": 0
+              "val": -1
             },
             "icon": "bms_discharge"
           }
@@ -325,10 +340,10 @@
           "en": "Grid"
         },
         "position": {
-          "x": 452.5,
-          "y": 1024.7
+          "x": 648.3,
+          "y": 1015.6
         },
-        "sizeWorld": 893,
+        "sizeWorld": 657,
         "scale": 1,
         "rotation": 0,
         "fontSize": 14,
@@ -346,8 +361,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -34,
-              "y": 79
+              "x": -92,
+              "y": 111
             }
           },
           {
@@ -358,8 +373,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -35,
-              "y": 77
+              "x": -93,
+              "y": 109
             }
           }
         ]
@@ -375,7 +390,7 @@
           "x": 3549.6,
           "y": 990.3
         },
-        "sizeWorld": 737,
+        "sizeWorld": 542,
         "scale": 1,
         "rotation": 0,
         "fontSize": 14,
@@ -393,8 +408,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -130,
-              "y": 113
+              "x": -99,
+              "y": 90
             }
           }
         ]
@@ -419,8 +434,30 @@
         "orthoSnap": true,
         "waypoints": [],
         "active": true,
+        "labelOffset": {
+          "x": 21,
+          "y": 6
+        },
         "fromPort": "bottom",
-        "toPort": "top"
+        "toPort": "top",
+        "dirRules": [
+          {
+            "when": {
+              "var": "bms_1.I(A)",
+              "op": ">",
+              "val": 1
+            },
+            "dir": "forward"
+          },
+          {
+            "when": {
+              "var": "bms_1.I(A)",
+              "op": "<",
+              "val": 1
+            },
+            "dir": "reverse"
+          }
+        ]
       },
       {
         "from": "grid_1",
@@ -471,7 +508,7 @@
           "zh": "T1",
           "en": "T1"
         },
-        "value": 0,
+        "value": "",
         "bind": {
           "field": "AuxDataLogs.AmbientT1",
           "deviceType": "BCU",
@@ -489,6 +526,45 @@
           "deviceType": "BCU",
           "deviceId": "8f97b65308af41eb895ffe9c58e978e3"
         }
+      }
+    ],
+    "valueDicts": [
+      {
+        "type": "charge_state",
+        "name": "充放电状态",
+        "nameEn": "charge_state",
+        "applyTo": [
+          {
+            "deviceType": "BCU",
+            "field": "AuxDataLogs.PackCurrent"
+          }
+        ],
+        "items": [
+          {
+            "when": {
+              "op": ">",
+              "val": "1"
+            },
+            "zh": "充电",
+            "en": "Charging"
+          },
+          {
+            "when": {
+              "op": "<",
+              "val": "-1"
+            },
+            "zh": "放电",
+            "en": "Discharging"
+          },
+          {
+            "when": {
+              "op": "else",
+              "val": ""
+            },
+            "zh": "待机",
+            "en": "Standby"
+          }
+        ]
       }
     ],
     "dataBindings": [
@@ -554,7 +630,7 @@
         "source": {
           "deviceType": "BCU",
           "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
-          "field": "AuxDataLogs.BusVoltage",
+          "field": "AuxDataLogs.PackVoltage",
           "deviceName": "Rack"
         }
       },
@@ -565,18 +641,31 @@
         "source": {
           "deviceType": "BCU",
           "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
-          "field": "StringDataLogs.String1Current",
+          "field": "AuxDataLogs.PackCurrent",
           "deviceName": "Rack"
         }
       },
       {
-        "signal": "bms_1.P(kW)",
+        "signal": "bms_1.P(kW)@0",
         "node": "bms_1",
-        "label": "功率(kW)",
+        "label": "功率(kW) · 操作数1",
+        "calcOf": "bms_1.P(kW)",
         "source": {
           "deviceType": "BCU",
           "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
           "field": "AuxDataLogs.PackCurrent",
+          "deviceName": "Rack"
+        }
+      },
+      {
+        "signal": "bms_1.P(kW)@1",
+        "node": "bms_1",
+        "label": "功率(kW) · 操作数2",
+        "calcOf": "bms_1.P(kW)",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
+          "field": "AuxDataLogs.PackVoltage",
           "deviceName": "Rack"
         }
       },
@@ -598,7 +687,7 @@
         "source": {
           "deviceType": "BCU",
           "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
-          "field": "AuxDataLogs.HiContactor",
+          "field": "AuxDataLogs.PackCurrent",
           "deviceName": "Rack"
         }
       },

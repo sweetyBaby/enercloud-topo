@@ -3,6 +3,7 @@ node_modules/
 __pycache__/
 *.pyc
 .dev-server.log
+# 部署打包产物（如 enercloud-topo-1.0.tar），本地生成、不入库
 *.tar
 # 图标回收站：删除图标的运行时暂存（可还原），不入库
 icons/.trash/
