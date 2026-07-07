@@ -39,6 +39,7 @@ const nodeLabel=TR.nodeLabel, dataKey=TR.dataKey, nsz=TR.nsz, nodeBox=TR.nodeBox
       detourRoute=TR.detourRoute, applyBusMerge=TR.applyBusMerge,
       shareNearbyTrunks=TR.shareNearbyTrunks, dedupe=TR.dedupe, simplifyPath=TR.simplifyPath,
       computeSmartEdge=TR.computeSmartEdge, edgePath=TR.edgePath, edgeAt=TR.edgeAt,
+      edgeHitInfo=TR.edgeHitInfo, isRouteObstacle=TR.isRouteObstacle,
       segsCross=TR.segsCross, pathsCross=TR.pathsCross,
       _pathLen=TR._pathLen, _pathBends=TR._pathBends,
       _pathDetourPenalty=TR._pathDetourPenalty, _pathScore=TR._pathScore,
@@ -48,7 +49,7 @@ const nodeLabel=TR.nodeLabel, dataKey=TR.dataKey, nsz=TR.nsz, nodeBox=TR.nodeBox
 // 别名静默绑定 undefined、直到低频路径被点到才炸。
 [['createTopoRuntime 实例', {nodeLabel,dataKey,nsz,nodeBox,anchorPoint,edgePath,edgePathRaw,channelRoute,
   findValueDict,resolveValueDict,valueDictLabel,translateFieldValue,fieldDisplayValue,
-  recomputeAllPaths,applyBusMerge,straightVariants,detourRoute,dedupe,simplifyPath,computeSmartEdge,edgeAt,
+  recomputeAllPaths,applyBusMerge,straightVariants,detourRoute,dedupe,simplifyPath,computeSmartEdge,edgeAt,edgeHitInfo,isRouteObstacle,
   segsCross,pathsCross,clipEnds,edgeAnchorPoint,nodePortPoint,nearestNodePort,directionalNodePort,
   invalidateRouting,invalidatePathCache,_pathScore,_countCross}],
 ].forEach(([label,fns])=>Object.entries(fns).forEach(([k,v])=>{
@@ -85,6 +86,16 @@ function addNode(type,x,y){
     hideLabel:(type==='anchor'),hideFields:(type==='anchor'),
     ...(type==='anchor'?{fill:'#4dd0ff',opacity:1}:{}),
     data:(def.data||[]).map(k=>({key:k,keyEn:(DATA_LABEL_EN[k]||k),dv:''}))});
+  // 占位点直接拖放到已有占位点上 → 并入既有点（不新建重叠点）；拖放到连线上 → 立即分接为汇合点
+  if(type==='anchor'){
+    const nn=nodes[nodes.length-1];
+    let tgt=null,td=12/zoom;
+    nodes.forEach(o=>{ if(o===nn||o.type!=='anchor')return; const os=nsz(o); const d=Math.hypot(x-o.x,y-(o.y-os*0.22)); if(d<td){td=d;tgt=o;} });
+    if(tgt&&mergeAnchorInto(nn,tgt)){ normalizeAnchorJunctions();snapshot();selectNode(tgt.id);flashHint('已并入既有占位点');return; }
+    const hit=edgeHitInfo(x,y,12/zoom);
+    if(hit&&attachAnchorToEdge(nn,hit))flashHint('占位点已接入连线，成为汇合点；可从它引出新连线');
+    normalizeAnchorJunctions();
+  }
   snapshot();selectNode(id);
 }
 // 字段的「信号键段」：端到端统一用【英文名】作信号标识（规则条件/导出/实时数据契约都用它）。

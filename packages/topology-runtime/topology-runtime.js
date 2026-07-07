@@ -156,6 +156,10 @@ function createTopoRuntime(env) {
   function isLinearBusNode(n){
     return !!(n&&['busbar','trunk_ac','trunk_dc','tie_line'].includes(n.type));
   }
+  // 标注类元素（文本框/变量/占位点）不参与连线避障：它们本就常被贴近连线/设备放置，
+  // 且 text/variable 的真实包围盒由编辑器动态测量（_textBox），runtime 的估算盒并不准。
+  // 占位点作为连线端点/汇合点时不受影响（避障检测本就排除 from/to）。
+  function isRouteObstacle(n){ return !!n && n.type!=='text' && n.type!=='variable' && n.type!=='anchor'; }
   function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
   function linearBusSpan(n){
     const b=nodeBox(n), s=nsz(n);
@@ -171,6 +175,7 @@ function createTopoRuntime(env) {
   }
   function nodePortPoint(n, port){
     const b=nodeBox(n);
+    if(n.type==='anchor')return port?[b.cx,b.cy]:null;   // 占位点：任何端口都是中心（多条线交于同一点，不贴盒边）
     if(isLinearBusNode(n)){
       if(typeof port==='string'&&port.startsWith('line:')){
         const sp=linearBusSpan(n), r=clamp(parseFloat(port.slice(5)),0,1);
@@ -226,6 +231,7 @@ function createTopoRuntime(env) {
     return [bx.cx+dx*t, bx.cy+dy*t];
   }
   function edgeAnchorPoint(n, tx, ty, port){
+    if(n.type==='anchor'){const b=nodeBox(n);return [b.cx,b.cy];}   // 占位点：连线端点落中心（T 型汇合交于一点）
     const explicit=nodePortPoint(n,port);
     if(explicit)return explicit;
     const inferred=directionalNodePort(n,tx,ty);
@@ -251,6 +257,7 @@ function createTopoRuntime(env) {
     const nodes=getNodes();
     for(const n of nodes){
       if(n.id===fromId||n.id===toId) continue;
+      if(!isRouteObstacle(n)) continue;   // 标注类元素不算障碍：贴线放置不再把直线顶成折线
       for(let i=0;i<pts.length-1;i++)
         if(segRectHit(pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1],n,6)) return true;
     }
@@ -317,8 +324,11 @@ function createTopoRuntime(env) {
   let _pathCache={}, _pathCacheSig='', _busTrunks=[];
   function topoSig(){
     const nodes=getNodes(), edges=getEdges();
-    // 拓扑签名：节点位置 + 边连接，变化时缓存失效
-    return nodes.map(n=>n.id+':'+Math.round(n.x)+','+Math.round(n.y)+':'+n.type).join('|')+'##'+
+    // 拓扑签名：节点位置 + 边连接，变化时缓存失效。
+    // 非障碍且未被任何边引用的标注节点（文本框/变量/游离占位点）不影响布线 → 不计入签名，
+    // 挪动它们不再触发全局重路由（消除“挪个文本，别的线跟着变形”的抖动）
+    const linked=new Set(); edges.forEach(e=>{linked.add(e.from);linked.add(e.to);});
+    return nodes.filter(n=>isRouteObstacle(n)||linked.has(n.id)).map(n=>n.id+':'+Math.round(n.x)+','+Math.round(n.y)+':'+n.type).join('|')+'##'+
            edges.map(e=>e.from+'>'+e.to+':'+(e.route||'')+':'+(e.fromPort||'')+'>'+(e.toPort||'')).join('|');
   }
   function invalidatePathCache(){ _pathCache={}; }
@@ -327,8 +337,8 @@ function createTopoRuntime(env) {
   function invalidateRouting(){ _pathCacheSig=''; }
   function buildObstacleGrid(){
     const nodes=getNodes();
-    // 收集所有节点视觉盒作为障碍；底部延伸覆盖图标底边下方的标签区域
-    return nodes.map(n=>{
+    // 收集节点视觉盒作为障碍（标注类元素除外）；底部延伸覆盖图标底边下方的标签区域
+    return nodes.filter(isRouteObstacle).map(n=>{
       const b=nodeBox(n);
       const s=nsz(n);
       const lfs=labelWorldFontPx(n);
@@ -819,8 +829,8 @@ function createTopoRuntime(env) {
     const nodes=getNodes();
     const ba=nodeBox(a), bb=nodeBox(b);
     const p0=edgeAnchorPoint(a,bb.cx,bb.cy,e.fromPort), p1=edgeAnchorPoint(b,ba.cx,ba.cy,e.toPort);
-    // 收集所有障碍（排除 a、b）的边界，作为候选绕行通道
-    const obs=nodes.filter(n=>n.id!==a.id&&n.id!==b.id).map(n=>nodeBox(n));
+    // 收集所有障碍（排除 a、b 与标注类元素）的边界，作为候选绕行通道
+    const obs=nodes.filter(n=>n.id!==a.id&&n.id!==b.id&&isRouteObstacle(n)).map(n=>nodeBox(n));
     const cands=[];
     // 基本 L 型两种
     cands.push([p0,[p1[0],p0[1]],p1]);
@@ -836,7 +846,7 @@ function createTopoRuntime(env) {
     for(const c of cands){
       const cl=clipEnds(c,a,b,e);
       let hits=0;
-      for(const n of nodes){ if(n.id===a.id||n.id===b.id)continue;
+      for(const n of nodes){ if(n.id===a.id||n.id===b.id||!isRouteObstacle(n))continue;
         for(let i=0;i<cl.length-1;i++) if(segRectHit(cl[i][0],cl[i][1],cl[i+1][0],cl[i+1][1],n,6)){hits++;break;}
       }
       if(hits===0) return cl;
@@ -1053,6 +1063,24 @@ function createTopoRuntime(env) {
         if(Math.sqrt((wx-x1-t*dx)**2+(wy-y1-t*dy)**2)<9/zoom)return e;
       }}return null;
   }
+  // edgeAt 的增强版：返回连线上离 (wx,wy) 最近的点及所在段（占位点吸附/分接用）。
+  // tol：世界坐标容差（缺省 9/zoom）；skip(e)：返回 true 的连线跳过（如排除占位点自己的连线）
+  function edgeHitInfo(wx,wy,tol,skip){
+    const edges=getEdges(), zoom=getZoom();
+    const T=(tol!=null)?tol:9/zoom;
+    let best=null;
+    for(const e of edges){
+      if(skip&&skip(e))continue;
+      const pts=edgePath(e);if(!pts)continue;
+      for(let i=0;i<pts.length-1;i++){
+        const[x1,y1]=pts[i],[x2,y2]=pts[i+1];const dx=x2-x1,dy=y2-y1,len2=dx*dx+dy*dy;if(len2<1)continue;
+        let t=((wx-x1)*dx+(wy-y1)*dy)/len2;t=Math.max(0,Math.min(1,t));
+        const px=x1+t*dx,py=y1+t*dy,d=Math.hypot(wx-px,wy-py);
+        if(d<T&&(!best||d<best.dist))best={edge:e,point:[px,py],segIndex:i,dist:d};
+      }
+    }
+    return best;
+  }
 
   // ═════════ 线段相交判定（原 topology-editor-07-editing.js）═════════
   function segsCross(a,b,c,d){
@@ -1072,7 +1100,7 @@ function createTopoRuntime(env) {
     // 值字典（code → 中/英文案）
     findValueDict, resolveValueDict, valueDictLabel, translateFieldValue, fieldDisplayValue,
     // 几何 / 端口
-    nodeLabel, dataKey, nsz, nodeBox, anchorPoint, clamp, isLinearBusNode,
+    nodeLabel, dataKey, nsz, nodeBox, anchorPoint, clamp, isLinearBusNode, isRouteObstacle,
     linearBusSpan, linearBusPort, nodePortPoint, nearestNodePort, directionalNodePort,
     edgeAnchorPoint, portSide, segRectHit, pathHitsNodes, segBoxClip, ptInBox,
     clipEnds, sideOf, approachSide,
@@ -1082,7 +1110,7 @@ function createTopoRuntime(env) {
     routeOrtho, orthogonalize, edgePathRaw, channelRoute, alignJunctions,
     straightVariants, optimizeChannel, buildCorridorVariants, recomputeAllPaths,
     detourRoute, applyBusMerge, shareNearbyTrunks, dedupe, simplifyPath,
-    computeSmartEdge, edgePath, edgeAt, segsCross, pathsCross,
+    computeSmartEdge, edgePath, edgeAt, edgeHitInfo, segsCross, pathsCross,
     _pathLen, _pathBends, _pathDetourPenalty, _pathScore, _dedupCollinear, _countCross,
     // 状态访问（宿主绘制层用）
     busTrunks: function () { return _busTrunks; },

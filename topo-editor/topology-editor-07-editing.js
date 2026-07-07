@@ -96,6 +96,120 @@ function waypointInsertIndex(e,x,y){
   }
   return best; // 段 i（pts[i]→pts[i+1]）对应在 inner waypoints 中的插入位置
 }
+// ── 占位点 ⇢ 连线汇合点（T 型分接）──
+// 把占位点 n 接入 hit（edgeHitInfo 结果）：原边 A→B 在分接点分裂为 A→n 与 n→B 两条边。
+// 原边保留 id/标签/数据绑定（信号键 edgeId.En 不断链）；后半段继承线型/流向/走线样式。
+// 调用方负责前后 snapshot()。
+function attachAnchorToEdge(n, hit){
+  const e=hit&&hit.edge;
+  if(!n||!e||e.from===n.id||e.to===n.id)return false;
+  // 头/尾段查重：分接出的段落若与既有连线端点重复则去重共用（不产生叠线）
+  const dupOther=(f,t)=>edges.some(x=>x!==e&&((x.from===f&&x.to===t)||(x.from===t&&x.to===f)));
+  const headDup=dupOther(e.from,n.id), tailDup=dupOther(n.id,e.to);
+  // 占位点视觉中心（y - s*0.22）对齐到分接点
+  const s=nsz(n);
+  n.x=hit.point[0]; n.y=hit.point[1]+s*0.22;
+  if(headDup&&tailDup){ edges=edges.filter(x=>x!==e); invalidateRouting(); return true; }   // 两段都已有共用线 → 整条冗余
+  // 手动折线：按当前绘制路径在分接段拆分拐点（前半 = 段 0..segIndex 的内点，后半 = 其余内点）
+  let headW=null,restW=null;
+  if(e.route==='manual'&&e.waypoints&&e.waypoints.length){
+    const pts=edgePath(e)||[];
+    headW=pts.slice(1,hit.segIndex+1).map(p=>p.slice());
+    restW=pts.slice(hit.segIndex+1,Math.max(hit.segIndex+1,pts.length-1)).map(p=>p.slice());
+  }
+  const setWps=(edge,wps)=>{ if(wps===null)return; if(wps.length)edge.waypoints=wps; else {delete edge.waypoints;edge.route='smart';} };
+  if(tailDup){   // 占位点→终点已有共用线 → 本线截到占位点为止
+    e.to=n.id; delete e.toPort; setWps(e,headW);
+    if(e.route==='manual')simplifyWaypoints(e);
+    invalidateRouting(); return true;
+  }
+  if(headDup){   // 起点→占位点已有共用线 → 本线改从占位点出发（id/标签随线保留）
+    e.from=n.id; delete e.fromPort; setWps(e,restW);
+    if(e.route==='manual')simplifyWaypoints(e);
+    invalidateRouting(); return true;
+  }
+  const tail={from:n.id,to:e.to,et:e.et,dir:e.dir||'forward',route:e.route||'smart',lbl:''};
+  if(e.toPort)tail.toPort=e.toPort;
+  if(e.w)tail.w=e.w;
+  if(e.lineColor)tail.lineColor=e.lineColor;
+  if(e.lineStyle)tail.lineStyle=e.lineStyle;
+  if(e.orthoSnap===false)tail.orthoSnap=false;
+  if(e.showWhen!=null)tail.showWhen=e.showWhen;
+  if(Array.isArray(e.dirRules)&&e.dirRules.length)tail.dirRules=JSON.parse(JSON.stringify(e.dirRules));
+  if(restW!==null&&restW.length){tail.waypoints=restW;tail.route='manual';}else if(restW!==null)tail.route='smart';
+  setWps(e,headW);
+  e.to=n.id; delete e.toPort;
+  edges.splice(edges.indexOf(e)+1,0,tail);   // 紧跟原边插入，保持绘制/序列化顺序稳定
+  if(e.route==='manual')simplifyWaypoints(e);
+  if(tail.route==='manual')simplifyWaypoints(tail);
+  invalidateRouting();
+  return true;
+}
+// ── 汇合规整：连线路径「穿过」某个占位点（非自身端点）时，在该点自动分接；
+//    分接出的段落若与既有连线端点重复则去重共用 → 多条线汇合后共用同一条线段（只画一条、一个箭头）。
+//    仅在离散提交点调用（新建连线/占位点落点或合并/端点重连），拖拽过程中不调用。调用方负责 snapshot()。
+function splitEdgeThroughAnchor(e,n,segIndex){
+  // 在占位点中心分接（点即占位点中心 → 不挪动占位点）；头/尾段查重逻辑统一在 attachAnchorToEdge 内
+  const s=nsz(n);
+  return attachAnchorToEdge(n,{edge:e,point:[n.x,n.y-s*0.22],segIndex});
+}
+function normalizeAnchorJunctions(){
+  // 上限按结构规模推导：每次分接最多让边数 +1，穿过 k 个占位点需 k 次 → 边数+占位点数 足够收敛
+  const maxPass=edges.length+nodes.length+12;
+  let changed=false,guard=0;
+  while(guard++<maxPass){
+    let did=false;
+    outer:
+    for(const e of edges.slice()){
+      if(!edges.includes(e))continue;
+      if(!nodes.find(x=>x.id===e.from)||!nodes.find(x=>x.id===e.to))continue;
+      const pts=edgePath(e); if(!pts||pts.length<2)continue;
+      for(const n of nodes){
+        if(n.type!=='anchor'||n.id===e.from||n.id===e.to)continue;
+        const s=nsz(n), cx=n.x, cy=n.y-s*0.22, tol=Math.max(s*0.45,4);
+        for(let i=0;i<pts.length-1;i++){
+          const[x1,y1]=pts[i],[x2,y2]=pts[i+1];const dx=x2-x1,dy=y2-y1,l2=dx*dx+dy*dy;if(l2<1)continue;
+          let t=((cx-x1)*dx+(cy-y1)*dy)/l2;t=Math.max(0,Math.min(1,t));
+          const px=x1+t*dx,py=y1+t*dy;
+          if(Math.hypot(cx-px,cy-py)>=tol)continue;
+          // 投影点不能贴着连线自己的端点（否则是端点相邻，不是"穿过"）
+          if(Math.hypot(px-pts[0][0],py-pts[0][1])<=tol||Math.hypot(px-pts[pts.length-1][0],py-pts[pts.length-1][1])<=tol)continue;
+          if(splitEdgeThroughAnchor(e,n,i)){did=true;changed=true;break outer;}
+        }
+      }
+    }
+    if(!did)break;
+  }
+  if(changed)invalidateRouting();
+  return changed;
+}
+// ── 占位点合并：把 src 的所有连线改接到 dst 后删除 src → 多个相邻汇合点聚为一个 ──
+// 自环（原本连接两点之间的线）删除；同一对端点的重复线只留一条（与创建连线的防重规则一致），
+// 重复时优先保留带 id/标签绑定的那条（信号键不丢）。调用方负责前后 snapshot()。
+function mergeAnchorInto(src,dst){
+  if(!src||!dst||src===dst||src.type!=='anchor'||dst.type!=='anchor')return false;
+  edges.forEach(e=>{ if(e.from===src.id)e.from=dst.id; if(e.to===src.id)e.to=dst.id; });
+  edges=edges.filter(e=>e.from!==e.to);   // 去自环
+  // 同端点对去重：优先保留「带信号键/标签绑定/数据驱动规则」的那条；双方都带元数据时保留先出现的，
+  // 并明确告警被丢的信号键/规则（不静默丢链路）
+  const meta=e=>!!(e.id||(e.lblBind&&e.lblBind.field)||e.showWhen!=null||(Array.isArray(e.dirRules)&&e.dirRules.length));
+  const keep=new Map(),droppedMeta=[];
+  edges.forEach(e=>{
+    const k=e.from<e.to?(e.from+'>'+e.to):(e.to+'>'+e.from);
+    const cur=keep.get(k);
+    if(!cur){keep.set(k,e);return;}
+    let drop=e;
+    if(!meta(cur)&&meta(e)){keep.set(k,e);drop=cur;}
+    if(meta(drop))droppedMeta.push(edgeLabelSig(drop)||edgeLabelDisplayName(drop));
+  });
+  const kept=new Set(keep.values());
+  edges=edges.filter(e=>kept.has(e));
+  nodes=nodes.filter(n=>n!==src);
+  if(selNode===src.id)selNode=dst.id;
+  invalidateRouting();
+  if(droppedMeta.length)flashHint('⚠ 合并去重删除了带绑定/规则的重复连线：'+droppedMeta.join('、')+'（如需保留请撤销）');
+  return true;
+}
 // 标签背景板颜色（用纯背景色不透明，彻底遮住下方连线，避免文字与线叠加）
 function bgPlate(){
   return bgColor;
@@ -1346,6 +1460,27 @@ function ctxDel(){if(ctxKind==='node'){selNode=ctxTgt.id;deleteSelected();}else{
 function ctxCopy(){document.getElementById('ctxmenu').style.display='none';if(ctxKind==='node'){selSet.clear();selChips.clear();selectNode(ctxTgt.id);copySelection();pasteClipboard();}}
 function ctxStraight(){document.getElementById('ctxmenu').style.display='none';if(ctxKind==='edge'){snapshot();ctxTgt.route='smart';delete ctxTgt.waypoints;invalidateRouting();snapshot();selectEdge(ctxTgt);flashHint('该连线已重置为智能走线（最短·自动避障）');}}
 function ctxLine(){document.getElementById('ctxmenu').style.display='none';if(ctxKind==='edge'){snapshot();ctxTgt.route='line';delete ctxTgt.waypoints;delete ctxTgt.orthoDir;invalidateRouting();snapshot();selectEdge(ctxTgt);flashHint('该连线已设为直线（起止直连）');}}
+// 右键连线「从此处引出连线」：在点击处插入占位点（原边分接为两段），并立即进入连线模式从该汇合点起线
+function ctxTapEdge(){
+  document.getElementById('ctxmenu').style.display='none';
+  if(ctxKind!=='edge'||!ctxTgt)return;
+  const hit=edgeHitInfo(ctxWX,ctxWY,14/zoom,oe=>oe!==ctxTgt);   // 只在右键命中的这条线上找分接点
+  if(!hit){flashHint('未在连线上找到分接点');return;}
+  snapshot();
+  const id=genId('anchor');
+  const dev=DEVICE_GROUPS.flatMap(g=>g.devices).find(d=>d.type==='anchor');
+  const n={id,type:'anchor',labelZh:(dev&&dev.label)||'占位点',labelEn:(dev&&dev.label_en)||'Anchor',
+    x:hit.point[0],y:hit.point[1],fontSize:14,fontColor:'#e8f4ff',scale:0.5,
+    hideLabel:true,hideFields:true,fill:'#4dd0ff',opacity:1,data:[]};
+  nodes.push(n);
+  n.y=hit.point[1]+nsz(n)*0.22;   // 视觉中心对齐分接点（attach 内亦会校正，此处兜底 attach 失败的情况）
+  attachAnchorToEdge(n,hit);
+  normalizeAnchorJunctions();
+  snapshot();
+  if(!edgeMode)toggleEdgeMode();
+  edgeFrom=id;edgeFromPort=null;edgeWaypoints=[];
+  document.getElementById('ehint').textContent='连线['+ET[pendingET].label+']：已从汇合点出发，点空白处加拐点，点目标节点完成';
+}
 
 // 外观面板：非模态（无遮罩、不点外即关），画布保持可交互，便于「选节点→批量应用」的往返操作
 function closeBgPanel(){const p=document.getElementById('bgpanel');if(p)p.classList.remove('show');}

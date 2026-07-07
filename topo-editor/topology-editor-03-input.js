@@ -215,7 +215,9 @@ canvas.addEventListener('mousedown',e=>{
             simplifyWaypoints(newEdge);
             dropOverroutedManualWaypoints(newEdge);
           }
-          edges.push(newEdge);snapshot();
+          edges.push(newEdge);
+          normalizeAnchorJunctions();   // 新线穿过既有占位点 → 自动分接/去重（汇合共用一条线）
+          snapshot();
         }
         edgeFrom=null;edgeFromPort=null;edgeWaypoints=[];document.getElementById('ehint').textContent='连线['+ET[pendingET].label+']：点击起始节点…';
         // 连完一条线后自动回到普通模式（除非勾选了「连续连线」）
@@ -486,6 +488,20 @@ canvas.addEventListener('mousemove',e=>{
   if(bestX!=null){nx=bestX;alignGuides.push({type:'v',x:guideX});}
   if(bestY!=null){ny=bestY;alignGuides.push({type:'h',y:guideY});}
   dragNode.x=nx;dragNode.y=ny;_dragging=true;_dragIds=new Set([dragNode.id]);
+  // 占位点拖拽吸附（优先级：其他占位点＞连线）：
+  //   靠近其他占位点 → 吸到其中心，松手合并为一个汇合点；
+  //   靠近连线      → 吸到线上最近点，松手分接为汇合点（排除它自己的连线）
+  _edgeSnapHover=null;_anchorMergeHover=null;
+  if(dragNode.type==='anchor'){
+    const s=nsz(dragNode), vcx=dragNode.x, vcy=dragNode.y-s*0.22;
+    let tgt=null,td=12/zoom;
+    nodes.forEach(o=>{ if(o===dragNode||o.type!=='anchor')return; const os=nsz(o); const d=Math.hypot(vcx-o.x,vcy-(o.y-os*0.22)); if(d<td){td=d;tgt=o;} });
+    if(tgt){ const os=nsz(tgt); dragNode.x=tgt.x; dragNode.y=(tgt.y-os*0.22)+s*0.22; _anchorMergeHover={target:tgt}; }
+    else{
+      const hit=edgeHitInfo(vcx,vcy,12/zoom,oe=>oe.from===dragNode.id||oe.to===dragNode.id);
+      if(hit){dragNode.x=hit.point[0];dragNode.y=hit.point[1]+s*0.22;_edgeSnapHover=hit;}
+    }
+  }
   if(selNode===dragNode.id){document.getElementById('p-x').textContent=dragNode.x.toFixed(0);document.getElementById('p-y').textContent=dragNode.y.toFixed(0);}
 });
 // 统一收尾所有拖拽状态。注册在 window 上：缩放/旋转手柄常被拖出画布（大文本框尤甚），
@@ -517,7 +533,7 @@ function endAllDrags(){
     const changed=_e[dragEndpoint.which]!==dragEndpoint.orig || _e[portKey]!==dragEndpoint.origPort;
     if(changed){ delete _e.waypoints; if(_e.route==='manual')_e.route='smart'; }   // 端点变了→旧拐点作废，重新走线
     dragEndpoint=null;invalidateRouting();canvas.style.cursor='default';
-    if(changed){snapshot();flashHint('已重连该端');}
+    if(changed){normalizeAnchorJunctions();snapshot();flashHint('已重连该端');}
     return;
   }
   if(dragWaypoint){const _dw=dragWaypoint,_e=_dw.e;dragWaypoint=null;alignGuides=[];
@@ -531,17 +547,26 @@ function endAllDrags(){
     // 把存储拐点同步为「实际渲染后的正交拐点」：强制正交会让线在直角处转弯而非原始点，
     // 不同步就会残留偏离线条的孤立手柄、并越拖越多。同步后手柄恒在线上、抓取即命中。
     invalidateRouting(); const rp=edgePath(_e); if(rp&&rp.length>2){ _e.waypoints=rp.slice(1,-1).map(p=>p.slice()); simplifyWaypoints(_e); autoAttachLooseEdgeEnds(_e); dropOverroutedManualWaypoints(_e); }
+    normalizeAnchorJunctions();   // 拐点拖到占位点上/线穿过占位点 → 自动分接/去重
     invalidateRouting();snapshot();canvas.style.cursor='default';return;}
   if(dragChipGroup){dragChipGroup=null;snapshot();canvas.style.cursor='default';return;}
   if(dragChip){dragChip=null;snapshot();canvas.style.cursor='default';return;}
   if(dragEdgeLabel){const moved=dragEdgeLabel.moved;dragEdgeLabel=null;if(moved)snapshot();canvas.style.cursor='default';return;}
   if(dragLblRotate){dragLblRotate=null;_hud=null;snapshot();canvas.style.cursor='default';return;}
   if(dragLblScale){dragLblScale=null;_hud=null;snapshot();canvas.style.cursor='default';return;}
-  if(dragNode){suppressNodeActionClick=true;setTimeout(()=>{suppressNodeActionClick=false;},0);_dragging=false;_groupDrag=false;_dragIds=new Set();invalidateRouting();alignGuides=[];snapshot();}
+  if(dragNode){suppressNodeActionClick=true;setTimeout(()=>{suppressNodeActionClick=false;},0);_dragging=false;_groupDrag=false;_dragIds=new Set();
+    // 占位点落在另一占位点上 → 合并为一个汇合点；落在连线上 → 分接为汇合点（原边分裂为两段）
+    if(dragNode.type==='anchor'&&_anchorMergeHover){ const t=_anchorMergeHover.target; if(mergeAnchorInto(dragNode,t)){selectNode(t.id);flashHint('两个占位点已合并为一个汇合点');} }
+    else if(dragNode.type==='anchor'&&_edgeSnapHover){ if(attachAnchorToEdge(dragNode,_edgeSnapHover))flashHint('占位点已接入连线，成为汇合点；可从它引出新连线'); }
+    if(dragNode.type==='anchor')normalizeAnchorJunctions();   // 占位点动过 → 穿过它的线自动分接/去重
+    _edgeSnapHover=null;_anchorMergeHover=null;
+    invalidateRouting();alignGuides=[];snapshot();}
   dragNode=null;canvas.style.cursor=edgeMode?'crosshair':'default';
 }
 window.addEventListener('mouseup',endAllDrags);
-canvas.addEventListener('mouseleave',()=>{dragNode=null;isPanning=false;});
+// 指针离开画布不中断节点拖拽：mouseup 挂在 window 上，出画布松手仍会走 endAllDrags 统一收尾
+// （旧实现在此清 dragNode，导致画布外松手跳过 snapshot/合并/分接，且 _dragging/_dragIds 残留）
+canvas.addEventListener('mouseleave',()=>{isPanning=false;});
 function isNodeActionRuntime(){return previewMode||document.body.classList.contains('rt');}
 function openNodeAction(action){
   if(!action||!action.url)return false;
@@ -677,9 +702,10 @@ canvas.addEventListener('contextmenu',e=>{
   e.preventDefault();const r=canvas.getBoundingClientRect();const[wx,wy]=toWorld(e.clientX-r.left,e.clientY-r.top);
   const n=nodeAt(wx,wy),ed=edgeAt(wx,wy),m=document.getElementById('ctxmenu');
   if(n&&triggerNodeAction(n,'contextmenu'))return;
-  if(n||ed){ctxTgt=n||ed;ctxKind=n?'node':'edge';
+  if(n||ed){ctxTgt=n||ed;ctxKind=n?'node':'edge';ctxWX=wx;ctxWY=wy;
     document.getElementById('ctx-conn').style.display=n?'flex':'none';
     document.getElementById('ctx-copy').style.display=n?'flex':'none';
+    document.getElementById('ctx-tap').style.display=(!n&&ed)?'flex':'none';
     document.getElementById('ctx-straight').style.display=ed?'flex':'none';
     document.getElementById('ctx-line').style.display=ed?'flex':'none';
     document.getElementById('ctx-del-edge').style.display=ed?'flex':'none';

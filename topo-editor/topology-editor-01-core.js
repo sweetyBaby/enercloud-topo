@@ -163,7 +163,9 @@ let edgeMode=false,edgeFrom=null,edgeFromPort=null,edgeWaypoints=[],pendingET='a
 let dragNode=null,dox=0,doy=0,panX=0,panY=0,zoom=1,isPanning=false,panSX=0,panSY=0;
 let dragChip=null,dchox=0,dchoy=0,dragWaypoint=null,dragBus=null,dragResize=null,dragGroupScale=null,_groupBox=null,dragRotate=null,_hud=null,dragChipGroup=null,dragEndpoint=null,dragEdgeLabel=null,dragLblRotate=null,dragLblScale=null;
 let selSet=new Set(),selChips=new Set(),rubber=null,_groupDrag=false,_groupStart={},alignGuides=[],_overlapHandles=[]; // 多选集合 + 选中字段 + 框选矩形 + 对齐辅助线 + 重叠线拐点浅色手柄
-let ids={},animT=0,ctxTgt=null,ctxKind=null,bgColor='#0a1f40',showGrid=true,showEdgeLabels=true,showFieldChips=true,showAnchors=true,busMerge=true,busMergeGap=16,busTrunkBold=true,busStyle='busbar',busOffsets={},busShareTrunk=false,busShowHandles=false,routeStyle=3,busAggregation=false;
+let _edgeSnapHover=null; // 占位点拖拽吸附到连线的命中信息（edgeHitInfo 结果），松手即分接为汇合点
+let _anchorMergeHover=null; // 占位点拖拽吸附到另一占位点：{target}，松手即合并为一个汇合点
+let ids={},animT=0,ctxTgt=null,ctxKind=null,ctxWX=0,ctxWY=0,bgColor='#0a1f40',showGrid=true,showEdgeLabels=true,showFieldChips=true,showAnchors=true,busMerge=true,busMergeGap=16,busTrunkBold=true,busStyle='busbar',busOffsets={},busShareTrunk=false,busShowHandles=false,routeStyle=3,busAggregation=false;
 let history=[],histIdx=-1;
 let suppressNodeActionClick=false;
 // ★ 数据驱动（动态显隐/流向）：规则随信号实时求值并自动生效；面板开关与「运行视图」互相独立

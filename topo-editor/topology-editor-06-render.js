@@ -2,6 +2,14 @@ function loop(ts){animT=ts*.001;drawAll();requestAnimationFrame(loop);}
 function hexRgb(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
 function rgba(h,a){const[r,g,b]=hexRgb(h);return`rgba(${r},${g},${b},${a})`;}
 
+// 已成汇合点的占位点：≥2 条连线接入（分接后的占位点即是）。此时占位点自身的填充圆隐藏、
+// 进出它的箭头抑制——视觉上只留 drawJunctionDots 画的那一个线色实心点，与普通线路汇合完全一致。
+function isJunctionAnchor(id){
+  const n=nodes.find(x=>x.id===id);
+  if(!n||n.type!=='anchor')return false;
+  let c=0; for(const e of edges){ if(e.from===id||e.to===id){ if(++c>=2)return true; } }
+  return false;
+}
 // 汇合/分支「电气节点」：在多条连线交汇于同一点、或某连线端点接入另一条连线处，画一个实心点，
 // 让"两线并为一处""线路在此分支/接入"一目了然（拖动对齐到同一通道、自动汇合后即出现该节点点）。
 function drawJunctionDots(){
@@ -108,6 +116,24 @@ function drawAll(){
       ctx.stroke();
     });
     ctx.setLineDash([]);ctx.restore();
+  }
+  // 占位点吸附连线预览：高亮分接点（松手即把原边分裂为两段、占位点成为汇合点）
+  if(_edgeSnapHover){
+    const p=_edgeSnapHover.point;
+    ctx.save();
+    ctx.fillStyle='rgba(255,204,68,0.22)';ctx.strokeStyle='#ffcc44';ctx.lineWidth=2/zoom;
+    ctx.beginPath();ctx.arc(p[0],p[1],10/zoom,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#ffcc44';
+    ctx.beginPath();ctx.arc(p[0],p[1],2.5/zoom,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  // 占位点吸附另一占位点预览：绿色环（松手即合并为一个汇合点）
+  if(_anchorMergeHover){
+    const t=_anchorMergeHover.target, ts=nsz(t);
+    ctx.save();
+    ctx.strokeStyle='#2ecc71';ctx.lineWidth=2/zoom;ctx.setLineDash([4/zoom,3/zoom]);
+    ctx.beginPath();ctx.arc(t.x,t.y-ts*0.22,12/zoom,0,Math.PI*2);ctx.stroke();
+    ctx.restore();
   }
   // 实时数值提示（旋转角度/缩放比例）
   if(_hud){
@@ -336,8 +362,9 @@ function drawEdge(e){
   // arrow at end（dir 已在函数顶部按数据驱动求得）
   const p2=pts[pts.length-1],p1=pts[pts.length-2];
   const pa=pts[0],pb=pts[1];
-  if((dir==='forward'||dir==='both')&&cfg.anim!=='busbar'&&cfg.anim!=='pipe')drawArrowSeg(p1,p2,cfg.color,cfg.w);
-  if((dir==='reverse'||dir==='both')&&cfg.anim!=='busbar'&&cfg.anim!=='pipe')drawArrowSeg(pb,pa,cfg.color,cfg.w);
+  // 端点是汇合占位点时不画箭头：流向经汇合点贯通，箭头戳在汇合圆点上是视觉噪音（流向动画仍表达方向）
+  if((dir==='forward'||dir==='both')&&cfg.anim!=='busbar'&&cfg.anim!=='pipe'&&!isJunctionAnchor(e.to))drawArrowSeg(p1,p2,cfg.color,cfg.w);
+  if((dir==='reverse'||dir==='both')&&cfg.anim!=='busbar'&&cfg.anim!=='pipe'&&!isJunctionAnchor(e.from))drawArrowSeg(pb,pa,cfg.color,cfg.w);
   // label：文字(中/英随语言) + 绑定值(经值字典转义)；可拖拽偏移/旋转/缩放/横竖走向（走向 auto=随标签所在线段方向）
   if(showEdgeLabels && !e.hideLabel){
     let lbl=edgeLabelText(e);
@@ -467,8 +494,10 @@ function drawNode(n){
   if(rot){ctx.translate(vcx,vcy);ctx.rotate(rot);ctx.translate(-vcx,-vcy);}
   if(n.type==='anchor'){
     // 占位点：可配置填充色 + 不透明度。把填充设为画布同色或不透明度调 0 即可对用户「隐形」。
+    // 已成汇合点（≥2 条连线接入）时自动隐藏自身填充圆——汇合视觉交给 drawJunctionDots 的线色实心点，
+    // 画面上只有一个点；游离/单边占位点照常显示，便于继续拖拽和连线。
     const r=s*0.36, op=(n.opacity!=null?n.opacity:1);
-    if(n.fill && n.fill!=='none' && op>0){
+    if(n.fill && n.fill!=='none' && op>0 && !isJunctionAnchor(n.id)){
       ctx.globalAlpha=op*_drawAlpha;ctx.fillStyle=n.fill;
       ctx.beginPath();ctx.arc(vcx,vcy,r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=_drawAlpha;
     }
