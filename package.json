@@ -3,7 +3,7 @@
     "dev": "node scripts/dev-server.js --port 3009",
     "build": "python scripts/build.py",
     "start": "node scripts/server.js",
-    "test": "node packages/topology-runtime/test/routing-golden.mjs && node packages/topology-runtime/test/rules-consistency.mjs"
+    "test": "node packages/topology-runtime/test/routing-golden.mjs && node packages/topology-runtime/test/rules-consistency.mjs && node packages/topology-runtime/test/device-type-normalize.mjs"
   },
   "devDependencies": {}
 }

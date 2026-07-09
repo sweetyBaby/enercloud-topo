@@ -1,0 +1,1116 @@
+{
+  "schemaVersion": "tpl-1",
+  "template": {
+    "id": "tpl_4",
+    "name": "鄂尔多斯",
+    "nameEn": "Ordos",
+    "desc": "",
+    "builtin": false
+  },
+  "canvas": {
+    "schemaVersion": "2.0",
+    "meta": {
+      "app": "储能拓扑编辑器",
+      "generatedAt": "2026-07-09T02:35:26.930Z",
+      "lang": "zh",
+      "libraryRef": {
+        "name": "energy-topology",
+        "version": "2.0.0"
+      },
+      "canvas": {
+        "bgColor": "#0a1f40",
+        "zoom": 0.1,
+        "panX": 341.8,
+        "panY": 381.1,
+        "grid": {
+          "show": true,
+          "stepPx": 40
+        },
+        "showAnchors": true
+      },
+      "view": {
+        "showEdgeLabels": true,
+        "showFieldChips": true,
+        "globalWidth": 1,
+        "routeStyle": 3,
+        "busMerge": true,
+        "busMergeGap": 16,
+        "busTrunkBold": true,
+        "busStyle": "busbar",
+        "busShareTrunk": false,
+        "busAggregation": false
+      }
+    },
+    "edgeStyles": {
+      "charge": {
+        "labelZh": "充电中",
+        "labelEn": "Charging",
+        "color": "#2ecc71",
+        "width": 2.5,
+        "dash": [],
+        "anim": "flow",
+        "speed": 0.9
+      },
+      "ac_power": {
+        "labelZh": "交流电力",
+        "labelEn": "AC Power",
+        "color": "#e74c3c",
+        "width": 2.5,
+        "dash": [],
+        "anim": "flow",
+        "speed": 0.5
+      }
+    },
+    "nodes": [
+      {
+        "id": "pcs_1",
+        "type": "pcs",
+        "label": {
+          "zh": "PCS变流器#2",
+          "en": "PCS"
+        },
+        "position": {
+          "x": 717.2,
+          "y": 686.7
+        },
+        "sizeWorld": 776,
+        "scale": 1,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#2ecc71",
+        "display": {
+          "showLabel": true,
+          "showFields": true
+        },
+        "data": [
+          {
+            "key": {
+              "zh": "交流功率(kW)",
+              "en": "P(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": 48,
+              "y": 47
+            }
+          },
+          {
+            "key": {
+              "zh": "交流电流(A)",
+              "en": "I(A)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": 48,
+              "y": -19
+            }
+          },
+          {
+            "key": {
+              "zh": "直流功率(KW)",
+              "en": "DC-P(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -267,
+              "y": -47
+            }
+          },
+          {
+            "key": {
+              "zh": "直流电压(V)",
+              "en": "U(V)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -267,
+              "y": -13.2
+            }
+          },
+          {
+            "key": {
+              "zh": "直流电流(A)",
+              "en": "DC-I(A)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -267,
+              "y": -78.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "bms_2",
+        "type": "bms",
+        "label": {
+          "zh": "电池BMS#2",
+          "en": "Battery BMS"
+        },
+        "position": {
+          "x": 717.2,
+          "y": 2516.5
+        },
+        "sizeWorld": 776,
+        "scale": 1,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#3aa0ff",
+        "display": {
+          "showLabel": true,
+          "showFields": true
+        },
+        "data": [
+          {
+            "key": {
+              "zh": "电压(v)",
+              "en": "U(V)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -3,
+              "y": -70
+            },
+            "dict": "",
+            "bind": {
+              "field": "AuxDataLogs.PackVoltage",
+              "deviceType": "BCU",
+              "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+              "followNode": true
+            }
+          },
+          {
+            "key": {
+              "zh": "电流(A)",
+              "en": "I(A)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -3,
+              "y": -74
+            },
+            "dict": "",
+            "bind": {
+              "field": "AuxDataLogs.PackCurrent",
+              "deviceType": "BCU",
+              "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+              "followNode": true
+            }
+          },
+          {
+            "key": {
+              "zh": "功率(kW)",
+              "en": "P(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -3,
+              "y": -78
+            },
+            "bind": {
+              "calc": {
+                "operands": [
+                  {
+                    "field": "AuxDataLogs.PackCurrent",
+                    "deviceType": "BCU",
+                    "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+                    "followNode": true
+                  },
+                  {
+                    "field": "AuxDataLogs.PackVoltage",
+                    "deviceType": "BCU",
+                    "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+                    "followNode": true
+                  },
+                  {
+                    "const": 1000
+                  }
+                ],
+                "operators": [
+                  "*",
+                  "/"
+                ]
+              }
+            }
+          },
+          {
+            "key": {
+              "zh": "SOC",
+              "en": "SOC"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -3,
+              "y": -82
+            },
+            "dict": "",
+            "bind": {
+              "field": "AuxDataLogs.SystemSOC",
+              "deviceType": "BCU",
+              "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+              "followNode": true
+            }
+          },
+          {
+            "key": {
+              "zh": "状态",
+              "en": "State"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -3,
+              "y": -83
+            },
+            "bind": {
+              "field": "AuxDataLogs.PackCurrent",
+              "deviceType": "BCU",
+              "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+              "followNode": true
+            }
+          }
+        ],
+        "deviceType": "BCU",
+        "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+        "iconRules": [
+          {
+            "when": {
+              "var": "bms_2.I(A)",
+              "op": ">",
+              "val": 1
+            },
+            "icon": "bms_charge"
+          },
+          {
+            "when": {
+              "var": "bms_2.I(A)",
+              "op": "<",
+              "val": -1
+            },
+            "icon": "bms_discharge"
+          }
+        ]
+      },
+      {
+        "id": "grid_1",
+        "type": "grid",
+        "label": {
+          "zh": "市电",
+          "en": "Grid"
+        },
+        "position": {
+          "x": -2621.7,
+          "y": 36.7
+        },
+        "sizeWorld": 940,
+        "scale": 1,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "display": {
+          "showLabel": true,
+          "showFields": true
+        },
+        "data": [
+          {
+            "key": {
+              "zh": "P(kW)",
+              "en": "P(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -92,
+              "y": 111
+            }
+          },
+          {
+            "key": {
+              "zh": "Q(kVar)",
+              "en": "Q(kVar)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -93,
+              "y": 109
+            }
+          }
+        ]
+      },
+      {
+        "id": "load_1",
+        "type": "load",
+        "label": {
+          "zh": "用户负载",
+          "en": "Load"
+        },
+        "position": {
+          "x": 4151.7,
+          "y": 66.3
+        },
+        "sizeWorld": 776,
+        "scale": 1,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "display": {
+          "showLabel": true,
+          "showFields": true
+        },
+        "data": [
+          {
+            "key": {
+              "zh": "负载功率(kW)",
+              "en": "Load(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -99,
+              "y": 90
+            }
+          }
+        ]
+      },
+      {
+        "id": "pcs_2",
+        "type": "pcs",
+        "label": {
+          "zh": "PCS变流器#1",
+          "en": "PCS"
+        },
+        "position": {
+          "x": 717.2,
+          "y": -685.7
+        },
+        "sizeWorld": 776,
+        "scale": 1,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#2ecc71",
+        "display": {
+          "showLabel": true,
+          "showFields": true
+        },
+        "data": [
+          {
+            "key": {
+              "zh": "交流功率(kW)",
+              "en": "P(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": 48,
+              "y": -7
+            }
+          },
+          {
+            "key": {
+              "zh": "交流电流(A)",
+              "en": "I(A)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": 48,
+              "y": -6
+            }
+          },
+          {
+            "key": {
+              "zh": "直流功率(KW)",
+              "en": "DC-P(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -267,
+              "y": -106
+            }
+          },
+          {
+            "key": {
+              "zh": "直流电流(A)",
+              "en": "DC-I(A)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -267,
+              "y": -105.1
+            }
+          },
+          {
+            "key": {
+              "zh": "直流电压(V)",
+              "en": "U(V)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -267,
+              "y": -104.2
+            }
+          }
+        ]
+      },
+      {
+        "id": "bms_1",
+        "type": "bms",
+        "label": {
+          "zh": "电池BMS#1",
+          "en": "Battery BMS"
+        },
+        "position": {
+          "x": 717.2,
+          "y": -2551.6
+        },
+        "sizeWorld": 776,
+        "scale": 1,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#3aa0ff",
+        "display": {
+          "showLabel": true,
+          "showFields": true
+        },
+        "data": [
+          {
+            "key": {
+              "zh": "电压(v)",
+              "en": "U(V)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -1,
+              "y": -12
+            },
+            "dict": "",
+            "bind": {
+              "field": "AuxDataLogs.PackVoltage",
+              "deviceType": "BCU",
+              "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+              "followNode": true
+            }
+          },
+          {
+            "key": {
+              "zh": "电流(A)",
+              "en": "I(A)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -1,
+              "y": -16
+            },
+            "dict": "",
+            "bind": {
+              "field": "AuxDataLogs.PackCurrent",
+              "deviceType": "BCU",
+              "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+              "followNode": true
+            }
+          },
+          {
+            "key": {
+              "zh": "功率(kW)",
+              "en": "P(kW)"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -1,
+              "y": -20
+            },
+            "bind": {
+              "calc": {
+                "operands": [
+                  {
+                    "field": "AuxDataLogs.PackCurrent",
+                    "deviceType": "BCU",
+                    "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+                    "followNode": true
+                  },
+                  {
+                    "field": "AuxDataLogs.PackVoltage",
+                    "deviceType": "BCU",
+                    "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+                    "followNode": true
+                  },
+                  {
+                    "const": 1000
+                  }
+                ],
+                "operators": [
+                  "*",
+                  "/"
+                ]
+              }
+            }
+          },
+          {
+            "key": {
+              "zh": "SOC",
+              "en": "SOC"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -1,
+              "y": -24
+            },
+            "dict": "",
+            "bind": {
+              "field": "AuxDataLogs.SystemSOC",
+              "deviceType": "BCU",
+              "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+              "followNode": true
+            }
+          },
+          {
+            "key": {
+              "zh": "状态",
+              "en": "State"
+            },
+            "value": "",
+            "hidden": false,
+            "offset": {
+              "x": -1,
+              "y": -25
+            },
+            "bind": {
+              "field": "AuxDataLogs.PackCurrent",
+              "deviceType": "BCU",
+              "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+              "followNode": true
+            }
+          }
+        ],
+        "deviceType": "BCU",
+        "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+        "iconRules": [
+          {
+            "when": {
+              "var": "bms_1.I(A)",
+              "op": ">",
+              "val": 1
+            },
+            "icon": "bms_charge"
+          },
+          {
+            "when": {
+              "var": "bms_1.I(A)",
+              "op": "<",
+              "val": -1
+            },
+            "icon": "bms_discharge"
+          }
+        ]
+      },
+      {
+        "id": "anchor_2",
+        "type": "anchor",
+        "label": {
+          "zh": "占位点",
+          "en": "Anchor Point"
+        },
+        "position": {
+          "x": -1669.6,
+          "y": -136.5
+        },
+        "sizeWorld": 153,
+        "scale": 0.5,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "display": {
+          "showLabel": false,
+          "showFields": false
+        },
+        "data": [],
+        "anchorStyle": {
+          "fill": "#4dd0ff",
+          "opacity": 1
+        }
+      },
+      {
+        "id": "anchor_3",
+        "type": "anchor",
+        "label": {
+          "zh": "占位点",
+          "en": "Anchor Point"
+        },
+        "position": {
+          "x": 3077.2,
+          "y": -70.7
+        },
+        "sizeWorld": 153,
+        "scale": 0.5,
+        "rotation": 0,
+        "fontSize": 14,
+        "fontColor": "#e8f4ff",
+        "display": {
+          "showLabel": false,
+          "showFields": false
+        },
+        "data": [],
+        "anchorStyle": {
+          "fill": "#4dd0ff",
+          "opacity": 1
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": "pcs_1",
+        "to": "bms_2",
+        "edgeType": "charge",
+        "edgeTypeLabel": {
+          "zh": "充电中",
+          "en": "Charging"
+        },
+        "color": "#2ecc71",
+        "dash": [],
+        "route": "smart",
+        "dir": "both",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "labelOffset": {
+          "x": 21,
+          "y": 6
+        },
+        "fromPort": "bottom",
+        "toPort": "top",
+        "dirRules": [
+          {
+            "when": {
+              "var": "bms_2.I(A)",
+              "op": ">",
+              "val": 1
+            },
+            "dir": "forward"
+          },
+          {
+            "when": {
+              "var": "bms_2.I(A)",
+              "op": "<",
+              "val": -1
+            },
+            "dir": "reverse"
+          }
+        ]
+      },
+      {
+        "from": "pcs_2",
+        "to": "bms_1",
+        "edgeType": "charge",
+        "edgeTypeLabel": {
+          "zh": "充电中",
+          "en": "Charging"
+        },
+        "color": "#2ecc71",
+        "dash": [],
+        "route": "smart",
+        "dir": "both",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "labelOffset": {
+          "x": 21,
+          "y": 6
+        },
+        "fromPort": "top",
+        "toPort": "bottom",
+        "dirRules": [
+          {
+            "when": {
+              "var": "bms_1.I(A)",
+              "op": ">",
+              "val": 1
+            },
+            "dir": "forward"
+          },
+          {
+            "when": {
+              "var": "bms_1.I(A)",
+              "op": "<",
+              "val": -1
+            },
+            "dir": "reverse"
+          }
+        ]
+      },
+      {
+        "from": "grid_1",
+        "to": "anchor_2",
+        "edgeType": "ac_power",
+        "edgeTypeLabel": {
+          "zh": "交流电力",
+          "en": "AC Power"
+        },
+        "color": "#e74c3c",
+        "dash": [],
+        "route": "smart",
+        "dir": "forward",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "fromPort": "right",
+        "toPort": "left"
+      },
+      {
+        "from": "anchor_2",
+        "to": "pcs_2",
+        "edgeType": "ac_power",
+        "edgeTypeLabel": {
+          "zh": "交流电力",
+          "en": "AC Power"
+        },
+        "color": "#e74c3c",
+        "dash": [],
+        "route": "smart",
+        "dir": "forward",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "fromPort": "right",
+        "toPort": "left"
+      },
+      {
+        "from": "anchor_2",
+        "to": "pcs_1",
+        "edgeType": "ac_power",
+        "edgeTypeLabel": {
+          "zh": "交流电力",
+          "en": "AC Power"
+        },
+        "color": "#e74c3c",
+        "dash": [],
+        "route": "smart",
+        "dir": "forward",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "fromPort": "right",
+        "toPort": "left"
+      },
+      {
+        "from": "anchor_3",
+        "to": "load_1",
+        "edgeType": "ac_power",
+        "edgeTypeLabel": {
+          "zh": "交流电力",
+          "en": "AC Power"
+        },
+        "color": "#e74c3c",
+        "dash": [],
+        "route": "smart",
+        "dir": "forward",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "fromPort": "right",
+        "toPort": "left"
+      },
+      {
+        "from": "pcs_1",
+        "to": "anchor_3",
+        "edgeType": "ac_power",
+        "edgeTypeLabel": {
+          "zh": "交流电力",
+          "en": "AC Power"
+        },
+        "color": "#e74c3c",
+        "dash": [],
+        "route": "smart",
+        "dir": "forward",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "fromPort": "right",
+        "toPort": "left"
+      },
+      {
+        "from": "pcs_2",
+        "to": "anchor_3",
+        "edgeType": "ac_power",
+        "edgeTypeLabel": {
+          "zh": "交流电力",
+          "en": "AC Power"
+        },
+        "color": "#e74c3c",
+        "dash": [],
+        "route": "smart",
+        "dir": "forward",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "fromPort": "right",
+        "toPort": "top"
+      }
+    ],
+    "signals": [
+      {
+        "key": {
+          "zh": "T1",
+          "en": "T1"
+        },
+        "value": "",
+        "bind": {
+          "field": "AuxDataLogs.AmbientT1",
+          "deviceType": "BCU",
+          "deviceId": "8f97b65308af41eb895ffe9c58e978e3"
+        }
+      },
+      {
+        "key": {
+          "zh": "T2",
+          "en": "T2"
+        },
+        "value": "",
+        "bind": {
+          "field": "AuxDataLogs.AmbientT2",
+          "deviceType": "BCU",
+          "deviceId": "8f97b65308af41eb895ffe9c58e978e3"
+        }
+      }
+    ],
+    "valueDicts": [
+      {
+        "type": "charge_state",
+        "name": "充放电状态",
+        "nameEn": "charge_state",
+        "applyTo": [
+          {
+            "deviceType": "BCU",
+            "field": "AuxDataLogs.PackCurrent"
+          }
+        ],
+        "items": [
+          {
+            "when": {
+              "op": ">",
+              "val": "1"
+            },
+            "zh": "充电",
+            "en": "Charging"
+          },
+          {
+            "when": {
+              "op": "<",
+              "val": "-1"
+            },
+            "zh": "放电",
+            "en": "Discharging"
+          },
+          {
+            "when": {
+              "op": "else",
+              "val": ""
+            },
+            "zh": "待机",
+            "en": "Standby"
+          }
+        ]
+      }
+    ],
+    "dataBindings": [
+      {
+        "signal": "bms_2.U(V)",
+        "node": "bms_2",
+        "label": "电压(v)",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+          "field": "AuxDataLogs.PackVoltage",
+          "deviceName": "Rack02"
+        }
+      },
+      {
+        "signal": "bms_2.I(A)",
+        "node": "bms_2",
+        "label": "电流(A)",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+          "field": "AuxDataLogs.PackCurrent",
+          "deviceName": "Rack02"
+        }
+      },
+      {
+        "signal": "bms_2.P(kW)@0",
+        "node": "bms_2",
+        "label": "功率(kW) · 操作数1",
+        "calcOf": "bms_2.P(kW)",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+          "field": "AuxDataLogs.PackCurrent",
+          "deviceName": "Rack02"
+        }
+      },
+      {
+        "signal": "bms_2.P(kW)@1",
+        "node": "bms_2",
+        "label": "功率(kW) · 操作数2",
+        "calcOf": "bms_2.P(kW)",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+          "field": "AuxDataLogs.PackVoltage",
+          "deviceName": "Rack02"
+        }
+      },
+      {
+        "signal": "bms_2.SOC",
+        "node": "bms_2",
+        "label": "SOC",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+          "field": "AuxDataLogs.SystemSOC",
+          "deviceName": "Rack02"
+        }
+      },
+      {
+        "signal": "bms_2.State",
+        "node": "bms_2",
+        "label": "状态",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "54b6c625c05c4e7cbae0ed5c3e950c9a",
+          "field": "AuxDataLogs.PackCurrent",
+          "deviceName": "Rack02"
+        }
+      },
+      {
+        "signal": "bms_1.U(V)",
+        "node": "bms_1",
+        "label": "电压(v)",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+          "field": "AuxDataLogs.PackVoltage",
+          "deviceName": "Rack01"
+        }
+      },
+      {
+        "signal": "bms_1.I(A)",
+        "node": "bms_1",
+        "label": "电流(A)",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+          "field": "AuxDataLogs.PackCurrent",
+          "deviceName": "Rack01"
+        }
+      },
+      {
+        "signal": "bms_1.P(kW)@0",
+        "node": "bms_1",
+        "label": "功率(kW) · 操作数1",
+        "calcOf": "bms_1.P(kW)",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+          "field": "AuxDataLogs.PackCurrent",
+          "deviceName": "Rack01"
+        }
+      },
+      {
+        "signal": "bms_1.P(kW)@1",
+        "node": "bms_1",
+        "label": "功率(kW) · 操作数2",
+        "calcOf": "bms_1.P(kW)",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+          "field": "AuxDataLogs.PackVoltage",
+          "deviceName": "Rack01"
+        }
+      },
+      {
+        "signal": "bms_1.SOC",
+        "node": "bms_1",
+        "label": "SOC",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+          "field": "AuxDataLogs.SystemSOC",
+          "deviceName": "Rack01"
+        }
+      },
+      {
+        "signal": "bms_1.State",
+        "node": "bms_1",
+        "label": "状态",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
+          "field": "AuxDataLogs.PackCurrent",
+          "deviceName": "Rack01"
+        }
+      },
+      {
+        "signal": "T1",
+        "node": null,
+        "label": "T1",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
+          "field": "AuxDataLogs.AmbientT1",
+          "deviceName": "Rack"
+        }
+      },
+      {
+        "signal": "T2",
+        "node": null,
+        "label": "T2",
+        "source": {
+          "deviceType": "BCU",
+          "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
+          "field": "AuxDataLogs.AmbientT2",
+          "deviceName": "Rack"
+        }
+      }
+    ]
+  }
+}

@@ -11,7 +11,7 @@
     "schemaVersion": "2.0",
     "meta": {
       "app": "储能拓扑编辑器",
-      "generatedAt": "2026-07-08T08:25:07.871Z",
+      "generatedAt": "2026-07-09T02:44:46.553Z",
       "lang": "zh",
       "libraryRef": {
         "name": "energy-topology",
@@ -20,8 +20,8 @@
       "canvas": {
         "bgColor": "#0a1f40",
         "zoom": 0.143,
-        "panX": 64,
-        "panY": 57.7,
+        "panX": 106,
+        "panY": 74.7,
         "grid": {
           "show": true,
           "stepPx": 40
@@ -102,12 +102,6 @@
             "offset": {
               "x": -18,
               "y": -57
-            },
-            "bind": {
-              "field": "AuxDataLogs.AmbientT1",
-              "deviceType": "BCU",
-              "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
-              "followNode": false
             }
           },
           {
@@ -120,12 +114,6 @@
             "offset": {
               "x": -20,
               "y": -56
-            },
-            "bind": {
-              "field": "CellStatisticsLogs.MaxCellTemp",
-              "deviceType": "BCU",
-              "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
-              "followNode": false
             }
           },
           {
@@ -138,12 +126,6 @@
             "offset": {
               "x": -227,
               "y": -135
-            },
-            "bind": {
-              "field": "AuxDataLogs.AmbientT1",
-              "deviceType": "BCU",
-              "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
-              "followNode": false
             }
           },
           {
@@ -156,12 +138,6 @@
             "offset": {
               "x": -227,
               "y": -137
-            },
-            "bind": {
-              "field": "AuxDataLogs.AmbientT2",
-              "deviceType": "BCU",
-              "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
-              "followNode": false
             }
           },
           {
@@ -174,12 +150,6 @@
             "offset": {
               "x": -229,
               "y": -140
-            },
-            "bind": {
-              "field": "AuxDataLogs.BusVoltage",
-              "deviceType": "BCU",
-              "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
-              "followNode": false
             }
           }
         ]
@@ -193,7 +163,7 @@
         },
         "position": {
           "x": 2301.2,
-          "y": 2499
+          "y": 2373.1
         },
         "sizeWorld": 542,
         "scale": 1,
@@ -214,9 +184,8 @@
             "hidden": false,
             "offset": {
               "x": 2,
-              "y": -88
+              "y": -59
             },
-            "dict": "",
             "bind": {
               "field": "AuxDataLogs.PackVoltage",
               "deviceType": "BCU",
@@ -233,9 +202,8 @@
             "hidden": false,
             "offset": {
               "x": 2,
-              "y": -92
+              "y": -63
             },
-            "dict": "",
             "bind": {
               "field": "AuxDataLogs.PackCurrent",
               "deviceType": "BCU",
@@ -252,7 +220,7 @@
             "hidden": false,
             "offset": {
               "x": 2,
-              "y": -96
+              "y": -67
             },
             "bind": {
               "calc": {
@@ -268,14 +236,10 @@
                     "deviceType": "BCU",
                     "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
                     "followNode": true
-                  },
-                  {
-                    "const": 1000
                   }
                 ],
                 "operators": [
-                  "*",
-                  "/"
+                  "*"
                 ]
               }
             }
@@ -289,9 +253,8 @@
             "hidden": false,
             "offset": {
               "x": 2,
-              "y": -100
+              "y": -71
             },
-            "dict": "",
             "bind": {
               "field": "AuxDataLogs.SystemSOC",
               "deviceType": "BCU",
@@ -308,7 +271,7 @@
             "hidden": false,
             "offset": {
               "x": 2,
-              "y": -101
+              "y": -72
             },
             "bind": {
               "field": "AuxDataLogs.PackCurrent",
@@ -575,61 +538,6 @@
       }
     ],
     "dataBindings": [
-      {
-        "signal": "pcs_1.P(kW)",
-        "node": "pcs_1",
-        "label": "交流功率(kW)",
-        "source": {
-          "deviceType": "BCU",
-          "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
-          "field": "AuxDataLogs.AmbientT1",
-          "deviceName": "Rack"
-        }
-      },
-      {
-        "signal": "pcs_1.I(A)",
-        "node": "pcs_1",
-        "label": "交流电流(A)",
-        "source": {
-          "deviceType": "BCU",
-          "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
-          "field": "CellStatisticsLogs.MaxCellTemp",
-          "deviceName": "Rack"
-        }
-      },
-      {
-        "signal": "pcs_1.DC-P(kW)",
-        "node": "pcs_1",
-        "label": "直流功率(KW)",
-        "source": {
-          "deviceType": "BCU",
-          "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
-          "field": "AuxDataLogs.AmbientT1",
-          "deviceName": "Rack01"
-        }
-      },
-      {
-        "signal": "pcs_1.U(V)",
-        "node": "pcs_1",
-        "label": "直流电压(V)",
-        "source": {
-          "deviceType": "BCU",
-          "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
-          "field": "AuxDataLogs.AmbientT2",
-          "deviceName": "Rack01"
-        }
-      },
-      {
-        "signal": "pcs_1.DC-I(A)",
-        "node": "pcs_1",
-        "label": "直流电流(A)",
-        "source": {
-          "deviceType": "BCU",
-          "deviceId": "d54341a26eb04a1dafd8412a63c532d5",
-          "field": "AuxDataLogs.BusVoltage",
-          "deviceName": "Rack01"
-        }
-      },
       {
         "signal": "bms_1.U(V)",
         "node": "bms_1",

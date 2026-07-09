@@ -113,7 +113,7 @@ async function loadBackendBindingData(){
   if(Array.isArray(types))DEVICE_TYPES=types.filter(t=>t&&t.dictValue&&(t.status==null||String(t.status)==='0'))
     .map(t=>({value:t.dictValue,label:t.dictLabel||t.dictValue}));
   if(Array.isArray(list))DEVICE_LIST=list.filter(d=>d&&d.deviceId&&d.delFlag!=='2')
-    .map(d=>({deviceId:d.deviceId,deviceName:d.deviceName||d.deviceId,deviceType:d.deviceType||d.archiveDeviceType||'',projectId:d.projectId||'',projectName:d.projectName||''}));
+    .map(d=>({deviceId:d.deviceId,deviceName:d.deviceName||d.deviceId,deviceType:d.archiveDeviceType||d.deviceType||'',projectId:d.projectId||'',projectName:d.projectName||''}));
   if(dicts&&typeof dicts==='object'&&!Array.isArray(dicts))DEVICE_DICTS=dicts;
 }
 // 字典查询助手
