@@ -11,7 +11,7 @@
     "schemaVersion": "2.0",
     "meta": {
       "app": "储能拓扑编辑器",
-      "generatedAt": "2026-07-09T02:35:26.930Z",
+      "generatedAt": "2026-07-09T05:43:56.921Z",
       "lang": "zh",
       "libraryRef": {
         "name": "energy-topology",
@@ -20,8 +20,8 @@
       "canvas": {
         "bgColor": "#0a1f40",
         "zoom": 0.1,
-        "panX": 341.8,
-        "panY": 381.1,
+        "panX": 303.9,
+        "panY": 181.3,
         "grid": {
           "show": true,
           "stepPx": 40
@@ -70,8 +70,8 @@
           "en": "PCS"
         },
         "position": {
-          "x": 717.2,
-          "y": 686.7
+          "x": 2777.2,
+          "y": 1446.7
         },
         "sizeWorld": 776,
         "scale": 1,
@@ -91,8 +91,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": 48,
-              "y": 47
+              "x": -4,
+              "y": 32
             }
           },
           {
@@ -103,8 +103,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": 48,
-              "y": -19
+              "x": -4,
+              "y": -35
             }
           },
           {
@@ -115,8 +115,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -267,
-              "y": -47
+              "x": -3,
+              "y": -164
             }
           },
           {
@@ -127,8 +127,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -267,
-              "y": -13.2
+              "x": -3,
+              "y": -130.2
             }
           },
           {
@@ -139,8 +139,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -267,
-              "y": -78.1
+              "x": -3,
+              "y": -195.1
             }
           }
         ]
@@ -153,8 +153,8 @@
           "en": "Battery BMS"
         },
         "position": {
-          "x": 717.2,
-          "y": 2516.5
+          "x": 2777.2,
+          "y": 3276.5
         },
         "sizeWorld": 776,
         "scale": 1,
@@ -174,8 +174,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -3,
-              "y": -70
+              "x": -6,
+              "y": -73
             },
             "dict": "",
             "bind": {
@@ -193,8 +193,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -3,
-              "y": -74
+              "x": -6,
+              "y": -74.1
             },
             "dict": "",
             "bind": {
@@ -212,8 +212,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -3,
-              "y": -78
+              "x": -6,
+              "y": -75.2
             },
             "bind": {
               "calc": {
@@ -249,8 +249,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -3,
-              "y": -82
+              "x": -6,
+              "y": -76.4
             },
             "dict": "",
             "bind": {
@@ -268,8 +268,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -3,
-              "y": -83
+              "x": -6,
+              "y": -77.5
             },
             "bind": {
               "field": "AuxDataLogs.PackCurrent",
@@ -308,7 +308,7 @@
           "en": "Grid"
         },
         "position": {
-          "x": -2621.7,
+          "x": -2141.7,
           "y": 36.7
         },
         "sizeWorld": 940,
@@ -355,8 +355,8 @@
           "en": "Load"
         },
         "position": {
-          "x": 4151.7,
-          "y": 66.3
+          "x": 5631.7,
+          "y": 0.5
         },
         "sizeWorld": 776,
         "scale": 1,
@@ -376,8 +376,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -99,
-              "y": 90
+              "x": -100.1,
+              "y": 95
             }
           }
         ]
@@ -390,8 +390,8 @@
           "en": "PCS"
         },
         "position": {
-          "x": 717.2,
-          "y": -685.7
+          "x": -719.7,
+          "y": 1426.7
         },
         "sizeWorld": 776,
         "scale": 1,
@@ -411,8 +411,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": 48,
-              "y": -7
+              "x": -6,
+              "y": -2.4
             }
           },
           {
@@ -423,8 +423,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": 48,
-              "y": -6
+              "x": -6,
+              "y": -3.5
             }
           },
           {
@@ -435,8 +435,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -267,
-              "y": -106
+              "x": -6,
+              "y": -159
             }
           },
           {
@@ -447,8 +447,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -267,
-              "y": -105.1
+              "x": -6,
+              "y": -160.1
             }
           },
           {
@@ -459,8 +459,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -267,
-              "y": -104.2
+              "x": -6,
+              "y": -161.2
             }
           }
         ]
@@ -473,8 +473,8 @@
           "en": "Battery BMS"
         },
         "position": {
-          "x": 717.2,
-          "y": -2551.6
+          "x": -719.7,
+          "y": 3256.5
         },
         "sizeWorld": 776,
         "scale": 1,
@@ -494,8 +494,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -1,
-              "y": -12
+              "x": -9,
+              "y": -75
             },
             "dict": "",
             "bind": {
@@ -513,8 +513,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -1,
-              "y": -16
+              "x": -9,
+              "y": -76.1
             },
             "dict": "",
             "bind": {
@@ -532,8 +532,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -1,
-              "y": -20
+              "x": -9,
+              "y": -77.2
             },
             "bind": {
               "calc": {
@@ -569,8 +569,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -1,
-              "y": -24
+              "x": -9,
+              "y": -78.4
             },
             "dict": "",
             "bind": {
@@ -588,8 +588,8 @@
             "value": "",
             "hidden": false,
             "offset": {
-              "x": -1,
-              "y": -25
+              "x": -9,
+              "y": -79.5
             },
             "bind": {
               "field": "AuxDataLogs.PackCurrent",
@@ -628,7 +628,7 @@
           "en": "Anchor Point"
         },
         "position": {
-          "x": -1669.6,
+          "x": -719.7,
           "y": -136.5
         },
         "sizeWorld": 153,
@@ -647,15 +647,15 @@
         }
       },
       {
-        "id": "anchor_3",
+        "id": "anchor_4",
         "type": "anchor",
         "label": {
           "zh": "占位点",
           "en": "Anchor Point"
         },
         "position": {
-          "x": 3077.2,
-          "y": -70.7
+          "x": 2777.2,
+          "y": -136.5
         },
         "sizeWorld": 153,
         "scale": 0.5,
@@ -739,8 +739,8 @@
           "x": 21,
           "y": 6
         },
-        "fromPort": "top",
-        "toPort": "bottom",
+        "fromPort": "bottom",
+        "toPort": "top",
         "dirRules": [
           {
             "when": {
@@ -761,6 +761,25 @@
         ]
       },
       {
+        "from": "anchor_4",
+        "to": "load_1",
+        "edgeType": "ac_power",
+        "edgeTypeLabel": {
+          "zh": "交流电力",
+          "en": "AC Power"
+        },
+        "color": "#e74c3c",
+        "dash": [],
+        "route": "smart",
+        "dir": "forward",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true
+      },
+      {
         "from": "grid_1",
         "to": "anchor_2",
         "edgeType": "ac_power",
@@ -778,8 +797,7 @@
         "orthoSnap": true,
         "waypoints": [],
         "active": true,
-        "fromPort": "right",
-        "toPort": "left"
+        "toPort": "top"
       },
       {
         "from": "anchor_2",
@@ -799,11 +817,30 @@
         "orthoSnap": true,
         "waypoints": [],
         "active": true,
-        "fromPort": "right",
-        "toPort": "left"
+        "toPort": "top"
       },
       {
         "from": "anchor_2",
+        "to": "anchor_4",
+        "edgeType": "ac_power",
+        "edgeTypeLabel": {
+          "zh": "交流电力",
+          "en": "AC Power"
+        },
+        "color": "#e74c3c",
+        "dash": [],
+        "route": "smart",
+        "dir": "forward",
+        "width": 1,
+        "label": "",
+        "showLabel": true,
+        "orthoSnap": true,
+        "waypoints": [],
+        "active": true,
+        "toPort": "top"
+      },
+      {
+        "from": "anchor_4",
         "to": "pcs_1",
         "edgeType": "ac_power",
         "edgeTypeLabel": {
@@ -819,72 +856,7 @@
         "showLabel": true,
         "orthoSnap": true,
         "waypoints": [],
-        "active": true,
-        "fromPort": "right",
-        "toPort": "left"
-      },
-      {
-        "from": "anchor_3",
-        "to": "load_1",
-        "edgeType": "ac_power",
-        "edgeTypeLabel": {
-          "zh": "交流电力",
-          "en": "AC Power"
-        },
-        "color": "#e74c3c",
-        "dash": [],
-        "route": "smart",
-        "dir": "forward",
-        "width": 1,
-        "label": "",
-        "showLabel": true,
-        "orthoSnap": true,
-        "waypoints": [],
-        "active": true,
-        "fromPort": "right",
-        "toPort": "left"
-      },
-      {
-        "from": "pcs_1",
-        "to": "anchor_3",
-        "edgeType": "ac_power",
-        "edgeTypeLabel": {
-          "zh": "交流电力",
-          "en": "AC Power"
-        },
-        "color": "#e74c3c",
-        "dash": [],
-        "route": "smart",
-        "dir": "forward",
-        "width": 1,
-        "label": "",
-        "showLabel": true,
-        "orthoSnap": true,
-        "waypoints": [],
-        "active": true,
-        "fromPort": "right",
-        "toPort": "left"
-      },
-      {
-        "from": "pcs_2",
-        "to": "anchor_3",
-        "edgeType": "ac_power",
-        "edgeTypeLabel": {
-          "zh": "交流电力",
-          "en": "AC Power"
-        },
-        "color": "#e74c3c",
-        "dash": [],
-        "route": "smart",
-        "dir": "forward",
-        "width": 1,
-        "label": "",
-        "showLabel": true,
-        "orthoSnap": true,
-        "waypoints": [],
-        "active": true,
-        "fromPort": "right",
-        "toPort": "top"
+        "active": true
       }
     ],
     "signals": [
