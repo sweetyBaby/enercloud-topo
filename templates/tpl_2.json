@@ -1,7 +1,7 @@
 {
   "schemaVersion": "tpl-1",
   "template": {
-    "id": "tpl_3",
+    "id": "tpl_2",
     "name": "金坛",
     "nameEn": "jintan",
     "desc": "",
@@ -11,7 +11,7 @@
     "schemaVersion": "2.0",
     "meta": {
       "app": "储能拓扑编辑器",
-      "generatedAt": "2026-07-07T07:07:31.539Z",
+      "generatedAt": "2026-07-08T08:25:07.871Z",
       "lang": "zh",
       "libraryRef": {
         "name": "energy-topology",
@@ -216,6 +216,7 @@
               "x": 2,
               "y": -88
             },
+            "dict": "",
             "bind": {
               "field": "AuxDataLogs.PackVoltage",
               "deviceType": "BCU",
@@ -234,6 +235,7 @@
               "x": 2,
               "y": -92
             },
+            "dict": "",
             "bind": {
               "field": "AuxDataLogs.PackCurrent",
               "deviceType": "BCU",
@@ -266,10 +268,14 @@
                     "deviceType": "BCU",
                     "deviceId": "8f97b65308af41eb895ffe9c58e978e3",
                     "followNode": true
+                  },
+                  {
+                    "const": 1000
                   }
                 ],
                 "operators": [
-                  "*"
+                  "*",
+                  "/"
                 ]
               }
             }
@@ -285,6 +291,7 @@
               "x": 2,
               "y": -100
             },
+            "dict": "",
             "bind": {
               "field": "AuxDataLogs.SystemSOC",
               "deviceType": "BCU",
