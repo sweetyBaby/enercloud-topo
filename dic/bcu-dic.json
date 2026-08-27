@@ -12,6 +12,7 @@
             "IsoRes",
             "LoContactor",
             "PackCurrent",
+            "HallCurrent",
             "PackVoltage",
             "PreContactor",
             "ShuntCurrent",
