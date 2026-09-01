@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "vd-1",
+  "type": "mk8_charge_state",
+  "name": "mk8充放电状态",
+  "nameEn": "mk8_charge_state",
+  "applyTo": [
+    {
+      "deviceType": "BCU",
+      "field": "AuxDataLogs.ShuntCurrent"
+    }
+  ],
+  "items": [
+    {
+      "when": {
+        "op": ">",
+        "val": "1"
+      },
+      "zh": "充电",
+      "en": "Charging"
+    },
+    {
+      "when": {
+        "op": "<",
+        "val": "-1"
+      },
+      "zh": "放电",
+      "en": "Discharging"
+    },
+    {
+      "when": {
+        "op": "else",
+        "val": ""
+      },
+      "zh": "待机",
+      "en": "Standby"
+    }
+  ]
+}

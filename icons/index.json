@@ -50,6 +50,13 @@
           "data": [
             "运行模式"
           ]
+        },
+        {
+          "type": "ups",
+          "label": "UPS不间断电源",
+          "label_en": "UPS",
+          "badge": "ups",
+          "file": "ups.svg"
         }
       ]
     },
@@ -472,6 +479,12 @@
           "label": "变量",
           "label_en": "Variable",
           "badge": "var"
+        },
+        {
+          "type": "table",
+          "label": "表格",
+          "label_en": "Table",
+          "badge": "table"
         }
       ]
     },

@@ -82,6 +82,18 @@ function addNode(type,x,y){
       data:[{key:'数值',keyEn:'Value',dv:'--'}]});
     snapshot();selectNode(id);return;
   }
+  if(type==='table'){
+    // 表格元素：rows×cols 网格。静态文字存 cells{"r,c":文字}；「绑定格」= data 里带 tr/tc 行列坐标的
+    // 数据字段（完整复用字段绑定/值字典/信号键/实时推送全链路，信号键=表格id.RxCx）
+    nodes.push({id,type,labelZh:'',labelEn:'',x,y,scale:1,
+      fontSize:14,fontColor:'#e8f4ff',valColor:'#4dd0ff',
+      rows:4,cols:3,headerRow:true,headerCol:false,
+      headerBg:'#143560',headerColor:'#cfe4ff',gridColor:'#2a5a9a',gridWidth:1,colMinW:64,
+      bg:'#0d1b2a',border:'none',borderColor:'#4dd0ff',borderWidth:1.5,radius:6,
+      cells:{'0,0':{zh:'名称',en:'Name'},'0,1':{zh:'参数1',en:'Param1'},'0,2':{zh:'参数2',en:'Param2'}},
+      data:[]});
+    snapshot();selectNode(id);return;
+  }
   nodes.push({id,type,labelZh,labelEn,x,y,fontSize:14,fontColor:'#e8f4ff',scale:(type==='anchor'?0.5:1),
     hideLabel:(type==='anchor'),hideFields:(type==='anchor'),
     ...(type==='anchor'?{fill:'#4dd0ff',opacity:1}:{}),
@@ -137,8 +149,37 @@ function fieldNameIssues(n){ return _nameIssues(((n&&n.data)||[]).map(f=>({zh:f.
 function globalSigIssues(){ return _nameIssues((customSignals||[]).map(s=>({zh:s.key,en:s.keyEn}))); }
 function fieldNameOk(s){ return s&&!s.emptyZh&&!s.emptyEn&&!s.dupZh&&!s.dupEn; }
 function nodeHasFieldNameError(n){ return fieldNameIssues(n).some(s=>!fieldNameOk(s)); }
-// 文本框 + 变量节点：都用 _textBox 包围盒（命中/对齐/缩放等几何逻辑一致）
-function usesTextBox(t){ return t==='text'||t==='variable'; }
+// 文本框 + 变量 + 表格节点：都用 _textBox 包围盒（命中/对齐/缩放等几何逻辑一致）。
+// 表格另有独立面板与多字段能力——「单字段」限制等文本盒专属语义请用 t!=='table' 区分。
+function usesTextBox(t){ return t==='text'||t==='variable'||t==='table'; }
+// ── 表格单元格几何 ──
+function tableCellField(n,r,c){ return (n.data||[]).find(f=>f.tr===r&&f.tc===c); }
+// 静态格文字（支持中英双语）：值为 {zh,en} 按当前语言取（缺省互为兜底）；旧数据纯字符串视为中文
+function tblStaticText(v){
+  if(v==null)return '';
+  if(typeof v==='object')return String((lang==='en'?(v.en||v.zh):(v.zh||v.en))||'');
+  return String(v);
+}
+// 静态格写入（which='zh'|'en'）：统一归一化为 {zh,en}；两个都为空则删格
+function tblSetStaticText(n,r,c,which,v){
+  n.cells=n.cells||{};const k=r+','+c;
+  let cur=n.cells[k];
+  if(cur==null)cur={zh:'',en:''};
+  else if(typeof cur!=='object')cur={zh:String(cur),en:''};
+  cur[which==='en'?'en':'zh']=v;
+  if(!cur.zh&&!cur.en)delete n.cells[k];else n.cells[k]=cur;
+}
+function tblFieldIndex(n,r,c){ return (n.data||[]).findIndex(f=>f.tr===r&&f.tc===c); }
+// 世界坐标 → 表格单元格 {r,c}（考虑节点旋转；不在任何格内返回 null）。_tblGeom 由 drawTableNode 每帧回填
+function tableCellAt(n,wx,wy){
+  const g=n&&n._tblGeom; if(!g)return null;
+  const rot=(n.rotation||0)*Math.PI/180;
+  const [lx,ly]=rot?rotatePt(wx,wy,n.x,n.y,-rot):[wx,wy];
+  if(lx<g.colX[0]||lx>g.colX[g.colX.length-1]||ly<g.rowY[0]||ly>g.rowY[g.rowY.length-1])return null;
+  let c=0;while(c<g.colX.length-2&&lx>g.colX[c+1])c++;
+  let r=0;while(r<g.rowY.length-2&&ly>g.rowY[r+1])r++;
+  return {r,c};
+}
 // 注：status / online 已彻底移除，节点的可用信号 = 仅其「已绑定数据字段」
 
 function nodeAt(wx,wy){for(let i=nodes.length-1;i>=0;i--){const n=nodes[i];if(usesTextBox(n.type)){const b=n._textBox;if(b&&wx>=b.x&&wx<=b.x+b.w&&wy>=b.y&&wy<=b.y+b.h)return n;continue;}const s=nsz(n);if(n.type==='anchor'){const vcy=n.y-s*0.22, hit=Math.max(s*0.5, 11/zoom);if(Math.abs(wx-n.x)<hit&&Math.abs(wy-vcy)<hit)return n;continue;}if(Math.abs(wx-n.x)<s*.55&&Math.abs(wy-n.y)<s*.5)return n;}return null;}

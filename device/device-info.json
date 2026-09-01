@@ -538,5 +538,47 @@
     "projectName": "EnergyCore",
     "projectIds": null,
     "delFlag": "0"
-  }
+  },
+   {
+            "createBy": "",
+            "createTime": "2026-07-21 08:59:09",
+            "updateBy": "",
+            "updateTime": "2026-08-27 09:17:59",
+            "remark": null,
+            "deviceId": "08be6bf2fa1e496f8f7fee4a74dda8c4",
+            "projectId": "7363cc40140d4e2988a53b036dfadddb",
+            "deviceName": "Rack01",
+            "deviceType": "BCU",
+            "archiveDeviceType": "BCU",
+            "archiveType": "RSIIC_MK8",
+            "groupTags": null,
+            "extraInfo": null,
+            "collectId": null,
+            "archiveNo": null,
+            "sort": 1,
+            "projectName": "郑工测试项目",
+            "projectIds": null,
+            "delFlag": "0"
+        },
+        {
+            "createBy": "",
+            "createTime": "2026-07-21 08:59:21",
+            "updateBy": "",
+            "updateTime": "2026-08-26 14:56:41",
+            "remark": null,
+            "deviceId": "20d5a21c468d4c6186e685748db7a5bf",
+            "projectId": "7363cc40140d4e2988a53b036dfadddb",
+            "deviceName": "Rack02",
+            "deviceType": "BCU",
+            "archiveDeviceType": "BCU",
+            "archiveType": "RSIIC_MK8",
+            "groupTags": null,
+            "extraInfo": null,
+            "collectId": null,
+            "archiveNo": null,
+            "sort": 2,
+            "projectName": "郑工测试项目",
+            "projectIds": null,
+            "delFlag": "0"
+        }
 ]

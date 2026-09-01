@@ -1,7 +1,7 @@
 {
   "schemaVersion": "vd-1",
   "type": "charge_state",
-  "name": "充放电状态",
+  "name": "Mk7充放电状态",
   "nameEn": "charge_state",
   "applyTo": [
     {

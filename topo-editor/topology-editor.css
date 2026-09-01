@@ -204,7 +204,7 @@ canvas{display:block;cursor:default}
 #fb-acts{display:flex;gap:8px;align-items:center;margin-top:14px}
 #fb-acts .tb{padding:5px 12px}#fb-acts .grn{border-color:#2ecc71;color:#2ecc71}
 /* 绑定弹窗「计算/比较」模式：模式切换 + 操作数行（类型/设备/分类/字段）+ 行间运算符 */
-#fb-box.fb-wide{width:560px}
+#fb-box.fb-wide{width:640px;max-height:90vh;overflow:auto}
 .fb-mode{display:flex;gap:16px;margin:6px 0 4px;font-size:12px;color:var(--ui-text2)}
 .fb-mode label{display:flex;align-items:center;gap:5px;cursor:pointer}
 .fb-mode input{accent-color:var(--ui-accent)}
@@ -255,7 +255,7 @@ canvas{display:block;cursor:default}
 .ctsep{height:1px;background:var(--ui-border)}
 #uo{display:none;position:fixed;inset:0;background:rgba(4,10,20,.78);z-index:60;align-items:center;justify-content:center}
 #uo.show{display:flex}
-#confirm-overlay{display:none;position:fixed;inset:0;background:rgba(4,10,20,.7);z-index:80;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+#confirm-overlay{display:none;position:fixed;inset:0;background:rgba(4,10,20,.7);z-index:260;align-items:center;justify-content:center;backdrop-filter:blur(3px)}   /* 置于各业务弹框(200/210)之上：确认框永远最顶层 */
 #confirm-overlay.show{display:flex}
 #confirm-box{background:var(--ui-bg);border:1px solid var(--ui-border);border-radius:12px;padding:26px 28px;width:340px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.5)}
 #confirm-icon{font-size:38px;margin-bottom:12px}
@@ -542,3 +542,52 @@ canvas{display:block;cursor:default}
 .pr.cpt>.pr-inline{flex:1;min-width:0}
 .pr.cpt>.phint{flex-basis:100%}
 .psec{margin:6px 0 4px}
+
+/* ── 表格元素：属性面板单元格编辑器 + 「从设备生成表格」弹窗 ── */
+/* 单元格编辑弹框：面板放不下多列，独立宽弹框；绑定/字典/生成弹窗(z=210)与确认框(z=260)可叠加其上 */
+#tbl-ed-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center}
+#tbl-ed-box{position:relative;display:flex;flex-direction:column;background:var(--ui-bg);border:1px solid var(--ui-border);border-radius:10px;padding:16px;max-width:94vw;max-height:88vh;min-width:min(560px,94vw);box-shadow:0 12px 40px rgba(0,0,0,.5)}
+#tbl-ed-grid{overflow:auto;flex:1;min-height:0;border:1px solid var(--ui-border);border-radius:5px;background:var(--ui-bg2);padding:4px}
+.tbl-idx{display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ui-text2);user-select:none}
+.tbl-idx[data-r],.tbl-idx[data-c]{cursor:pointer;border-radius:3px}
+.tbl-idx[data-r]:hover,.tbl-idx[data-c]:hover{background:var(--ui-hover);color:var(--ui-accent)}
+.tblc.sel{outline:2px solid #ffcc44;outline-offset:1px}
+#tbl-marquee{position:fixed;z-index:205;border:1.5px dashed var(--ui-accent);background:rgba(77,208,255,.12);pointer-events:none}
+.tblgrid{display:grid;gap:4px;padding:2px}
+.tblc{position:relative;display:flex;flex-direction:column;gap:2px;min-width:0;padding:3px;border:1px solid var(--ui-border);border-radius:4px;background:var(--ui-input-bg)}
+.tblc.hdr{background:color-mix(in srgb,var(--ui-accent) 12%,var(--ui-input-bg))}
+.tblc.bound{border-color:#2ecc71}
+.tblc input{width:100%;min-width:0;box-sizing:border-box;background:transparent;border:none;border-bottom:1px dashed var(--ui-border);color:var(--ui-text);font-size:12px;padding:2px 3px;outline:none}
+.tblc.bound input{color:#9fe8c0}
+.tblc input:focus{border-bottom-color:var(--ui-accent)}
+.tblc-en{font-size:11px;color:var(--ui-text2)}   /* 静态格英文输入：字号略小作次要信息 */
+/* 生成向导·扩展列卡片 */
+.tg-ext-card{border:1px solid var(--ui-border);border-radius:5px;background:var(--ui-input-bg);padding:6px;display:flex;flex-direction:column;gap:4px}
+.tg-ext-row{display:flex;align-items:center;gap:5px}
+.tg-ext-row input,.tg-ext-row select{box-sizing:border-box;background:var(--ui-bg2);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:4px 6px;border-radius:4px;outline:none}
+.tg-ext-row .df-del{flex:0 0 24px;width:24px;background:var(--ui-btn-bg);border:1px solid var(--ui-border);color:var(--ui-text2);font-size:11px;line-height:1;padding:4px 0;border-radius:3px;cursor:pointer}
+.tg-ext-row .df-del:hover{border-color:#e06060;color:#e06060}
+.tg-ext-body{display:flex;flex-direction:column;gap:4px;padding-left:4px}
+.tblc-src{font-size:10px;line-height:1.4;color:#2ecc71;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tblc-acts{display:flex;gap:3px;justify-content:flex-end;flex-wrap:wrap}
+.tblc-acts button{width:24px;background:var(--ui-btn-bg);border:1px solid var(--ui-border);color:var(--ui-text2);font-size:11px;line-height:1;padding:3px 0;border-radius:3px;cursor:pointer}
+.tblc-acts .df-bind{filter:grayscale(1);opacity:.6}
+.tblc-acts .df-bind:hover{filter:none;opacity:1;border-color:var(--ui-accent);color:var(--ui-accent)}
+.tblc-acts .df-bind.bound{filter:none;opacity:1;border-color:#2ecc71;background:color-mix(in srgb,#2ecc71 16%,var(--ui-btn-bg))}
+.tblc-acts .df-dict.bound{border-color:#b38bff;background:color-mix(in srgb,#b38bff 16%,var(--ui-btn-bg))}
+.tblc-acts .df-del:hover{border-color:#e06060;color:#e06060}
+.tg-list{max-height:170px;overflow:auto;border:1px solid var(--ui-border);border-radius:5px;background:var(--ui-bg2);padding:5px 7px;display:flex;flex-direction:column;gap:3px}
+.tg-list>*{flex:0 0 auto}   /* flex 列容器的子项禁止收缩：行数超高度时滚动，而不是把每行压扁 */
+.tg-list label{display:flex;align-items:center;gap:6px;font-size:12px;line-height:1.6;color:var(--ui-text);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 字段树：location 分组可折叠 + 分组三态全选 + 模糊搜索 */
+.tg-q{width:100%;box-sizing:border-box;margin:0 0 6px;background:var(--ui-input-bg);border:1px solid var(--ui-border);color:var(--ui-text);font-family:inherit;font-size:12px;padding:6px 8px;border-radius:5px;outline:none}
+.tg-q:focus{border-color:var(--ui-accent)}
+.tg-tree{max-height:230px}
+.tg-grp-hd{display:flex;align-items:center;gap:6px;cursor:pointer;padding:3px 4px;border-radius:4px;user-select:none}
+.tg-grp-hd:hover{background:var(--ui-hover)}
+.tg-grp-hd input{width:auto;flex:0 0 auto}
+.tg-chev{width:12px;flex:0 0 auto;font-size:10px;color:var(--ui-text2)}
+.tg-grp-name{font-size:12px;font-weight:600;color:var(--ui-accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-grp-n{margin-left:auto;flex:0 0 auto;font-size:11px;color:var(--ui-text2)}
+.tg-grp-body{display:flex;flex-direction:column;gap:3px;padding:2px 0 5px 26px}
+.tg-grp-body label{flex:0 0 auto}

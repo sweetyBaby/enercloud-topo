@@ -115,6 +115,7 @@
     <button class="rt-btn" onclick="batchVis('fields',true)" title="显示所选元素的数据字段" data-i18n="显示字段">显示字段</button>
     <button class="rt-btn" onclick="batchVis('fields',false)" title="隐藏所选元素的数据字段" data-i18n="隐藏字段">隐藏字段</button>
     <span class="eblabel" style="margin:0 4px">|</span>
+    <button class="rt-btn" onclick="deleteSelected()" title="删除所选元素及其连线（快捷键 Del）" style="border-color:var(--danger,#e05a5a);color:var(--danger,#e05a5a)" data-i18n="🗑 删除所选">🗑 删除所选</button>
     <button class="rt-btn" onclick="clearMultiSel()" title="取消选择（清除当前多选）" data-i18n="⊘ 取消选择">⊘ 取消选择</button>
   </span>
 </div>
@@ -336,6 +337,57 @@
             <div class="pr-inline"><input type="color" id="p-val-color" value="#4dd0ff" oninput="applyVarStyle()">
             <input type="text" id="p-val-color-hex" style="flex:1" oninput="syncVarColor(this.value)"></div></div>
           <div class="pr"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--ui-text)"><input type="checkbox" id="p-val-bold" onchange="applyVarStyle()" style="width:auto"> <span data-i18n="值(value)加粗">值(value)加粗</span></label></div>
+        </div>
+        <div id="table-style" style="display:none">
+          <div class="psep"></div>
+          <div class="psec" data-i18n="📋 表格">📋 表格</div>
+          <div class="pr cpt"><label data-i18n="行 × 列">行 × 列</label>
+            <div class="pr-inline">
+              <input type="number" id="p-tbl-rows-num" class="pnum" min="1" max="100" step="1" value="4" oninput="applyTableSize()" title="行数">
+              <span class="punit">行</span>
+              <input type="number" id="p-tbl-cols-num" class="pnum" min="1" max="30" step="1" value="3" oninput="applyTableSize()" title="列数">
+              <span class="punit">列</span></div></div>
+          <div class="pr"><div style="display:flex;gap:14px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-tbl-hrow" onchange="applyTableStyle()" style="width:auto"> <span data-i18n="首行表头">首行表头</span></label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-tbl-hcol" onchange="applyTableStyle()" style="width:auto"> <span data-i18n="首列表头">首列表头</span></label>
+          </div></div>
+          <div class="pr cpt"><label data-i18n="表头底色">表头底色</label>
+            <div class="pr-inline"><input type="color" id="p-tbl-hbg" value="#143560" oninput="applyTableStyle()">
+              <input type="text" id="p-tbl-hbg-hex" style="flex:1" placeholder="无底色留空" oninput="applyTableStyle()"></div></div>
+          <div class="pr cpt"><label data-i18n="表头文字色">表头文字色</label>
+            <div class="pr-inline"><input type="color" id="p-tbl-hfc" value="#cfe4ff" oninput="applyTableStyle()">
+              <input type="text" id="p-tbl-hfc-hex" style="flex:1" oninput="applyTableStyle()"></div></div>
+          <div class="pr cpt"><label data-i18n="网格线颜色">网格线颜色</label>
+            <div class="pr-inline"><input type="color" id="p-tbl-grid" value="#2a5a9a" oninput="applyTableStyle()">
+              <input type="text" id="p-tbl-grid-hex" style="flex:1" oninput="applyTableStyle()"></div></div>
+          <div class="pr cpt"><label data-i18n="网格线宽">网格线宽</label>
+            <div class="pr-inline"><input type="range" id="p-tbl-gw" min="0.5" max="6" step="0.5" value="1" oninput="pairFromSlider('p-tbl-gw');applyTableStyle()">
+              <input type="number" id="p-tbl-gw-num" class="pnum" min="0.5" max="10" step="0.5" value="1" oninput="pairFromNum('p-tbl-gw');applyTableStyle()"><span class="punit">px</span></div></div>
+          <div class="pr cpt"><label data-i18n="绑定值颜色">绑定值颜色</label>
+            <div class="pr-inline"><input type="color" id="p-tbl-vc" value="#4dd0ff" oninput="applyTableStyle()">
+              <input type="text" id="p-tbl-vc-hex" style="flex:1" oninput="applyTableStyle()"></div></div>
+          <div class="pr cpt"><label data-i18n="最小列宽">最小列宽</label>
+            <div class="pr-inline"><input type="range" id="p-tbl-minw" min="20" max="300" step="1" value="64" oninput="pairFromSlider('p-tbl-minw');applyTableStyle()">
+              <input type="number" id="p-tbl-minw-num" class="pnum" min="20" max="600" step="1" value="64" oninput="pairFromNum('p-tbl-minw');applyTableStyle()"><span class="punit">px</span></div></div>
+          <div class="pr cpt"><label data-i18n="固定列宽">固定列宽</label>
+            <div class="pr-inline"><input type="range" id="p-tbl-colw" min="0" max="400" step="1" value="0" oninput="pairFromSlider('p-tbl-colw');applyTableStyle()">
+              <input type="number" id="p-tbl-colw-num" class="pnum" min="0" max="800" step="1" value="0" oninput="pairFromNum('p-tbl-colw');applyTableStyle()"><span class="punit">px</span></div>
+            <div class="phint" style="margin-top:2px" data-i18n="0=按内容自适应（受最小列宽约束）；>0 所有列等宽">0=按内容自适应（受最小列宽约束）；&gt;0 所有列等宽</div></div>
+          <div class="pr cpt"><label data-i18n="行高">行高</label>
+            <div class="pr-inline"><input type="range" id="p-tbl-rowh" min="0" max="160" step="1" value="0" oninput="pairFromSlider('p-tbl-rowh');applyTableStyle()">
+              <input type="number" id="p-tbl-rowh-num" class="pnum" min="0" max="400" step="1" value="0" oninput="pairFromNum('p-tbl-rowh');applyTableStyle()"><span class="punit">px</span></div>
+            <div class="phint" style="margin-top:2px" data-i18n="0=按字号+内边距自动">0=按字号+内边距自动</div></div>
+          <div class="pr cpt"><label data-i18n="单元格内边距（横 / 纵）">单元格内边距（横 / 纵）</label>
+            <div class="pr-inline">
+              <input type="number" id="p-tbl-padx-num" class="pnum" min="0" max="80" step="1" value="10" oninput="applyTableStyle()" title="左右留白"><span class="punit">横</span>
+              <input type="number" id="p-tbl-pady-num" class="pnum" min="0" max="80" step="1" value="6" oninput="applyTableStyle()" title="上下留白（自动行高时即行间距）"><span class="punit">纵</span></div></div>
+          <div class="pr"><label data-i18n="单元格内容">单元格内容</label>
+            <button class="tb" style="width:100%;font-size:12px" onclick="openTableCellEditor()" data-i18n="📝 编辑单元格内容…">📝 编辑单元格内容…</button>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <button class="tb grn" style="flex:1;font-size:12px" onclick="openTableGen()" data-i18n="⚡ 从设备生成表格">⚡ 从设备生成表格</button>
+              <button class="tb" style="font-size:12px" onclick="tblClearAll()" data-i18n="清空">清空</button>
+            </div>
+            <div class="phint" style="margin-top:4px" data-i18n="单元格编辑在独立弹框中进行；画布上双击单元格也可直接编辑文字/默认值。">单元格编辑在独立弹框中进行；画布上双击单元格也可直接编辑文字/默认值。</div></div>
         </div>
         <div id="anchor-style" style="display:none">
           <div class="psep"></div>
