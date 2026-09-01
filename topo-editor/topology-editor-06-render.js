@@ -463,6 +463,7 @@ function drawNode(n){
   // 文本框元素：只渲染文字，无图标
   if(n.type==='text'){ drawTextNode(n); return; }
   if(n.type==='variable'){ drawVariableNode(n); return; }
+  if(n.type==='table'){ drawTableNode(n); return; }
   const _it=effIconType(n);   // 数据驱动：按 iconRules 生效的图标 type（不改节点自身 type，仅换绘制图像）
   const img=CUSTOM_ICONS[_it]||IMGS[_it];const s=nsz(n);
   const isSel=selNode===n.id,isESrc=edgeMode&&edgeFrom===n.id;
@@ -637,19 +638,127 @@ function drawTextNode(n){
   }
   ctx.shadowBlur=0;ctx.restore();
 }
+// 绑定字段的「当前显示值」：实时/注入信号（含计算绑定求值，均在 buildCtx 内）→ 值字典转义；
+// 无信号值回退字段静态默认值；再无则空。变量节点 / 表格绑定格共用。
+// ctxv 可选传入已构建好的信号上下文（表格逐格取值时只构建一次，避免每格重复 buildCtx）
+function fieldLiveValue(n,f,ctxv){
+  if(!f)return '';
+  ctxv=ctxv||buildCtx(signalValues);
+  const sig=fieldSig(n,f);
+  if(Object.prototype.hasOwnProperty.call(ctxv,sig)){
+    const v=ctxv[sig];
+    if(v!==''&&v!=null)return translateFieldValue(f,v,nodeDeviceType(n));   // 值字典转义
+  }
+  if(f.dv!==''&&f.dv!=null)return fieldDisplayValue(f,nodeDeviceType(n));
+  return '';
+}
 // 变量节点的「值」：优先取绑定字段的实时信号值，否则取该字段的静态默认值；无字段则空
 function variableValue(n){
-  const f=(n.data||[]).find(x=>!x.hidden&&x.key);
-  if(f){
-    const ctxv=buildCtx(signalValues);
-    const sig=fieldSig(n,f);
-    if(Object.prototype.hasOwnProperty.call(ctxv,sig)){
-      const v=ctxv[sig];
-      if(v!==''&&v!=null)return translateFieldValue(f,v,nodeDeviceType(n));   // 值字典转义
+  return fieldLiveValue(n,(n.data||[]).find(x=>!x.hidden&&x.key));
+}
+// 表格节点渲染：rows×cols 网格，列宽按内容自适应（含最小列宽），字号/内边距随 1/zoom 屏幕恒定。
+// 单元格内容：绑定格（data 里带 tr/tc 的字段）显示实时值/默认值；否则显示 cells{"r,c"} 静态文字。
+function drawTableNode(n){
+  const isSel=selNode===n.id;
+  const sc=n.scale||1, fs=(n.fontSize||14)*sc/zoom;
+  const rows=Math.max(1,(n.rows|0)||1), cols=Math.max(1,(n.cols|0)||1);
+  // 内边距随整表缩放（padY 同时决定行间距观感）；行高/列宽可显式指定（屏幕 px），0/未设=自动
+  const padX=(n.padX!=null?n.padX:10)*sc/zoom, padY=(n.padY!=null?n.padY:6)*sc/zoom;
+  const minW=(n.colMinW!=null?n.colMinW:64)*sc/zoom;
+  const fixedW=(n.colW>0)?n.colW*sc/zoom:0;
+  const fontN=fs+"px -apple-system,'Microsoft YaHei',sans-serif";
+  const fontB='bold '+fontN;
+  ctx.save();
+  const rot=(n.rotation||0)*Math.PI/180;
+  if(rot){ctx.translate(n.x,n.y);ctx.rotate(rot);ctx.translate(-n.x,-n.y);}
+  // 一次构建信号上下文，逐格取显示文本；列宽=固定列宽，或该列最宽内容自适应（表头以粗体量宽）
+  const ctxv=buildCtx(signalValues);
+  const txts=[],colW=[];
+  for(let c=0;c<cols;c++)colW[c]=fixedW||minW;
+  const iconSize=fs*1.5;   // 单元格图标边长（随字号/整表缩放）
+  for(let r=0;r<rows;r++){txts[r]=[];
+    for(let c=0;c<cols;c++){
+      const f=tableCellField(n,r,c);
+      let t='',bound=false,has=false,icon=null;
+      if(f){
+        bound=bindHasSource(f.bind);
+        const show=f.cellShow||'value';
+        if(show!=='value'){
+          // 动态图标：顺序匹配图标规则（条件按信号上下文求值），首个命中生效；都不命中用默认图标
+          let it=f.icon||'';
+          if(Array.isArray(f.iconRules))for(const rl of f.iconRules){if(rl&&rl.icon&&evalCond(rl.when,ctxv)){it=rl.icon;break;}}
+          if(it)icon=it;
+        }
+        if(show!=='icon'&&bound){const v=fieldLiveValue(n,f,ctxv);has=(v!==''&&v!=null);t=has?String(v):'--';}
+      }
+      else t=tblStaticText(n.cells&&n.cells[r+','+c]).replace(/\n/g,' ');   // 静态格中英双语，随当前语言
+      const hdr=(n.headerRow&&r===0)||(n.headerCol&&c===0);
+      ctx.font=hdr?fontB:fontN;
+      if(!fixedW){
+        const w0=(t?ctx.measureText(t).width:0)+(icon?(iconSize+(t?fs*0.35:0)):0);
+        if(w0)colW[c]=Math.max(colW[c],w0+padX*2);
+      }
+      txts[r][c]={t,bound,has,hdr,icon};
     }
-    if(f.dv!==''&&f.dv!=null)return fieldDisplayValue(f,nodeDeviceType(n));
   }
-  return '';
+  const rowH=(n.rowH>0)?n.rowH*sc/zoom:(fs*1.45+padY*2);
+  const w=colW.reduce((a,b)=>a+b,0), h=rows*rowH;
+  const bx=n.x-w/2, by=n.y-h/2;
+  n._textBox={x:bx,y:by,w,h};
+  // 单元格命中几何（双击编辑用）：列/行边界，世界坐标（旋转前局部系，tableCellAt 反旋转后比对）
+  const colX=[bx];for(let c=0;c<cols;c++)colX.push(colX[c]+colW[c]);
+  const rowY=[by];for(let r=0;r<rows;r++)rowY.push(by+(r+1)*rowH);
+  n._tblGeom={colX,rowY};
+  const b=n._textBox, rr=boxRadiusWorld(n,b);
+  drawBoxBg(n,b,rr);
+  // 表头底色 + 网格线 + 文字：裁剪到圆角盒内，避免溢出圆角
+  ctx.save();
+  ctx.beginPath();
+  if(ctx.roundRect)ctx.roundRect(b.x,b.y,b.w,b.h,rr);else ctx.rect(b.x,b.y,b.w,b.h);
+  ctx.clip();
+  if(n.headerBg&&n.headerBg!=='none'){
+    ctx.fillStyle=n.headerBg;
+    if(n.headerRow)ctx.fillRect(bx,by,w,rowH);
+    if(n.headerCol)ctx.fillRect(bx,by+(n.headerRow?rowH:0),colW[0],h-(n.headerRow?rowH:0));
+  }
+  ctx.strokeStyle=n.gridColor||'#2a5a9a';ctx.lineWidth=(n.gridWidth!=null?n.gridWidth:1)/zoom;
+  ctx.beginPath();
+  for(let r=0;r<=rows;r++){ctx.moveTo(bx,rowY[r]);ctx.lineTo(bx+w,rowY[r]);}
+  for(let c=0;c<=cols;c++){ctx.moveTo(colX[c],by);ctx.lineTo(colX[c],by+h);}
+  ctx.stroke();
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const cell=txts[r][c];if(!cell.t&&!cell.icon)continue;
+    const cx0=(colX[c]+colX[c+1])/2, cy0=(rowY[r]+rowY[r+1])/2;
+    ctx.font=cell.hdr?fontB:fontN;
+    ctx.fillStyle=cell.hdr?(n.headerColor||'#cfe4ff')
+      :(cell.bound?(cell.has?(n.valColor||'#4dd0ff'):'#6b8299'):(n.fontColor||'#e8f4ff'));
+    if(cell.icon){
+      // 图标（+文字）整体在格内居中：图标左、值右
+      const img=CUSTOM_ICONS[cell.icon]||IMGS[cell.icon];
+      const gap=cell.t?fs*0.35:0;
+      const tw=cell.t?ctx.measureText(cell.t).width:0;
+      const total=iconSize+gap+tw;
+      let x=cx0-total/2;
+      if(img)ctx.drawImage(img,x,cy0-iconSize/2,iconSize,iconSize);
+      if(cell.t){ctx.textAlign='left';fillTextVCenter(cell.t,x+iconSize+gap,cy0,fs);}
+    }else{
+      ctx.textAlign='center';
+      fillTextVCenter(cell.t,cx0,cy0,fs);
+    }
+  }
+  ctx.restore();
+  drawBoxBorder(n,b,rr);
+  if(isSel)drawBoxSelectionChrome(n,b,rot);
+  // 表格标题：label 非空且未隐藏时显示在表格上方居中（取原始标签，空标签=无标题，不回退节点 id）
+  const title=(lang==='en'?(n.labelEn||n.labelZh):(n.labelZh||n.labelEn))||'';
+  if(title&&!n.hideLabel){
+    const tfs=fs*1.05;
+    ctx.font='bold '+tfs+"px -apple-system,'Microsoft YaHei',sans-serif";
+    ctx.textAlign='center';ctx.fillStyle=n.fontColor||'#e8f4ff';
+    ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=2/zoom;
+    ctx.fillText(title,n.x,by-tfs*0.6);
+  }
+  ctx.shadowBlur=0;ctx.restore();
 }
 // 变量节点渲染：label 段 + value 段，各自字体可独立设置；可横排 / 竖排
 function drawVariableNode(n){

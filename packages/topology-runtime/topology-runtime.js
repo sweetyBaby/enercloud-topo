@@ -183,9 +183,9 @@ function createTopoRuntime(env) {
     return !!(n&&['busbar','trunk_ac','trunk_dc','tie_line'].includes(n.type));
   }
   // 标注类元素（文本框/变量/占位点）不参与连线避障：它们本就常被贴近连线/设备放置，
-  // 且 text/variable 的真实包围盒由编辑器动态测量（_textBox），runtime 的估算盒并不准。
+  // 且 text/variable/table 的真实包围盒由编辑器动态测量（_textBox），runtime 的估算盒并不准。
   // 占位点作为连线端点/汇合点时不受影响（避障检测本就排除 from/to）。
-  function isRouteObstacle(n){ return !!n && n.type!=='text' && n.type!=='variable' && n.type!=='anchor'; }
+  function isRouteObstacle(n){ return !!n && n.type!=='text' && n.type!=='variable' && n.type!=='table' && n.type!=='anchor'; }
   function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
   function linearBusSpan(n){
     const b=nodeBox(n), s=nsz(n);

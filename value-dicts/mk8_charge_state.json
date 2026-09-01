@@ -6,7 +6,7 @@
   "applyTo": [
     {
       "deviceType": "BCU",
-      "field": "AuxDataLogs.HallCurrent"
+      "field": "AuxDataLogs.ShuntCurrent"
     }
   ],
   "items": [

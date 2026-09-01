@@ -180,7 +180,7 @@ canvas.addEventListener('mousedown',e=>{
     if(sn&&sn._resizeHandles){
       for(const h of sn._resizeHandles){
         if(Math.hypot(wx-h[0],wy-h[1])<9/zoom){
-          const isText=usesTextBox(sn.type);
+          const isText=usesTextBox(sn.type)&&sn.type!=='table';   // 表格走 scale 整表缩放（行高/列宽/内边距/字号一起缩）
           const cx=usesTextBox(sn.type)?sn.y:(sn.y-nsz(sn)*0.22);
           const baseDist=Math.hypot(h[0]-sn.x, h[1]-sn.y)||1;
           dragResize={n:sn,baseDist,startScale:sn.scale||1,startFont:sn.fontSize,startValFont:sn.valFontSize,isText};canvas.style.cursor='nwse-resize';return;
@@ -360,7 +360,7 @@ canvas.addEventListener('mousemove',e=>{
     const {cx,cy,snap}=dragGroupScale;
     selSet.forEach(id=>{const n=nodes.find(z=>z.id===id);if(!n||!snap[id])return;
       n.x=cx+(snap[id].x-cx)*ratio; n.y=cy+(snap[id].y-cy)*ratio;
-      if(usesTextBox(n.type)){
+      if(usesTextBox(n.type)&&n.type!=='table'){
         n.fontSize=Math.max(8,Math.round((snap[id].fontSize||14)*ratio));
         if(n.type==='variable'&&snap[id].valFontSize!=null)n.valFontSize=Math.max(8,Math.round(snap[id].valFontSize*ratio));
       }
@@ -616,6 +616,27 @@ canvas.addEventListener('dblclick',e=>{
   const n=nodeAt(wx,wy);
   if(n){
     if(triggerNodeAction(n,'dblclick'))return;
+    // 双击表格单元格 → 就地编辑：绑定格改「默认值」（实时数据覆盖），静态格改文字
+    if(n.type==='table'){
+      const hit=tableCellAt(n,wx,wy);
+      if(hit){
+        const f=tableCellField(n,hit.r,hit.c), pos='R'+(hit.r+1)+'C'+(hit.c+1);
+        if(f&&bindHasSource(f.bind)){
+          openInlineInput(e.clientX,e.clientY,'默认值 · '+pos+'（实时数据会覆盖）',(f.dv==null?'':String(f.dv)),v=>{
+            snapshot();f.dv=v;snapshot();selectNode(n.id);
+          });
+        }else{
+          // 静态格中英双语：双击编辑「当前语言」的文字（另一语言在单元格弹框里编辑）
+          const isEn=lang==='en';
+          const cur=n.cells&&n.cells[hit.r+','+hit.c];
+          const curTxt=(cur&&typeof cur==='object')?(isEn?(cur.en||''):(cur.zh||'')):(cur==null?'':String(cur));
+          openInlineInput(e.clientX,e.clientY,(isEn?'Cell text (EN) · ':'单元格文字（中文）· ')+pos,curTxt,v=>{
+            snapshot();tblSetStaticText(n,hit.r,hit.c,isEn?'en':'zh',v);snapshot();selectNode(n.id);
+          });
+        }
+      }else selectNode(n.id);
+      return;
+    }
     if(usesTextBox(n.type)){ openTextEditor(n, e.clientX, e.clientY); return; }
     const isEn=lang==='en';
     const cur=isEn?(n.labelEn||''):(n.labelZh||n.label||'');

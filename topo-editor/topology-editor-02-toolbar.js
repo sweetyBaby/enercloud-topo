@@ -115,6 +115,7 @@ function makeNI(type,zh,en,badge,customUrl){
   if(customUrl)img.src=customUrl;
   else if(type==='text'){img.src='data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><text x="24" y="34" font-size="34" text-anchor="middle" fill="#42a5f5" font-family="serif" font-weight="bold">T</text></svg>');}
   else if(type==='variable'){img.src='data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><text x="24" y="20" font-size="17" text-anchor="middle" fill="#9fc0dd" font-family="sans-serif">label</text><text x="24" y="40" font-size="19" text-anchor="middle" fill="#4dd0ff" font-family="sans-serif" font-weight="bold">value</text></svg>');}
+  else if(type==='table'){img.src='data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect x="4" y="8" width="40" height="32" rx="3" fill="none" stroke="#42a5f5" stroke-width="2.5"/><line x1="4" y1="18" x2="44" y2="18" stroke="#42a5f5" stroke-width="2.5"/><line x1="4" y1="29" x2="44" y2="29" stroke="#42a5f5" stroke-width="1.5"/><line x1="19" y1="18" x2="19" y2="40" stroke="#42a5f5" stroke-width="1.5"/><line x1="31.5" y1="18" x2="31.5" y2="40" stroke="#42a5f5" stroke-width="1.5"/></svg>');}
   else if(IMGS[type])img.src=IMGS[type].src;
   const txt=document.createElement('div');txt.className='ni-txt';
   txt.innerHTML='<span class="ni-lbl">'+dl+'</span><span class="ni-badge">'+badge+'</span>';

@@ -94,7 +94,13 @@ function buildJSON(){
           ...(f.chipBorderWidth!=null?{chipBorderWidth:f.chipBorderWidth}:{}),
           ...(f.chipRadius!=null?{chipRadius:f.chipRadius}:{}),
           // 值字典显式指定（undefined=自动匹配不导出；''=强制不转义；'xxx'=强制用该字典）
-          ...(f.dict!==undefined&&f.dict!==null?{dict:f.dict}:{})
+          ...(f.dict!==undefined&&f.dict!==null?{dict:f.dict}:{}),
+          // 表格绑定格的行列坐标（0 起）；非表格字段无此属性
+          ...(f.tr!=null?{cell:{r:f.tr,c:f.tc}}:{}),
+          // 表格单元格动态图标：展示方式（icon/both；缺省 value 不导出）+ 默认图标 + 图标规则（顺序匹配）
+          ...(f.cellShow&&f.cellShow!=='value'?{cellShow:f.cellShow}:{}),
+          ...(f.icon?{icon:f.icon}:{}),
+          ...(Array.isArray(f.iconRules)&&f.iconRules.length?{iconRules:f.iconRules.map(x=>({when:x.when,icon:x.icon}))}:{})
         };
         if(f.bind&&bindIsCalc(f.bind)){
           // ★ 计算绑定：导出 calc 定义（操作数逐个显式化，同单字段的 followNode 语义）；
@@ -130,6 +136,28 @@ function buildJSON(){
         layout:(n.varLayout==='v'?'vertical':'horizontal'),
         label:{fontSize:(n.fontSize||16),color:(n.fontColor||'#e8f4ff'),bold:(n.labelBold!==false)},
         value:{fontSize:(n.valFontSize||n.fontSize||16),color:(n.valColor||'#4dd0ff'),bold:!!n.valBold}
+      };
+    }
+    if(n.type==='table'){
+      // 表格节点：行列/表头/网格样式 + 静态单元格文字（中英双语 text:{zh,en}；绑定格在 data 里以 cell:{r,c} 标记行列）
+      const cells=[];
+      Object.keys(n.cells||{}).forEach(k=>{
+        const v=n.cells[k];if(v==null)return;
+        const zh=(typeof v==='object')?String(v.zh||''):String(v);
+        const en=(typeof v==='object')?String(v.en||''):'';
+        if(!zh&&!en)return;
+        const p=k.split(',');cells.push({r:+p[0],c:+p[1],text:{zh,en}});
+      });
+      cells.sort((a,b)=>(a.r-b.r)||(a.c-b.c));
+      o.tableStyle={
+        rows:Math.max(1,(n.rows|0)||1), cols:Math.max(1,(n.cols|0)||1),
+        headerRow:!!n.headerRow, headerCol:!!n.headerCol,
+        headerBg:n.headerBg||'none', headerColor:n.headerColor||'#cfe4ff',
+        gridColor:n.gridColor||'#2a5a9a', gridWidth:(n.gridWidth!=null?n.gridWidth:1),
+        colMinW:(n.colMinW!=null?n.colMinW:64), valueColor:n.valColor||'#4dd0ff',
+        ...(n.rowH>0?{rowH:n.rowH}:{}),   // 显式行高（缺省=按字号+内边距自动）
+        ...(n.colW>0?{colW:n.colW}:{}),   // 固定列宽（缺省=按内容自适应）；内边距在 textStyle.padX/padY
+        cells
       };
     }
     if(n.type==='anchor') o.anchorStyle={fill:n.fill||'none', opacity:(n.opacity!=null?n.opacity:1)};
@@ -277,7 +305,9 @@ function unboundBindingReport(){
     if(n.type==='anchor')return;                       // 占位点无数据
     (n.data||[]).forEach(f=>{
       if(!f.key)return;
-      if(!bindHasSource(f.bind)){add(n,f,'未绑定字段');return;}
+      if(!bindHasSource(f.bind)){
+        if(f.tr!=null&&(f.cellShow||f.icon||(Array.isArray(f.iconRules)&&f.iconRules.length)))return;   // 表格纯图标格：无需数据绑定，不算风险
+        add(n,f,'未绑定字段');return;}
       if(bindIsCalc(f.bind)){                          // ★ 计算绑定：逐个字段操作数校验来源
         for(const x of calcFieldOperands(f.bind)){
           const r=srcIssue(x.o.deviceType||nodeDeviceType(n)||'', x.o.deviceId||n.deviceId||'', x.o.field);
@@ -524,6 +554,10 @@ function parseImportedNode(o){
     if(f.chipBorderWidth!=null)fld.chipBorderWidth=+f.chipBorderWidth;
     if(f.chipRadius!=null)fld.chipRadius=(typeof f.chipRadius==='string'&&f.chipRadius.trim().endsWith('%'))?f.chipRadius:+f.chipRadius;
     if(f.dict!==undefined&&f.dict!==null)fld.dict=String(f.dict);   // 值字典显式指定（''=强制不转义）
+    if(f.cell&&f.cell.r!=null&&f.cell.c!=null){fld.tr=(+f.cell.r)|0;fld.tc=(+f.cell.c)|0;}   // 表格绑定格的行列坐标
+    if(f.cellShow==='icon'||f.cellShow==='both')fld.cellShow=f.cellShow;   // 表格单元格动态图标
+    if(f.icon)fld.icon=String(f.icon);
+    if(Array.isArray(f.iconRules)&&f.iconRules.length)fld.iconRules=f.iconRules.filter(x=>x&&x.icon).map(x=>({when:x.when,icon:x.icon}));
     if(f.bind&&f.bind.calc&&Array.isArray(f.bind.calc.operands)){
       // ★ 计算绑定还原：followNode 操作数退回「跟随节点」（只存 field），显式来源固化 deviceType/deviceId
       const c=parseImportedCalc(f.bind.calc);
@@ -535,13 +569,39 @@ function parseImportedNode(o){
     }
     return fld;
   });
-  // 文本框 / 变量节点 共用的盒子样式（背景/边框/圆角/内边距）
+  // 文本框 / 变量 / 表格节点 共用的盒子样式（背景/边框/圆角/内边距）
   if(usesTextBox(o.type)){const t=o.textStyle||{};n.bg=t.bg||o.bg||'none';n.border=t.border||o.border||'none';
     n.borderColor=t.borderColor||o.borderColor||'#4dd0ff';n.borderWidth=(t.borderWidth!=null?t.borderWidth:(o.borderWidth!=null?o.borderWidth:1.5));
     n.radius=(t.radius!=null?t.radius:(o.radius!=null?o.radius:6));n.padX=(t.padX!=null?t.padX:(o.padX!=null?o.padX:10));n.padY=(t.padY!=null?t.padY:(o.padY!=null?o.padY:6));
-    const oldBind=t.bind||o.textBind;
-    if(oldBind&&!n.data.length)n.data=[{key:String(oldBind).split('.').pop()||'数值',keyEn:'Value',dv:''}];
-    if(!n.data.length)n.data=[{key:'数值',keyEn:'Value',dv:''}];}
+    if(o.type!=='table'){   // 单值文本盒才需要「恰好一个字段」的兜底；表格多字段按 cell 坐标管理
+      const oldBind=t.bind||o.textBind;
+      if(oldBind&&!n.data.length)n.data=[{key:String(oldBind).split('.').pop()||'数值',keyEn:'Value',dv:''}];
+      if(!n.data.length)n.data=[{key:'数值',keyEn:'Value',dv:''}];
+    }}
+  // 表格节点：行列/表头/网格样式 + 静态单元格文字
+  if(o.type==='table'){const ts=o.tableStyle||{};
+    n.cells={};
+    (Array.isArray(ts.cells)?ts.cells:[]).forEach(c=>{
+      if(!c||c.r==null||c.c==null)return;
+      const t=c.text;let zh,en;
+      if(t&&typeof t==='object'){zh=String(t.zh||'');en=String(t.en||'');}   // 新格式：中英双语
+      else{zh=(t==null?'':String(t));en='';}                                  // 旧格式：纯字符串视为中文
+      if(zh||en)n.cells[((+c.r)|0)+','+((+c.c)|0)]={zh,en};
+    });
+    // 行列数：缺省时按 内容/绑定格 的最大行列推导兜底
+    let maxR=0,maxC=0;
+    Object.keys(n.cells).forEach(k=>{const p=k.split(',');maxR=Math.max(maxR,+p[0]+1);maxC=Math.max(maxC,+p[1]+1);});
+    n.data.forEach(f=>{if(f.tr!=null){maxR=Math.max(maxR,f.tr+1);maxC=Math.max(maxC,f.tc+1);}});
+    n.rows=Math.max(1,(ts.rows!=null?(+ts.rows|0):maxR)||1);
+    n.cols=Math.max(1,(ts.cols!=null?(+ts.cols|0):maxC)||1);
+    n.headerRow=(ts.headerRow!==false);n.headerCol=!!ts.headerCol;
+    n.headerBg=ts.headerBg||'none';n.headerColor=ts.headerColor||'#cfe4ff';
+    n.gridColor=ts.gridColor||'#2a5a9a';n.gridWidth=(ts.gridWidth!=null?+ts.gridWidth:1);
+    n.colMinW=(ts.colMinW!=null?+ts.colMinW:64);n.valColor=ts.valueColor||'#4dd0ff';
+    if(+ts.rowH>0)n.rowH=+ts.rowH;
+    if(+ts.colW>0)n.colW=+ts.colW;
+    if(o.fontSize==null)n.fontSize=14;
+  }
   // 变量节点：label / value 两段字体属性 + 排列方式
   if(o.type==='variable'){const vs=o.variableStyle||{};const lb=vs.label||{},vl=vs.value||{};
     n.varLayout=(vs.layout==='vertical'||vs.layout==='v')?'v':'h';
