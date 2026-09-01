@@ -41,6 +41,11 @@
  *   isDragging(): boolean         选填，默认 false。编辑器拖拽中只重算相关连线
  *   dragIds(): Set<string>        选填。被拖拽节点 id 集合
  */
+// ── 图纸格式版本（单一事实源）──
+// 编辑器 buildJSON 导出盖章；前端 load-topology 按主版本握手（图纸主版本更新 → 明确报"请升级系统"）。
+// 升版约定：新增字段只升次版本（旧消费方按缺省值忽略即可）；不兼容变更（字段改名/语义变化）升主版本。
+var TOPO_SCHEMA_VERSION = '2.0';
+
 function createTopoRuntime(env) {
   if (!env || typeof env.getNodes !== 'function' || typeof env.getEdges !== 'function')
     throw new Error('createTopoRuntime: env.getNodes/getEdges 必填');
@@ -1146,5 +1151,5 @@ function createTopoRuntime(env) {
 
 // CJS 尾巴：Node / 打包器（Next.js 等）消费；浏览器 <script> 引入时 module 未定义，走全局
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createTopoRuntime };
+  module.exports = { createTopoRuntime, TOPO_SCHEMA_VERSION };
 }

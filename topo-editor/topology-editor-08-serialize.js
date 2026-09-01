@@ -1,8 +1,6 @@
-// ───── 画布图纸格式版本（buildJSON 导出时盖章）─────
-// 升版约定：新增字段只升次版本（旧消费方按缺省值忽略即可）；不兼容变更（字段改名/语义变化）
-// 必须升主版本。前端（v0-energy-system-dashboard 的 load-topology.ts）按主版本握手：
-// 图纸主版本比前端新 → 明确报"请升级系统"而不是渲染错乱。改这里必须同步前端的 TOPO_SCHEMA_SUPPORTED_MAJOR。
-const TOPO_SCHEMA_VERSION='2.0';
+// ───── 画布图纸格式版本 ─────
+// TOPO_SCHEMA_VERSION 由 packages/topology-runtime/topology-runtime.js 提供（topo.html 先于
+// 本分段加载，浏览器全局可直接使用；前端经 npm 包导入同一常量）——单一事实源，升版约定见包内注释。
 
 // ───── 元素库 + 字典：后台维护、提供给前端的「单一事实来源」 ─────
 // 前端加载一次即可知道每种 type 的图标 / 默认字段 / 默认尺寸 / 分组 / 连线类型 / 中英字典。

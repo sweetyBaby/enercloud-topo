@@ -252,3 +252,9 @@ export interface TopoRuntime {
 }
 
 export function createTopoRuntime(env: TopoRuntimeEnv): TopoRuntime
+
+/**
+ * 图纸格式版本（"主.次"，单一事实源）。编辑器 buildJSON 导出盖章；前端按主版本握手。
+ * 升版约定：新增字段只升次版本；不兼容变更（字段改名/语义变化）升主版本。
+ */
+export const TOPO_SCHEMA_VERSION: string
