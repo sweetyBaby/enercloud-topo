@@ -1,3 +1,9 @@
+// ───── 画布图纸格式版本（buildJSON 导出时盖章）─────
+// 升版约定：新增字段只升次版本（旧消费方按缺省值忽略即可）；不兼容变更（字段改名/语义变化）
+// 必须升主版本。前端（v0-energy-system-dashboard 的 load-topology.ts）按主版本握手：
+// 图纸主版本比前端新 → 明确报"请升级系统"而不是渲染错乱。改这里必须同步前端的 TOPO_SCHEMA_SUPPORTED_MAJOR。
+const TOPO_SCHEMA_VERSION='2.0';
+
 // ───── 元素库 + 字典：后台维护、提供给前端的「单一事实来源」 ─────
 // 前端加载一次即可知道每种 type 的图标 / 默认字段 / 默认尺寸 / 分组 / 连线类型 / 中英字典。
 function buildLibraryObj(){
@@ -144,7 +150,7 @@ function buildJSON(){
   const edgeStyles={};
   usedET.forEach(k=>{const c=ET[k]||ET.ac_power;edgeStyles[k]={labelZh:c.label,labelEn:c.labelEn,color:c.color,width:c.w,dash:c.dash,anim:c.anim,speed:c.spd};});
   const obj={
-    schemaVersion:'2.0',
+    schemaVersion:TOPO_SCHEMA_VERSION,
     meta:{
       app:'储能拓扑编辑器', generatedAt:new Date().toISOString(), lang,
       // ★ 引用元素库版本（按 name+version 加载完整库）；本文件已自带 edgeStyles，可独立还原线型
@@ -666,6 +672,14 @@ async function importCanvasJSON(obj){
   if(!obj||typeof obj!=='object'||!Array.isArray(obj.nodes)){
     alert(lang==='en'?'Not a valid canvas JSON (missing "nodes" array).':'不是有效的画布 JSON（缺少 nodes 数组）。');
     return;
+  }
+  // 版本握手：图纸主版本比编辑器新 → 导入可能丢字段、再导出会降级图纸，需用户确认
+  const docMajor=parseInt(obj.schemaVersion,10);
+  if(isFinite(docMajor)&&docMajor>parseInt(TOPO_SCHEMA_VERSION,10)){
+    const ok=await uiConfirm(lang==='en'
+      ?('This file uses schema '+obj.schemaVersion+', newer than this editor ('+TOPO_SCHEMA_VERSION+'). Importing may drop newer fields. Continue?')
+      :('图纸格式版本 '+obj.schemaVersion+' 高于本编辑器支持的 '+TOPO_SCHEMA_VERSION+'，导入可能丢失新版字段，确定继续？'),false);
+    if(!ok)return;
   }
   if(nodes.length>0){
     const ok=await uiConfirm(lang==='en'?'Import will replace current canvas content. Continue?':'导入将替换当前画布内容，确定？',false);
