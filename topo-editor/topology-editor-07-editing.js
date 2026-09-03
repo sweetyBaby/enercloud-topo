@@ -453,10 +453,23 @@ function applyVarStyle(){
 }
 function syncVarColor(v){if(/^#[0-9a-fA-F]{6}$/.test(v)){document.getElementById('p-val-color').value=v;applyVarStyle();}}
 // ───── 表格节点：行列/表头/网格样式 + 单元格内容编辑（绑定复用 openFieldBind/openFieldDict 全链路）─────
+// 表格 UI 双语：动态拼接的字符串统一走 TT（面板静态文案走 data-i18n 字典）
+function TT(zh,en){return lang==='en'?en:zh;}
 function applyTableStyle(){
   const n=nodes.find(x=>x.id===selNode);if(!n||n.type!=='table')return;
+  // 样式面板撤销：首个改动前快照一次（保底回退点），停止调整 800ms 后再补一张「定稿」快照——
+  // 没有定稿快照的话 redo 只会回放改动前状态、样式调整永远重做不出来；逐键快照则会刷爆历史
+  if(_tblStyleSnapId!==n.id){snapshot();_tblStyleSnapId=n.id;}
+  clearTimeout(_tblStyleSnapT);
+  _tblStyleSnapT=setTimeout(()=>{snapshot();_tblStyleSnapId=null;},800);
+  const hadHR=!!n.headerRow, hadHC=!!n.headerCol;
   n.headerRow=document.getElementById('p-tbl-hrow').checked;
   n.headerCol=document.getElementById('p-tbl-hcol').checked;
+  // 勾上表头时该行/列已有绑定格 → 提示（表头格显示表头文字而非绑定值；单元格弹框仍可解绑，非死角）
+  if(!hadHR&&n.headerRow&&(n.data||[]).some(f=>f.tr===0))
+    flashHint(TT('注意：首行已有绑定格——勾为表头后显示表头文字而非绑定值，可在「编辑单元格」里解绑','Row 1 has bound cells — as header they show text, unbind in cell editor'));
+  if(!hadHC&&n.headerCol&&(n.data||[]).some(f=>f.tr!=null&&f.tc===0))
+    flashHint(TT('注意：首列已有绑定格——勾为表头后显示表头文字而非绑定值，可在「编辑单元格」里解绑','Column 1 has bound cells — as header they show text, unbind in cell editor'));
   n.gridWidth=Math.max(0.5,Math.min(10,pairVal('p-tbl-gw',1)));
   n.colMinW=Math.max(20,Math.min(600,Math.round(pairVal('p-tbl-minw',64))));
   // 行高 / 固定列宽：0=自动（行高按字号+内边距，列宽按内容自适应）；>0 为屏幕 px（随整表缩放）
@@ -491,13 +504,25 @@ async function applyTableSize(){
   if(rows===(n.rows||1)&&cols===(n.cols||1))return;
   const dropped=(n.data||[]).filter(f=>f.tr!=null&&(f.tr>=rows||f.tc>=cols));
   if(dropped.length){
-    const ok=await uiConfirm('缩小行列会删除 '+dropped.length+' 个超出范围的绑定单元格，确定？',true);
+    const ok=await uiConfirm(TT('缩小行列会删除 ','Shrinking removes ')+dropped.length+TT(' 个超出范围的绑定单元格，确定？',' out-of-range bound cell(s). Continue?'),true);
     if(!ok){pairSet('p-tbl-rows',n.rows||1);pairSet('p-tbl-cols',n.cols||1);return;}
   }
   snapshot();
   n.rows=rows;n.cols=cols;
   n.data=(n.data||[]).filter(f=>f.tr==null||(f.tr<rows&&f.tc<cols));
   if(n.cells)Object.keys(n.cells).forEach(k=>{const p=k.split(',');if(+p[0]>=rows||+p[1]>=cols)delete n.cells[k];});
+  // 存活合并锚点的 span 钳制到新表内（否则渲染只是裁剪、导出仍带越界 span，再扩表会诡异复活）
+  (n.data||[]).forEach(f=>{
+    if(f.tr==null)return;
+    if(f.spanR>1){f.spanR=Math.min(f.spanR,rows-f.tr);if(f.spanR<=1)delete f.spanR;}
+    if(f.spanC>1){f.spanC=Math.min(f.spanC,cols-f.tc);if(f.spanC<=1)delete f.spanC;}
+  });
+  if(n.cells)Object.keys(n.cells).forEach(k=>{
+    const v=n.cells[k];if(!v||typeof v!=='object')return;
+    const p=k.split(','),r=+p[0],c=+p[1];
+    if(v.spanR>1){v.spanR=Math.min(v.spanR,rows-r);if(v.spanR<=1)delete v.spanR;}
+    if(v.spanC>1){v.spanC=Math.min(v.spanC,cols-c);if(v.spanC<=1)delete v.spanC;}
+  });
   snapshot();
   renderTableCells(n);
 }
@@ -515,24 +540,39 @@ function openTableCellEditor(keepOrig){
   ov._nid=n.id;
   ov._selCells=new Set();
   ov.onclick=e=>{if(e.target===ov)tblEdCancel();};
-  ov.innerHTML='<div id="tbl-ed-box"><button class="dlg-close" onclick="tblEdCancel()" title="取消（不保存）" aria-label="关闭">✕</button>'+
-    '<div id="fb-title">📝 单元格内容 · '+tplEsc(n.id)+'（'+n.rows+' 行 × '+n.cols+' 列）</div>'+
-    '<div class="phint" style="margin:2px 0 8px">静态格填中/英文字；🔗 绑定后台字段（输入框变为默认值）；📖 值字典；⇊ 绑定按各行设备应用到整列。'+
-    '在空白处<b>拖拽框选</b>、点<b>行/列序号</b>整行整列选择，Del 或「删除选中」清除所选格的内容与绑定；修改需点「保存」生效，取消则全部回滚。</div>'+
+  ov.innerHTML='<div id="tbl-ed-box"><button class="dlg-close" onclick="tblEdCancel()" title="'+TT('取消（不保存）','Cancel (discard)')+'" aria-label="'+TT('关闭','Close')+'">✕</button>'+
+    '<div id="fb-title">📝 '+TT('单元格内容','Cell contents')+' · '+tplEsc(n.id)+'（'+n.rows+' × '+n.cols+'）</div>'+
+    '<div class="phint" style="margin:2px 0 8px">'+TT(
+      '静态格填中/英文字；🔗 绑定后台字段（输入框变为默认值）；📖 值字典；🎨 格样式（颜色/加粗/对齐）；⇊ 绑定按各行设备应用到整列。'+
+      '在空白处<b>拖拽框选</b>、点<b>行/列序号</b>整行整列选择（<b>右键序号</b>可插入/删除/移动行列、设列宽与对齐）；'+
+      '选中矩形区域可「合并」为一格。修改需点「保存」生效，取消则全部回滚。',
+      'Static cells: type zh/en text. 🔗 bind backend field (input becomes default value); 📖 value dict; 🎨 cell style; ⇊ fill column. '+
+      '<b>Drag</b> to select, click <b>row/col headers</b> to toggle lines (<b>right-click headers</b> to insert/delete/move, set width & align); '+
+      'a rectangular selection can be <b>merged</b>. Click Save to apply; Cancel rolls everything back.')+'</div>'+
     '<div id="tbl-ed-grid"></div>'+
-    '<div style="display:flex;gap:8px;margin-top:10px;flex-shrink:0">'+
-    '<button class="tb" id="tbl-ed-del" onclick="tblEdDeleteSel()" disabled>🗑 删除选中</button>'+
-    '<button class="tb grn" onclick="openTableGen()">⚡ 从设备生成表格</button>'+
-    '<button class="tb" onclick="tblClearAll()">清空内容</button>'+
+    '<div style="display:flex;gap:8px;margin-top:10px;flex-shrink:0;flex-wrap:wrap">'+
+    '<button class="tb" id="tbl-ed-del" onclick="tblEdDeleteSel()" disabled>🗑 '+TT('删除选中','Delete sel.')+'</button>'+
+    '<button class="tb" id="tbl-ed-copy" onclick="tblCopySel()" disabled>⧉ '+TT('复制','Copy')+'</button>'+
+    '<button class="tb" id="tbl-ed-paste" onclick="tblPasteSel()" disabled>📥 '+TT('粘贴','Paste')+'</button>'+
+    '<button class="tb" id="tbl-ed-merge" onclick="tblMergeSel()" disabled>▦ '+TT('合并','Merge')+'</button>'+
+    '<button class="tb" id="tbl-ed-unmerge" onclick="tblUnmergeSel()" disabled>▤ '+TT('取消合并','Unmerge')+'</button>'+
+    '<button class="tb grn" onclick="openTableGen()">⚡ '+TT('从设备生成表格','Generate from devices')+'</button>'+
+    '<button class="tb" onclick="tblClearAll()">'+TT('清空内容','Clear all')+'</button>'+
     '<span style="flex:1"></span>'+
-    '<button class="tb" onclick="tblEdCancel()">取消</button>'+
-    '<button class="tb grn" onclick="tblEdSave()">✓ 保存</button></div></div>';
+    '<button class="tb" onclick="tblEdCancel()">'+TT('取消','Cancel')+'</button>'+
+    '<button class="tb grn" onclick="tblEdSave()">✓ '+TT('保存','Save')+'</button></div></div>';
   document.body.appendChild(ov);
-  // 捕获期按键：Del 删除选中格（同时挡住画布全局 Del 误删表格节点）；Esc 先清选择、再退出（=取消）
+  // 捕获期按键：Del 删除选中格（同时挡住画布全局 Del 误删表格节点）；Esc 先清选择、再退出（=取消）；
+  // Ctrl+Z/Y 拦下画布全局撤销（undo() 会清 selNode，弹框将整体失联）——输入框内放行原生文本撤销
   ov._keydown=e=>{
     if(!document.getElementById('tbl-ed-overlay'))return;
     const tag=(document.activeElement&&document.activeElement.tagName)||'';
     const inField=(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA');
+    if((e.ctrlKey||e.metaKey)&&(e.key==='z'||e.key==='Z'||e.key==='y'||e.key==='Y')){
+      e.stopPropagation();
+      if(!inField)e.preventDefault();
+      return;
+    }
     if((e.key==='Delete'||e.key==='Backspace')&&!inField){
       e.preventDefault();e.stopPropagation();
       if(!document.getElementById('fb-overlay'))tblEdDeleteSel();   // 绑定/生成弹窗开着时只挡按键，不误删
@@ -555,7 +595,7 @@ async function tblEdCancel(){
   const ov=document.getElementById('tbl-ed-overlay');if(!ov)return;
   const n=nodes.find(x=>x.id===ov._nid);
   if(n&&n.type==='table'&&_tblEdState(n)!==ov._orig){
-    const ok=await uiConfirm('取消将放弃本次弹框中的全部修改（含绑定/生成/删除），确定？',true);
+    const ok=await uiConfirm(TT('取消将放弃本次弹框中的全部修改（含绑定/生成/删除），确定？','Cancel discards ALL changes made in this dialog (bindings/generation/deletions). Continue?'),true);
     if(!ok)return;
     const o=JSON.parse(ov._orig);
     n.rows=o.rows;n.cols=o.cols;n.headerRow=o.headerRow;n.headerCol=o.headerCol;n.cells=o.cells;n.data=o.data;
@@ -574,7 +614,7 @@ function tblEdSave(){
     const cur=JSON.stringify({nodes,edges,bgColor,routeStyle});
     if(history[histIdx]!==cur)snapshot();
     if(selNode===n.id)selectNode(n.id);
-    flashHint('表格修改已保存');
+    flashHint(TT('表格修改已保存','Table changes saved'));
   }
 }
 // 删除框选/序号选中的单元格：静态文字与绑定字段一并清除
@@ -591,68 +631,117 @@ function tblEdDeleteSel(){
   const cnt=sel.size;sel.clear();
   snapshot();
   renderDFs(n);
-  flashHint('已清除 '+cnt+' 个单元格的内容与绑定');
+  flashHint(TT('已清除 ','Cleared ')+cnt+TT(' 个单元格的内容与绑定',' cell(s)'));
 }
-// 选中态同步：格子高亮 + 「删除选中」按钮计数/禁用
+// 选中集的包围矩形；isRect=选中格恰好铺满该矩形（合并的前提）
+function _tblSelRect(sel){
+  if(!sel||!sel.size)return null;
+  let r0=1e9,c0=1e9,r1=-1,c1=-1;
+  sel.forEach(k=>{const p=k.split(','),r=+p[0],c=+p[1];r0=Math.min(r0,r);c0=Math.min(c0,c);r1=Math.max(r1,r);c1=Math.max(c1,c);});
+  return {r0,c0,r1,c1,isRect:sel.size===(r1-r0+1)*(c1-c0+1)};
+}
+// 选中态同步：格子高亮 + 底部操作按钮启停（删除/复制/粘贴/合并/取消合并）
 function tblEdSyncSel(){
   const ov=document.getElementById('tbl-ed-overlay');if(!ov)return;
   const sel=ov._selCells;
   ov.querySelectorAll('.tblc[data-rc]').forEach(el=>el.classList.toggle('sel',sel.has(el.dataset.rc)));
   const b=document.getElementById('tbl-ed-del');
-  if(b){b.disabled=!sel.size;b.textContent='🗑 删除选中'+(sel.size?('('+sel.size+')'):'');}
+  if(b){b.disabled=!sel.size;b.textContent='🗑 '+TT('删除选中','Delete sel.')+(sel.size?('('+sel.size+')'):'');}
+  const n=nodes.find(x=>x.id===ov._nid);
+  const rect=_tblSelRect(sel);
+  const cp=document.getElementById('tbl-ed-copy');if(cp)cp.disabled=!sel.size;
+  const ps=document.getElementById('tbl-ed-paste');if(ps)ps.disabled=!(_tblClip&&sel.size);
+  // 合并：矩形铺满选择 + 至少 2 格 + 不与选区外的既有合并区交叠
+  let canMerge=false,touchMerged=false;
+  if(n&&rect){
+    const cover=tblCoverMap(n);
+    let overlapOut=false;
+    sel.forEach(k=>{const p=k.split(','),a=cover[+p[0]]&&cover[+p[0]][+p[1]];
+      if(a){touchMerged=true;
+        if(a.ar<rect.r0||a.ac<rect.c0)overlapOut=true;
+        else{const src=tableCellField(n,a.ar,a.ac)||((n.cells||{})[a.ar+','+a.ac])||{};
+          if(a.ar+(src.spanR||1)-1>rect.r1||a.ac+(src.spanC||1)-1>rect.c1)overlapOut=true;}
+      }});
+    canMerge=rect.isRect&&sel.size>1&&!overlapOut;
+  }
+  const mg=document.getElementById('tbl-ed-merge');if(mg)mg.disabled=!canMerge;
+  const um=document.getElementById('tbl-ed-unmerge');if(um)um.disabled=!touchMerged;
 }
 // 单元格编辑网格（渲染到弹框内）：行/列序号条 + 每格输入框（静态格=文字；绑定格=默认值，实时数据覆盖）。
-// 表头格（首行/首列表头）是纯静态文字，不提供绑定按钮；普通格 🔗绑定 / 📖字典 / ⇊整列 / ✕解绑。
+// 普通格 🔗绑定 / 🖼图标 / 🎨样式 / 📖字典 / ⇊整列 / ✕解绑；表头格保留 🎨 与（已有绑定时的）🔗/✕——
+// 先绑定后勾表头的格由此仍可解绑，不再是死角。被合并覆盖的格渲染为不可编辑的占位（内容在锚点格）。
 function renderTableCells(n){
   const host=document.getElementById('tbl-ed-grid');if(!host||!n||n.type!=='table')return;
   const rows=Math.max(1,(n.rows|0)||1), cols=Math.max(1,(n.cols|0)||1);
+  const cover=tblCoverMap(n);
   const st=host.scrollTop, sl=host.scrollLeft;   // 重渲染（绑定确定/整列填充后）保持滚动位置
   let html='<div class="tblgrid" style="grid-template-columns:34px repeat('+cols+',minmax(150px,1fr))">';
   html+='<span class="tbl-idx"></span>';
-  for(let c=0;c<cols;c++)html+='<span class="tbl-idx" data-c="'+c+'" title="点击选择/取消整列">C'+(c+1)+'</span>';
+  const idxTip=TT('点击选择/取消整列；右键：插入/删除/移动/列宽/对齐','Click: toggle column; right-click: insert/delete/move/width/align');
+  const idxTipR=TT('点击选择/取消整行；右键：插入/删除/移动','Click: toggle row; right-click: insert/delete/move');
+  for(let c=0;c<cols;c++)html+='<span class="tbl-idx" data-c="'+c+'" title="'+idxTip+'">C'+(c+1)+'</span>';
   for(let r=0;r<rows;r++){
-    html+='<span class="tbl-idx" data-r="'+r+'" title="点击选择/取消整行">R'+(r+1)+'</span>';
+    html+='<span class="tbl-idx" data-r="'+r+'" title="'+idxTipR+'">R'+(r+1)+'</span>';
     for(let c=0;c<cols;c++){
+      const cvr=cover[r]&&cover[r][c];
+      if(cvr&&(cvr.ar!==r||cvr.ac!==c)){   // 被合并区覆盖：占位、不可编辑（选择仍可点，用于取消合并）
+        html+='<div class="tblc cov" data-rc="'+r+','+c+'" title="'+TT('合并区（锚点 R','Merged cell (anchor R')+(cvr.ar+1)+'C'+(cvr.ac+1)+'）">⧉</div>';
+        continue;
+      }
       const i=tblFieldIndex(n,r,c), f=i>=0?n.data[i]:null, bound=!!(f&&bindHasSource(f.bind));
       const hdr=(n.headerRow&&r===0)||(n.headerCol&&c===0);
       const cv=n.cells&&n.cells[r+','+c];
       const zh=(cv&&typeof cv==='object')?(cv.zh||''):(cv==null?'':String(cv));
       const en=(cv&&typeof cv==='object')?(cv.en||''):'';
       const hasIcon=!!(f&&(f.cellShow||f.icon||(Array.isArray(f.iconRules)&&f.iconRules.length)));
-      const tip=bound?('已绑定：'+fieldBindSummary(n,f)+'（输入框=无实时数据时的默认值）'):(hdr?'表头文字（静态，中英双语）':'静态文字（中英双语）；🔗 绑定数据字段，🖼 配置动态图标');
+      const hasStyle=!!((f&&(f.cellColor||f.cellBg||f.cellBold||f.cellAlign))||(cv&&typeof cv==='object'&&(cv.color||cv.bg||cv.bold||cv.align)));
+      const spanR=(f?f.spanR:(cv&&cv.spanR))||1, spanC=(f?f.spanC:(cv&&cv.spanC))||1;
+      const tip=bound?(TT('已绑定：','Bound: ')+fieldBindSummary(n,f)+TT('（输入框=无实时数据时的默认值）',' (input = default when no live data)'))
+        :(hdr?TT('表头文字（静态，中英双语）','Header text (static, zh/en)'):TT('静态文字（中英双语）；🔗 绑定数据字段，🖼 配置动态图标','Static text (zh/en); 🔗 bind field, 🖼 dynamic icon'));
       const hasDict=bound&&f.dict!==undefined&&f.dict!==null;
       let srcTxt=bound?fieldBindSummary(n,f):'';
-      if(hasIcon)srcTxt+=(srcTxt?' · ':'')+'🖼 '+({icon:'仅图标',both:'图标+值'}[f.cellShow]||'仅值')+((f.iconRules&&f.iconRules.length)?('，'+f.iconRules.length+' 条规则'):'');
+      if(hasIcon)srcTxt+=(srcTxt?' · ':'')+'🖼 '+({icon:TT('仅图标','icon'),both:TT('图标+值','icon+value')}[f.cellShow]||TT('仅值','value'))+((f.iconRules&&f.iconRules.length)?('，'+f.iconRules.length+TT(' 条规则',' rules')):'');
+      if(spanR>1||spanC>1)srcTxt=(srcTxt?srcTxt+' · ':'')+'▦ '+spanR+'×'+spanC;
+      if(f&&f.decimals!=null)srcTxt+=(srcTxt?' · ':'')+TT('小数','dp ')+f.decimals+TT(' 位','');
+      const paintBtn='<button class="df-bind'+(hasStyle?' bound':'')+'" onclick="tblCellStylePopover('+r+','+c+',event)" title="'+TT('格样式：文字色/底色/加粗/对齐（多选时应用到所有选中格）','Cell style: color/bg/bold/align (applies to selection)')+'">🎨</button>';
       html+='<div class="tblc'+(bound?' bound':'')+(hdr?' hdr':'')+'" data-rc="'+r+','+c+'" title="'+tplEsc(tip)+'">'+
         (bound
-          ?('<input value="'+tplEsc(f.dv==null?'':String(f.dv))+'" placeholder="默认值" oninput="tblCellInput('+r+','+c+',\'dv\',this.value)">')
-          :('<input value="'+tplEsc(zh)+'" placeholder="'+(hdr?'表头·中文':'中文')+'" oninput="tblCellInput('+r+','+c+',\'zh\',this.value)">'+
+          ?('<input value="'+tplEsc(f.dv==null?'':String(f.dv))+'" placeholder="'+TT('默认值','default')+'" oninput="tblCellInput('+r+','+c+',\'dv\',this.value)">')
+          :('<input value="'+tplEsc(zh)+'" placeholder="'+(hdr?TT('表头·中文','header zh'):TT('中文','zh'))+'" oninput="tblCellInput('+r+','+c+',\'zh\',this.value)">'+
             '<input class="tblc-en" value="'+tplEsc(en)+'" placeholder="English" oninput="tblCellInput('+r+','+c+',\'en\',this.value)">'))+
         (srcTxt?('<div class="tblc-src" title="'+tplEsc(srcTxt)+'">↳ '+tplEsc(srcTxt)+'</div>'):'')+
-        (hdr?'':('<span class="tblc-acts">'+
-          '<button class="df-bind'+(bound?' bound':'')+'" onclick="tblBindCell('+r+','+c+')" title="'+(bound?'修改绑定':'绑定数据字段')+'">🔗</button>'+
-          '<button class="df-bind'+(hasIcon?' bound':'')+'" onclick="tblCellIconRules('+r+','+c+')" title="动态图标：按信号规则切换单元格图标（仅图标 / 图标+值）">🖼</button>'+
-          (bound?('<button class="df-bind df-dict'+(hasDict?' bound':'')+'" onclick="tblDictCell('+r+','+c+')" title="值字典">📖</button>'):'')+
-          ((bound||hasIcon)?('<button class="df-bind" onclick="tblFillColumn('+r+','+c+')" title="应用到整列：把此格的绑定/图标规则复制到本列所有行——绑定设备替换为各行设备，规则里本行信号（RxCy）改写为各行信号">⇊</button>'):'')+
-          (f?('<button class="df-del" onclick="tblUnbindCell('+r+','+c+')" title="清除绑定与图标配置（恢复为静态文字格）">✕</button>'):'')+
-        '</span>'))+
+        '<span class="tblc-acts">'+
+          (hdr?'':('<button class="df-bind'+(bound?' bound':'')+'" onclick="tblBindCell('+r+','+c+')" title="'+(bound?TT('修改绑定','Edit binding'):TT('绑定数据字段','Bind field'))+'">🔗</button>'+
+            '<button class="df-bind'+(hasIcon?' bound':'')+'" onclick="tblCellIconRules('+r+','+c+')" title="'+TT('动态图标：按信号规则切换单元格图标（仅图标 / 图标+值）','Dynamic icon by signal rules (icon / icon+value)')+'">🖼</button>'))+
+          paintBtn+
+          (hdr&&bound?('<button class="df-bind bound" onclick="tblBindCell('+r+','+c+')" title="'+TT('修改绑定（此格已被勾成表头，值不再显示）','Edit binding (cell is now a header)')+'">🔗</button>'):'')+
+          (!hdr&&bound?('<button class="df-bind df-dict'+(hasDict?' bound':'')+'" onclick="tblDictCell('+r+','+c+')" title="'+TT('值字典','Value dict')+'">📖</button>'):'')+
+          (!hdr&&(bound||hasIcon)?('<button class="df-bind" onclick="tblFillColumn('+r+','+c+')" title="'+TT('应用到整列：把此格的绑定/图标规则/样式复制到本列所有行——绑定设备替换为各行设备，规则里本行信号（RxCy）改写为各行信号','Fill column: copy binding/icon rules/style to every row (device follows each row)')+'">⇊</button>'):'')+
+          (f?('<button class="df-del" onclick="tblUnbindCell('+r+','+c+')" title="'+TT('清除绑定与图标配置（恢复为静态文字格）','Clear binding & icon config')+'">✕</button>'):'')+
+        '</span>'+
         '</div>';
     }
   }
   html+='</div>';
   host.innerHTML=html;
   host.scrollTop=st;host.scrollLeft=sl;
-  // ── 选择交互：行/列序号点击整行整列切换；空白处拖拽框选（Ctrl 追加）；单击格子空白区选中该格 ──
+  // ── 选择交互：行/列序号点击整行整列切换、右键结构菜单；空白处拖拽框选（Ctrl 追加）；单击格子空白区选中该格 ──
   const ov=document.getElementById('tbl-ed-overlay');
   if(!ov)return;
   const sel=ov._selCells;
-  host.querySelectorAll('.tbl-idx[data-r]').forEach(el=>el.onclick=()=>{
-    const r=+el.dataset.r,ks=[];for(let c=0;c<cols;c++)ks.push(r+','+c);
-    const all=ks.every(k=>sel.has(k));ks.forEach(k=>{if(all)sel.delete(k);else sel.add(k);});tblEdSyncSel();
+  host.querySelectorAll('.tbl-idx[data-r]').forEach(el=>{
+    el.onclick=()=>{
+      const r=+el.dataset.r,ks=[];for(let c=0;c<cols;c++)ks.push(r+','+c);
+      const all=ks.every(k=>sel.has(k));ks.forEach(k=>{if(all)sel.delete(k);else sel.add(k);});tblEdSyncSel();
+    };
+    el.oncontextmenu=e=>{e.preventDefault();tblStructMenu('row',+el.dataset.r,e.clientX,e.clientY);};
   });
-  host.querySelectorAll('.tbl-idx[data-c]').forEach(el=>el.onclick=()=>{
-    const c=+el.dataset.c,ks=[];for(let r2=0;r2<rows;r2++)ks.push(r2+','+c);
-    const all=ks.every(k=>sel.has(k));ks.forEach(k=>{if(all)sel.delete(k);else sel.add(k);});tblEdSyncSel();
+  host.querySelectorAll('.tbl-idx[data-c]').forEach(el=>{
+    el.onclick=()=>{
+      const c=+el.dataset.c,ks=[];for(let r2=0;r2<rows;r2++)ks.push(r2+','+c);
+      const all=ks.every(k=>sel.has(k));ks.forEach(k=>{if(all)sel.delete(k);else sel.add(k);});tblEdSyncSel();
+    };
+    el.oncontextmenu=e=>{e.preventDefault();tblStructMenu('col',+el.dataset.c,e.clientX,e.clientY);};
   });
   host.onmousedown=e=>{
     if(e.button!==0)return;
@@ -695,17 +784,31 @@ function tblCellInput(r,c,which,v){
   if(which==='dv')return;
   tblSetStaticText(n,r,c,which,v);
 }
+// 建绑定格字段（不存在则按 RxCy 自动键创建）：吸附既有静态格的合并 span 与格级样式到字段上——
+// 否则「先合并/上样式、再绑定」会退回 1×1 无样式（渲染以字段属性为准）；解绑时 tblUnbindCell 迁回
+function _tblEnsureField(n,r,c){
+  let i=tblFieldIndex(n,r,c);
+  if(i>=0)return i;
+  n.data=n.data||[];
+  const key=_tblAutoKey(r,c);
+  const f={key,keyEn:key,dv:'',tr:r,tc:c};
+  const cv=n.cells&&n.cells[r+','+c];
+  if(cv&&typeof cv==='object'){
+    if(cv.spanR>1){f.spanR=cv.spanR;delete cv.spanR;}
+    if(cv.spanC>1){f.spanC=cv.spanC;delete cv.spanC;}
+    if(cv.color){f.cellColor=cv.color;delete cv.color;}
+    if(cv.bg){f.cellBg=cv.bg;delete cv.bg;}
+    if(cv.bold){f.cellBold=true;delete cv.bold;}
+    if(cv.align){f.cellAlign=cv.align;delete cv.align;}
+    if(!cv.zh&&!cv.en)delete n.cells[r+','+c];
+  }
+  n.data.push(f);
+  return n.data.length-1;
+}
 // 绑定单元格：没有格字段则先按 RxCx 自动建（信号键=表格id.RxCx，天然唯一），再复用标准绑定弹窗
 function tblBindCell(r,c){
   const n=nodes.find(x=>x.id===selNode);if(!n||n.type!=='table')return;
-  let i=tblFieldIndex(n,r,c);
-  if(i<0){
-    n.data=n.data||[];
-    const key='R'+(r+1)+'C'+(c+1);
-    n.data.push({key,keyEn:key,dv:'',tr:r,tc:c});
-    i=n.data.length-1;
-  }
-  openFieldBind(i);
+  openFieldBind(_tblEnsureField(n,r,c));
 }
 function tblDictCell(r,c){
   const n=nodes.find(x=>x.id===selNode);if(!n||n.type!=='table')return;
@@ -716,27 +819,21 @@ function tblDictCell(r,c){
 // 无数据绑定、只配图标规则的「纯图标格」也允许（规则引用其它信号即可）。
 function tblCellIconRules(r,c){
   const n=nodes.find(x=>x.id===selNode);if(!n||n.type!=='table')return;
-  let i=tblFieldIndex(n,r,c);
-  if(i<0){
-    n.data=n.data||[];
-    const key='R'+(r+1)+'C'+(c+1);
-    n.data.push({key,keyEn:key,dv:'',tr:r,tc:c});
-    i=n.data.length-1;
-  }
+  const i=_tblEnsureField(n,r,c);
   const f=n.data[i];
   const ds={def:f.icon||'', rules:(Array.isArray(f.iconRules)?f.iconRules:[]).map(x=>({when:condToEdit(x.when),icon:x.icon||''}))};
   let show=f.cellShow||(bindHasSource(f.bind)?'both':'icon');
-  openRuleModal('单元格图标规则',
-    {kind:'表格',main:(nodeLabel(n)||n.id)+' · R'+(r+1)+'C'+(c+1),sub:bindHasSource(f.bind)?('信号：'+fieldSig(n,f)+' ← '+fieldBindSummary(n,f)):'未绑定数据（规则可引用其它信号）',color:'var(--ui-accent)'},
+  openRuleModal(TT('单元格图标规则','Cell icon rules'),
+    {kind:TT('表格','Table'),main:(nodeLabel(n)||n.id)+' · R'+(r+1)+'C'+(c+1),sub:bindHasSource(f.bind)?(TT('信号：','Signal: ')+fieldSig(n,f)+' ← '+fieldBindSummary(n,f)):TT('未绑定数据（规则可引用其它信号）','No binding (rules may reference other signals)'),color:'var(--ui-accent)'},
     box=>{
       box.innerHTML='';box.className='rm-cond';
       const bar=document.createElement('div');bar.className='rm-dircard';bar.style.display='flex';bar.style.alignItems='center';bar.style.gap='8px';bar.style.flexWrap='wrap';
-      bar.appendChild(document.createTextNode('展示方式'));
+      bar.appendChild(document.createTextNode(TT('展示方式','Display')));
       const ss=document.createElement('select');
-      [['value','仅值（不显示图标）'],['icon','仅图标'],['both','图标 + 值']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;ss.appendChild(o);});
+      [['value',TT('仅值（不显示图标）','Value only')],['icon',TT('仅图标','Icon only')],['both',TT('图标 + 值','Icon + value')]].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;ss.appendChild(o);});
       ss.value=show;ss.onchange=()=>{show=ss.value;};
       bar.appendChild(ss);
-      bar.appendChild(document.createTextNode('默认图标（规则都不命中时）'));
+      bar.appendChild(document.createTextNode(TT('默认图标（规则都不命中时）','Default icon (when no rule matches)')));
       bar.appendChild(mkIconSelect(ds.def,v=>{ds.def=v;}));
       box.appendChild(bar);
       const inner=document.createElement('div');box.appendChild(inner);
@@ -766,8 +863,449 @@ function _tblRewriteRowSigs(cond,nid,srcRow,dstRow){
 function tblUnbindCell(r,c){
   const n=nodes.find(x=>x.id===selNode);if(!n||n.type!=='table')return;
   const i=tblFieldIndex(n,r,c);if(i<0)return;
-  snapshot();n.data.splice(i,1);snapshot();
+  snapshot();
+  // 字段上的合并 span 与格级样式迁回静态格（解绑清的是绑定与图标配置，不应顺带取消合并/清样式）
+  const f=n.data[i];
+  if(f&&(f.spanR>1||f.spanC>1||f.cellColor||f.cellBg||f.cellBold||f.cellAlign)){
+    n.cells=n.cells||{};
+    let cv=n.cells[r+','+c];
+    if(cv==null)cv={zh:'',en:''};
+    else if(typeof cv!=='object')cv={zh:String(cv),en:''};
+    if(f.spanR>1)cv.spanR=f.spanR;
+    if(f.spanC>1)cv.spanC=f.spanC;
+    if(f.cellColor)cv.color=f.cellColor;
+    if(f.cellBg)cv.bg=f.cellBg;
+    if(f.cellBold)cv.bold=true;
+    if(f.cellAlign)cv.align=f.cellAlign;
+    n.cells[r+','+c]=cv;
+  }
+  n.data.splice(i,1);snapshot();
   renderDFs(n);
+}
+// ═════ 表格结构操作 / 合并 / 复制粘贴 / 格样式（2.1）═════
+let _tblClip=null;         // 单元格剪贴板：{w,h,items:[{dr,dc,f,cv,srcSig}]}（含绑定/图标/样式/合并，可跨表）
+let _tblStyleSnapId=null;  // 样式面板「选中后首个改动前快照一次」的标记（粗粒度撤销，避免逐键快照刷史）
+let _tblStyleSnapT=null;   // 样式面板定稿快照的防抖计时器
+// 绑定格自动键（RxCy，1 起）；仅当 key/keyEn 仍是自动格式时才随位置改名——用户改过名则信号键保持稳定
+function _tblAutoKey(r,c){return 'R'+(r+1)+'C'+(c+1);}
+function _tblIsAutoKey(f){const re=/^R\d+C\d+$/;return re.test(String(f.keyEn||''))&&(!f.key||re.test(String(f.key)));}
+// 全图改写信号引用（结构变更/粘贴导致 RxCy 键更名时）：节点显隐/图标规则、字段级单元格图标规则、
+// 连线显隐/流向规则、注入的测试信号行。map={旧信号键:新信号键}
+function tblRenameSigsEverywhere(map){
+  if(!map||!Object.keys(map).length)return;
+  nodes.forEach(m=>{
+    if(m.visibleWhen!=null)migrateCondSignals(m.visibleWhen,map);
+    if(Array.isArray(m.iconRules))m.iconRules.forEach(x=>x&&migrateCondSignals(x.when,map));
+    (m.data||[]).forEach(f=>{if(Array.isArray(f.iconRules))f.iconRules.forEach(x=>x&&migrateCondSignals(x.when,map));});
+  });
+  edges.forEach(e=>{
+    if(e.showWhen!=null)migrateCondSignals(e.showWhen,map);
+    if(Array.isArray(e.dirRules))e.dirRules.forEach(x=>x&&migrateCondSignals(x.when,map));
+  });
+  let injChanged=false;
+  (injRows||[]).forEach(row=>{
+    const old=row.node+'.'+row.field, nw=map[old];
+    if(nw){const d=nw.indexOf('.');row.node=nw.slice(0,d);row.field=nw.slice(d+1);injChanged=true;}
+  });
+  // 注入行的键变了要重建 signalValues（否则预览规则读不到样例值、导出 sampleSignals 滤掉旧键）
+  if(injChanged&&typeof syncInjections==='function')syncInjections();
+}
+// 行/列结构变更核心：axis='r'|'c'，在 at 处 delta=+1 插入 / delta=-1 删除本行列。
+// 统一处理：静态格键与合并 span、绑定字段 tr/tc 与 span、自动键(RxCy)改名 + 全图信号引用改写、
+// 逐列宽/列对齐数组、行列数。返回 false=被挡下或用户取消
+async function tblStructShift(n,axis,at,delta){
+  const isR=axis==='r';
+  const rows=Math.max(1,(n.rows|0)||1), cols=Math.max(1,(n.cols|0)||1);
+  if(delta<0&&(isR?rows:cols)<=1){flashHint(TT('至少保留 1 行 / 1 列','Keep at least 1 row / column'));return false;}
+  const spanOf=o=>({sR:(o&&typeof o==='object'&&o.spanR>1)?o.spanR:1,sC:(o&&typeof o==='object'&&o.spanC>1)?o.spanC:1});
+  const cellsArr=Object.keys(n.cells||{}).map(k=>{const p=k.split(',');return {r:+p[0],c:+p[1],v:n.cells[k]};});
+  if(delta<0){
+    // 被删行/列上有合并锚点（区域将失去锚点）→ 先取消合并，避免隐式内容搬移
+    const anchorHit=cellsArr.some(x=>{const s=spanOf(x.v);return (isR?x.r:x.c)===at&&(isR?s.sR:s.sC)>1;})
+      ||(n.data||[]).some(f=>f.tr!=null&&(isR?f.tr:f.tc)===at&&(((isR?f.spanR:f.spanC)||1)>1));
+    if(anchorHit){flashHint(TT('该行/列上有合并格锚点，请先取消合并','Merged-cell anchor on this line — unmerge first'));return false;}
+    const hitF=(n.data||[]).filter(f=>f.tr!=null&&(isR?f.tr:f.tc)===at);
+    if(hitF.length){
+      const ok=await uiConfirm(TT('删除将移除 ','Deleting removes ')+hitF.length+TT(' 个绑定单元格，确定？',' bound cell(s). Continue?'),true);
+      if(!ok)return false;
+    }
+  }
+  snapshot();
+  const mapPos=v=>delta>0?(v>=at?v+1:v):(v>at?v-1:v);
+  const renames={};
+  // 静态格：重键 + span 收放（插入点/删除点落在合并区内部 → 区域变长/变短）
+  const newCells={};
+  cellsArr.forEach(x=>{
+    const o=(typeof x.v==='object')?{...x.v}:{zh:String(x.v==null?'':x.v),en:''};
+    const s=spanOf(o);
+    const pos=isR?x.r:x.c;
+    let span=isR?s.sR:s.sC;
+    if(delta<0&&pos===at)return;   // 被删行列上的静态格（锚点已在上面挡下）
+    if(delta>0){if(pos<at&&at<pos+span)span++;}
+    else if(pos<at&&at<pos+span)span--;
+    if(isR){if(span>1)o.spanR=span;else delete o.spanR;}
+    else {if(span>1)o.spanC=span;else delete o.spanC;}
+    const nr=isR?mapPos(x.r):x.r, nc=isR?x.c:mapPos(x.c);
+    newCells[nr+','+nc]=o;
+  });
+  n.cells=newCells;
+  // 绑定字段：删行列上的字段移除，其余平移；span 收放；自动键改名并记录信号改写
+  n.data=(n.data||[]).filter(f=>f.tr==null||!(delta<0&&(isR?f.tr:f.tc)===at));
+  (n.data||[]).forEach(f=>{
+    if(f.tr==null)return;
+    const pos=isR?f.tr:f.tc;
+    let span=(isR?f.spanR:f.spanC)||1;
+    if(delta>0){if(pos<at&&at<pos+span)span++;}
+    else if(pos<at&&at<pos+span)span--;
+    const or=f.tr,oc=f.tc;
+    if(isR){f.tr=mapPos(f.tr);if(span>1)f.spanR=span;else delete f.spanR;}
+    else {f.tc=mapPos(f.tc);if(span>1)f.spanC=span;else delete f.spanC;}
+    if((f.tr!==or||f.tc!==oc)&&_tblIsAutoKey(f)){
+      const old=n.id+'.'+(f.keyEn||f.key);
+      f.key=_tblAutoKey(f.tr,f.tc);f.keyEn=f.key;
+      renames[old]=n.id+'.'+f.keyEn;
+    }
+  });
+  if(isR)n.rows=rows+delta;else n.cols=cols+delta;
+  if(!isR){   // 逐列宽 / 列对齐数组随列位增删
+    ['colWs','colAlign'].forEach(k=>{
+      if(!Array.isArray(n[k]))return;
+      const a=n[k].slice();
+      if(delta>0)a.splice(at,0,k==='colWs'?0:'center');else a.splice(at,1);
+      n[k]=a;
+    });
+  }
+  tblRenameSigsEverywhere(renames);
+  snapshot();
+  return true;
+}
+// 相邻行/列互换（上移/下移/左移/右移）。任一合并区涉及 a 或 b 行列 → 先取消合并（避免区域被隐式拆动）
+async function tblStructSwap(n,axis,a,b){
+  const isR=axis==='r';
+  const hit=(pos,span)=>span>1&&((a>=pos&&a<pos+span)||(b>=pos&&b<pos+span));
+  let blocked=false;
+  Object.keys(n.cells||{}).forEach(k=>{const v=n.cells[k];
+    if(v&&typeof v==='object'){const p=k.split(',');
+      if(hit(isR?+p[0]:+p[1],(isR?v.spanR:v.spanC)||1))blocked=true;}});
+  (n.data||[]).forEach(f=>{if(f.tr!=null&&hit(isR?f.tr:f.tc,(isR?f.spanR:f.spanC)||1))blocked=true;});
+  if(blocked){flashHint(TT('移动涉及合并格，请先取消合并','Move touches merged cells — unmerge first'));return false;}
+  snapshot();
+  const renames={};
+  const mapPos=v=>v===a?b:(v===b?a:v);
+  const newCells={};
+  Object.keys(n.cells||{}).forEach(k=>{const p=k.split(','),r=+p[0],c=+p[1];
+    newCells[(isR?mapPos(r):r)+','+(isR?c:mapPos(c))]=n.cells[k];});
+  n.cells=newCells;
+  (n.data||[]).forEach(f=>{
+    if(f.tr==null)return;
+    const or=f.tr,oc=f.tc;
+    if(isR)f.tr=mapPos(f.tr);else f.tc=mapPos(f.tc);
+    if((f.tr!==or||f.tc!==oc)&&_tblIsAutoKey(f)){
+      const old=n.id+'.'+(f.keyEn||f.key);
+      f.key=_tblAutoKey(f.tr,f.tc);f.keyEn=f.key;
+      renames[old]=n.id+'.'+f.keyEn;
+    }
+  });
+  if(!isR){['colWs','colAlign'].forEach(k=>{if(Array.isArray(n[k])){const t=n[k][a];n[k][a]=n[k][b];n[k][b]=t;}});}
+  tblRenameSigsEverywhere(renames);
+  snapshot();
+  return true;
+}
+// 行/列序号右键菜单：插入/删除/移动；列另有 对齐 与 逐列宽
+function tblStructMenu(kind,idx,cx,cy){
+  const ov=document.getElementById('tbl-ed-overlay');if(!ov)return;
+  const n=nodes.find(x=>x.id===ov._nid);if(!n||n.type!=='table')return;
+  const old=document.getElementById('tbl-struct-menu');if(old)old.remove();
+  const isR=kind==='row';
+  const rows=Math.max(1,(n.rows|0)||1), cols=Math.max(1,(n.cols|0)||1);
+  const items=[];
+  const act=(label,fn)=>items.push({label,fn});
+  if(isR){
+    act('⬆ '+TT('在上方插入行','Insert row above'),()=>tblStructShift(n,'r',idx,1));
+    act('⬇ '+TT('在下方插入行','Insert row below'),()=>tblStructShift(n,'r',idx+1,1));
+    act('🗑 '+TT('删除本行','Delete this row'),()=>tblStructShift(n,'r',idx,-1));
+    if(idx>0)act('↑ '+TT('上移','Move up'),()=>tblStructSwap(n,'r',idx,idx-1));
+    if(idx<rows-1)act('↓ '+TT('下移','Move down'),()=>tblStructSwap(n,'r',idx,idx+1));
+  }else{
+    act('⬅ '+TT('在左侧插入列','Insert column left'),()=>tblStructShift(n,'c',idx,1));
+    act('➡ '+TT('在右侧插入列','Insert column right'),()=>tblStructShift(n,'c',idx+1,1));
+    act('🗑 '+TT('删除本列','Delete this column'),()=>tblStructShift(n,'c',idx,-1));
+    if(idx>0)act('← '+TT('左移','Move left'),()=>tblStructSwap(n,'c',idx,idx-1));
+    if(idx<cols-1)act('→ '+TT('右移','Move right'),()=>tblStructSwap(n,'c',idx,idx+1));
+  }
+  const m=document.createElement('div');m.id='tbl-struct-menu';m.className='tsm';
+  m.innerHTML='<div class="tsm-t">'+(isR?('R'+(idx+1)):('C'+(idx+1)))+'</div>'+
+    items.map((it,i)=>'<button class="tsm-i" data-i="'+i+'">'+it.label+'</button>').join('')+
+    (isR?'':(
+      '<div class="tsm-sep"></div>'+
+      '<div class="tsm-row"><span>'+TT('对齐','Align')+'</span><select id="tsm-align">'+
+        [['center',TT('居中','center')],['left',TT('左','left')],['right',TT('右','right')]]
+          .map(([v,t])=>'<option value="'+v+'"'+(((n.colAlign&&n.colAlign[idx])||'center')===v?' selected':'')+'>'+t+'</option>').join('')+'</select></div>'+
+      '<div class="tsm-row"><span>'+TT('列宽','Width')+'</span><input id="tsm-colw" type="number" min="0" max="800" step="1" value="'+(Array.isArray(n.colWs)?(n.colWs[idx]||0):0)+'"><span class="punit">px</span></div>'+
+      '<div class="phint" style="margin:2px 8px 6px">'+TT('列宽 0=自动/继承全表「固定列宽」','Width 0 = auto / inherit table default')+'</div>'));
+  document.body.appendChild(m);
+  m.style.left=Math.max(8,Math.min(cx,window.innerWidth-200))+'px';
+  m.style.top=Math.max(8,Math.min(cy,window.innerHeight-m.offsetHeight-12))+'px';
+  const done=()=>{renderTableCells(n);tblEdSyncSel();if(selNode===n.id){pairSet('p-tbl-rows',n.rows||1);pairSet('p-tbl-cols',n.cols||1);}};
+  m.querySelectorAll('.tsm-i').forEach(btn=>btn.onclick=async()=>{
+    const it=items[+btn.dataset.i];m.remove();
+    const ok=await it.fn();
+    if(ok!==false)done();
+  });
+  if(!isR){
+    const al=m.querySelector('#tsm-align');
+    al.onchange=()=>{
+      snapshot();
+      let a=Array.isArray(n.colAlign)?n.colAlign.slice():[];
+      for(let i2=0;i2<cols;i2++)if(!a[i2])a[i2]='center';
+      a[idx]=al.value;
+      if(a.every(x=>x==='center'))delete n.colAlign;else n.colAlign=a;
+      snapshot();
+    };
+    const cw=m.querySelector('#tsm-colw');
+    cw.onchange=()=>{
+      snapshot();
+      const v=Math.max(0,Math.round(+cw.value||0));
+      let a=Array.isArray(n.colWs)?n.colWs.slice():[];
+      for(let i2=0;i2<cols;i2++)if(a[i2]==null)a[i2]=0;
+      a[idx]=v;
+      if(a.every(x=>!x))delete n.colWs;else n.colWs=a;
+      snapshot();
+    };
+  }
+  const close=ev=>{if(!m.contains(ev.target)){m.remove();document.removeEventListener('mousedown',close,true);}};
+  setTimeout(()=>document.addEventListener('mousedown',close,true),0);
+}
+// 合并选中矩形为一格：左上角为锚点（内容保留），其余格内容/绑定清除
+async function tblMergeSel(){
+  const ov=document.getElementById('tbl-ed-overlay');if(!ov)return;
+  const n=nodes.find(x=>x.id===ov._nid);if(!n||n.type!=='table')return;
+  const rect=_tblSelRect(ov._selCells);
+  if(!rect||!rect.isRect||ov._selCells.size<2)return;
+  const {r0,c0,r1,c1}=rect;
+  let lose=0;
+  for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++){
+    if(r===r0&&c===c0)continue;
+    if(tblFieldIndex(n,r,c)>=0||((n.cells||{})[r+','+c]!=null))lose++;
+  }
+  if(lose){
+    const ok=await uiConfirm(TT('合并将清除锚点（左上角）以外 ','Merging clears ')+lose+TT(' 个格的内容与绑定，确定？',' non-anchor cell(s). Continue?'),true);
+    if(!ok)return;
+  }
+  snapshot();
+  for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++){
+    if(r===r0&&c===c0)continue;
+    const i=tblFieldIndex(n,r,c);if(i>=0)n.data.splice(i,1);
+    if(n.cells)delete n.cells[r+','+c];
+  }
+  const sR=r1-r0+1, sC=c1-c0+1;
+  const f=tableCellField(n,r0,c0);
+  if(f){
+    if(sR>1)f.spanR=sR;else delete f.spanR;
+    if(sC>1)f.spanC=sC;else delete f.spanC;
+  }else{
+    n.cells=n.cells||{};
+    let cv=n.cells[r0+','+c0];
+    if(cv==null)cv={zh:'',en:''};
+    else if(typeof cv!=='object')cv={zh:String(cv),en:''};
+    if(sR>1)cv.spanR=sR;else delete cv.spanR;
+    if(sC>1)cv.spanC=sC;else delete cv.spanC;
+    n.cells[r0+','+c0]=cv;
+  }
+  ov._selCells.clear();
+  snapshot();renderDFs(n);tblEdSyncSel();
+}
+// 取消合并：选中格所属的全部合并区解除（锚点内容保留在原位）
+function tblUnmergeSel(){
+  const ov=document.getElementById('tbl-ed-overlay');if(!ov)return;
+  const n=nodes.find(x=>x.id===ov._nid);if(!n||n.type!=='table')return;
+  const sel=ov._selCells;if(!sel.size)return;
+  const cover=tblCoverMap(n);
+  const anchors=new Set();
+  sel.forEach(k=>{const p=k.split(','),a=cover[+p[0]]&&cover[+p[0]][+p[1]];if(a)anchors.add(a.ar+','+a.ac);});
+  if(!anchors.size)return;
+  snapshot();
+  anchors.forEach(k=>{
+    const p=k.split(','),r=+p[0],c=+p[1];
+    const f=tableCellField(n,r,c);
+    if(f){delete f.spanR;delete f.spanC;}
+    const cv=n.cells&&n.cells[k];
+    if(cv&&typeof cv==='object'){
+      delete cv.spanR;delete cv.spanC;
+      if(!cv.zh&&!cv.en&&!cv.color&&!cv.bg&&!cv.bold&&!cv.align)delete n.cells[k];
+    }
+  });
+  snapshot();renderDFs(n);tblEdSyncSel();
+}
+// 复制选中格（含绑定/图标规则/样式/合并 span；相对坐标存剪贴板，可跨表粘贴）
+function tblCopySel(){
+  const ov=document.getElementById('tbl-ed-overlay');if(!ov)return;
+  const n=nodes.find(x=>x.id===ov._nid);if(!n||n.type!=='table')return;
+  const sel=ov._selCells;if(!sel.size)return;
+  const rect=_tblSelRect(sel);
+  const items=[];
+  sel.forEach(k=>{
+    const p=k.split(','),r=+p[0],c=+p[1];
+    const f=tableCellField(n,r,c);
+    const cv=n.cells&&n.cells[k];
+    if(!f&&cv==null)return;
+    items.push({
+      dr:r-rect.r0, dc:c-rect.c0,
+      f:f?JSON.parse(JSON.stringify(f)):null,
+      cv:cv!=null?JSON.parse(JSON.stringify(typeof cv==='object'?cv:{zh:String(cv),en:''})):null,
+      srcSig:f?(n.id+'.'+(f.keyEn||f.key)):null
+    });
+  });
+  if(!items.length){flashHint(TT('选中格没有内容可复制','Nothing to copy in selection'));return;}
+  _tblClip={w:rect.c1-rect.c0+1, h:rect.r1-rect.r0+1, items};
+  flashHint(TT('已复制 ','Copied ')+items.length+TT(' 个单元格（含绑定/图标/样式），选择目标格后点「粘贴」',' cell(s) — select target cell(s) and Paste'));
+  tblEdSyncSel();
+}
+// 粘贴到选中区左上角：目标按「整个落点区域」（含粘贴合并格铺开的范围）清理覆盖；与既有合并区
+// 交叠且该区伸出落点范围 → 拦下（先取消合并）。自动键(RxCy)随新位置改名；非自动键与表内既有
+// 字段撞名时强制改为自动键（信号键在表内必须唯一，否则导出被重名校验挡下）。副本内自引用信号一并改写
+async function tblPasteSel(){
+  const ov=document.getElementById('tbl-ed-overlay');if(!ov||!_tblClip)return;
+  const n=nodes.find(x=>x.id===ov._nid);if(!n||n.type!=='table')return;
+  const rect=_tblSelRect(ov._selCells);if(!rect)return;
+  const rows=Math.max(1,(n.rows|0)||1), cols=Math.max(1,(n.cols|0)||1);
+  const r0=rect.r0, c0=rect.c0;
+  if(r0+_tblClip.h>rows||c0+_tblClip.w>cols){
+    flashHint(TT('粘贴区域（','Paste block (')+_tblClip.h+'×'+_tblClip.w+TT('）超出表格范围，请先扩大行列',') exceeds table bounds — enlarge first'));
+    return;
+  }
+  // 落点区域 = 每个粘贴项的锚点 + 其合并 span 铺开范围（先按表界裁剪）
+  const clipSpan=it=>({
+    sR:Math.min(((it.f?it.f.spanR:it.cv&&it.cv.spanR)||1),rows-(r0+it.dr)),
+    sC:Math.min(((it.f?it.f.spanC:it.cv&&it.cv.spanC)||1),cols-(c0+it.dc))
+  });
+  const destSet=new Set();
+  _tblClip.items.forEach(it=>{
+    const r=r0+it.dr, c=c0+it.dc, s=clipSpan(it);
+    for(let rr=r;rr<r+Math.max(1,s.sR);rr++)for(let cc=c;cc<c+Math.max(1,s.sC);cc++)destSet.add(rr+','+cc);
+  });
+  // 与既有合并区交叠检查：区域完整落在落点范围内=将被整体覆盖（允许）；伸出范围=会被拆开（拦下）
+  const cover0=tblCoverMap(n);
+  let mergedClash=false;
+  destSet.forEach(k=>{
+    if(mergedClash)return;
+    const p=k.split(','), a=cover0[+p[0]]&&cover0[+p[0]][+p[1]];
+    if(!a)return;
+    const af=tableCellField(n,a.ar,a.ac), av=(n.cells||{})[a.ar+','+a.ac];
+    const sR=(af&&af.spanR>1?af.spanR:(av&&av.spanR)||1), sC=(af&&af.spanC>1?af.spanC:(av&&av.spanC)||1);
+    for(let rr=a.ar;rr<a.ar+sR;rr++)for(let cc=a.ac;cc<a.ac+sC;cc++)
+      if(!destSet.has(rr+','+cc))mergedClash=true;
+  });
+  if(mergedClash){
+    flashHint(TT('粘贴区域与现有合并格交叠（且该合并区伸出落点范围），请先取消合并','Paste area overlaps a merged region extending outside it — unmerge first'));
+    return;
+  }
+  let over=0;
+  destSet.forEach(k=>{const p=k.split(',');
+    if(tblFieldIndex(n,+p[0],+p[1])>=0||((n.cells||{})[k]!=null))over++;});
+  if(over){
+    const ok=await uiConfirm(TT('粘贴将覆盖 ','Paste overwrites ')+over+TT(' 个已有格，确定？',' existing cell(s). Continue?'),true);
+    if(!ok)return;
+  }
+  snapshot();
+  // 整个落点区域清场（含被粘贴合并格盖住的格），再写入粘贴项
+  destSet.forEach(k=>{const p=k.split(',');
+    const i=tblFieldIndex(n,+p[0],+p[1]);if(i>=0)n.data.splice(i,1);
+    if(n.cells)delete n.cells[k];});
+  const renMap={};
+  const pasted=[];
+  _tblClip.items.forEach(it=>{
+    const r=r0+it.dr, c=c0+it.dc;
+    if(it.f){
+      const nf=JSON.parse(JSON.stringify(it.f));
+      nf.tr=r;nf.tc=c;
+      // 自动键随新位置改名；非自动键与表内既有字段撞名 → 也改为自动键（保持信号键唯一）
+      const dup=()=> (n.data||[]).some(o=>o!==nf&&o.tr!=null&&((o.keyEn||o.key)===(nf.keyEn||nf.key)||o.key===nf.key));
+      if(_tblIsAutoKey(nf)||dup()){nf.key=_tblAutoKey(r,c);nf.keyEn=nf.key;}
+      if(it.srcSig&&it.srcSig!==n.id+'.'+(nf.keyEn||nf.key))renMap[it.srcSig]=n.id+'.'+(nf.keyEn||nf.key);
+      if(nf.spanR>1&&r+nf.spanR>rows)nf.spanR=rows-r;
+      if(nf.spanC>1&&c+nf.spanC>cols)nf.spanC=cols-c;
+      if(!(nf.spanR>1))delete nf.spanR;
+      if(!(nf.spanC>1))delete nf.spanC;
+      n.data=n.data||[];n.data.push(nf);pasted.push(nf);
+    }else if(it.cv){
+      const cv=JSON.parse(JSON.stringify(it.cv));
+      if(cv.spanR>1&&r+cv.spanR>rows)cv.spanR=rows-r;
+      if(cv.spanC>1&&c+cv.spanC>cols)cv.spanC=cols-c;
+      if(!(cv.spanR>1))delete cv.spanR;
+      if(!(cv.spanC>1))delete cv.spanC;
+      n.cells=n.cells||{};n.cells[r+','+c]=cv;
+    }
+  });
+  // 只改写「粘贴副本」的图标规则自引用（源格与其它规则不动）
+  pasted.forEach(f=>{if(Array.isArray(f.iconRules))f.iconRules.forEach(x=>x&&migrateCondSignals(x.when,renMap));});
+  snapshot();renderDFs(n);tblEdSyncSel();
+  flashHint(TT('已粘贴 ','Pasted ')+_tblClip.items.length+TT(' 个单元格',' cell(s)'));
+}
+// 🎨 格样式弹层：文字色/底色/加粗/对齐。点开的格若在选中集内 → 应用到全部选中格
+function tblCellStylePopover(r,c,ev){
+  if(ev){ev.stopPropagation();ev.preventDefault();}
+  const ov=document.getElementById('tbl-ed-overlay');if(!ov)return;
+  const n=nodes.find(x=>x.id===ov._nid);if(!n||n.type!=='table')return;
+  const old=document.getElementById('tbl-style-pop');if(old)old.remove();
+  const sel=ov._selCells;
+  const targets=(sel&&sel.size&&sel.has(r+','+c))
+    ?[...sel].map(k=>{const p=k.split(',');return {r:+p[0],c:+p[1]};})
+    :[{r,c}];
+  const f0=tableCellField(n,r,c), cv0=n.cells&&n.cells[r+','+c];
+  const cur={
+    color:(f0?f0.cellColor:(cv0&&typeof cv0==='object'?cv0.color:''))||'',
+    bg:(f0?f0.cellBg:(cv0&&typeof cv0==='object'?cv0.bg:''))||'',
+    bold:!!(f0?f0.cellBold:(cv0&&typeof cv0==='object'&&cv0.bold)),
+    align:(f0?f0.cellAlign:(cv0&&typeof cv0==='object'?cv0.align:''))||''
+  };
+  const m=document.createElement('div');m.id='tbl-style-pop';m.className='tsm';
+  m.innerHTML='<div class="tsm-t">🎨 '+TT('格样式','Cell style')+(targets.length>1?('（'+targets.length+TT(' 格',' cells')+'）'):(' · R'+(r+1)+'C'+(c+1)))+'</div>'+
+    '<div class="tsm-row"><span>'+TT('文字色','Color')+'</span><input type="color" id="tsp-color" value="'+(cur.color||'#e8f4ff')+'"><label class="tsm-on"><input type="checkbox" id="tsp-color-on"'+(cur.color?' checked':'')+' style="width:auto">'+TT('启用','on')+'</label></div>'+
+    '<div class="tsm-row"><span>'+TT('底色','Bg')+'</span><input type="color" id="tsp-bg" value="'+(cur.bg||'#143560')+'"><label class="tsm-on"><input type="checkbox" id="tsp-bg-on"'+(cur.bg?' checked':'')+' style="width:auto">'+TT('启用','on')+'</label></div>'+
+    '<div class="tsm-row"><label style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="tsp-bold"'+(cur.bold?' checked':'')+' style="width:auto"> '+TT('加粗','Bold')+'</label></div>'+
+    '<div class="tsm-row"><span>'+TT('对齐','Align')+'</span><select id="tsp-align">'+
+      [['',TT('继承列','column')],['left',TT('左','left')],['center',TT('居中','center')],['right',TT('右','right')]]
+        .map(([v,t])=>'<option value="'+v+'"'+(cur.align===v?' selected':'')+'>'+t+'</option>').join('')+'</select></div>'+
+    '<div style="display:flex;gap:6px;justify-content:flex-end;margin:6px 8px 8px">'+
+    '<button class="tb" id="tsp-cancel">'+TT('取消','Cancel')+'</button>'+
+    '<button class="tb grn" id="tsp-ok">✓ '+TT('应用','Apply')+'</button></div>';
+  document.body.appendChild(m);
+  const cx=ev?ev.clientX:window.innerWidth/2, cy=ev?ev.clientY:window.innerHeight/2;
+  m.style.left=Math.max(8,Math.min(cx,window.innerWidth-230))+'px';
+  m.style.top=Math.max(8,Math.min(cy,window.innerHeight-m.offsetHeight-12))+'px';
+  m.querySelector('#tsp-cancel').onclick=()=>m.remove();
+  m.querySelector('#tsp-ok').onclick=()=>{
+    const color=m.querySelector('#tsp-color-on').checked?m.querySelector('#tsp-color').value:'';
+    const bg=m.querySelector('#tsp-bg-on').checked?m.querySelector('#tsp-bg').value:'';
+    const bold=m.querySelector('#tsp-bold').checked;
+    const align=m.querySelector('#tsp-align').value;
+    m.remove();
+    snapshot();
+    targets.forEach(t=>{
+      const f=tableCellField(n,t.r,t.c);
+      if(f){
+        if(color)f.cellColor=color;else delete f.cellColor;
+        if(bg)f.cellBg=bg;else delete f.cellBg;
+        if(bold)f.cellBold=true;else delete f.cellBold;
+        if(align)f.cellAlign=align;else delete f.cellAlign;
+      }else{
+        n.cells=n.cells||{};
+        let cv=n.cells[t.r+','+t.c];
+        if(cv==null)cv={zh:'',en:''};
+        else if(typeof cv!=='object')cv={zh:String(cv),en:''};
+        if(color)cv.color=color;else delete cv.color;
+        if(bg)cv.bg=bg;else delete cv.bg;
+        if(bold)cv.bold=true;else delete cv.bold;
+        if(align)cv.align=align;else delete cv.align;
+        if(!cv.zh&&!cv.en&&!cv.color&&!cv.bg&&!cv.bold&&!cv.align&&!(cv.spanR>1)&&!(cv.spanC>1))delete n.cells[t.r+','+t.c];
+        else n.cells[t.r+','+t.c]=cv;
+      }
+    });
+    snapshot();renderDFs(n);tblEdSyncSel();
+  };
+  const close=e2=>{if(!m.contains(e2.target)){m.remove();document.removeEventListener('mousedown',close,true);}};
+  setTimeout(()=>document.addEventListener('mousedown',close,true),0);
 }
 // 某行的「所属设备」：取该行任一已绑定格的设备（单字段绑定的 deviceId，或计算绑定首个带设备的操作数）
 function tblRowDevice(n,r){
@@ -786,7 +1324,7 @@ function tblFillColumn(sr,c){
   const src=tableCellField(n,sr,c);
   const hasBind=!!(src&&bindHasSource(src.bind));
   const hasIcon=!!(src&&(src.cellShow||src.icon||(Array.isArray(src.iconRules)&&src.iconRules.length)));
-  if(!hasBind&&!hasIcon){flashHint('请先给该格配置绑定或图标规则，再应用到整列');return;}
+  if(!hasBind&&!hasIcon){flashHint(TT('请先给该格配置绑定或图标规则，再应用到整列','Configure a binding or icon rules on this cell first'));return;}
   const rows=Math.max(1,(n.rows|0)||1), start=n.headerRow?1:0;
   let filled=0;const noDev=[];
   snapshot();
@@ -794,16 +1332,19 @@ function tblFillColumn(sr,c){
     if(r===sr)continue;
     const dev=hasBind?tblRowDevice(n,r):null;
     if(hasBind&&!dev){noDev.push(r+1);continue;}
-    let i=tblFieldIndex(n,r,c);
-    if(i<0){const key='R'+(r+1)+'C'+(c+1);n.data.push({key,keyEn:key,dv:'',tr:r,tc:c});i=n.data.length-1;}
-    const f=n.data[i];
+    const f=n.data[_tblEnsureField(n,r,c)];
     if(hasBind){
       const nb=JSON.parse(JSON.stringify(src.bind));
       if(nb.field){nb.deviceId=dev.deviceId;if(dev.deviceType)nb.deviceType=dev.deviceType;else delete nb.deviceType;}
       else if(nb.calc)(nb.calc.operands||[]).forEach(o=>{if(o&&o.field){o.deviceId=dev.deviceId;if(dev.deviceType)o.deviceType=dev.deviceType;else delete o.deviceType;}});
       f.bind=nb;
       if(src.dict!==undefined&&src.dict!==null)f.dict=src.dict;else delete f.dict;
+      if(src.decimals!=null)f.decimals=src.decimals;else delete f.decimals;   // 显示小数位一并复制
     }
+    // 格样式一并复制（对齐/颜色/加粗；合并 span 不复制——逐行格没有跨行语义）
+    ['cellColor','cellBg','cellBold','cellAlign'].forEach(k=>{
+      if(src[k]!=null&&src[k]!=='')f[k]=src[k];else delete f[k];
+    });
     // 图标配置复制：规则条件里引用源行单元格的信号（R{sr+1}Cx）改写为本行（R{r+1}Cx），跨行引用保持不变
     if(hasIcon){
       if(src.cellShow)f.cellShow=src.cellShow;else delete f.cellShow;
@@ -817,8 +1358,8 @@ function tblFillColumn(sr,c){
   }
   snapshot();
   renderDFs(n);
-  flashHint('已应用到整列：'+filled+' 格'+(hasBind?'（绑定随各行设备）':'')+(hasIcon?'（含图标规则）':'')+
-    (noDev.length?('；第 '+noDev.join('、')+' 行无已绑定格、识别不到设备，已跳过'):''));
+  flashHint(TT('已应用到整列：','Filled column: ')+filled+TT(' 格',' cells')+(hasBind?TT('（绑定随各行设备）',' (device per row)'):'')+(hasIcon?TT('（含图标规则）',' (incl. icon rules)'):'')+
+    (noDev.length?(TT('；第 ','; rows ')+noDev.join('、')+TT(' 行无已绑定格、识别不到设备，已跳过',' skipped — no device identified')):''));
 }
 // ── 从设备生成表格：设备类型 → 多选设备（行）→ 多选字段（列），一键建表并逐格绑定 ──
 function openTableGen(){
@@ -826,35 +1367,48 @@ function openTableGen(){
   closeFieldBind();
   const ov=document.createElement('div');ov.id='fb-overlay';ov.onclick=e=>{if(e.target===ov)closeFieldBind();};
   const typeOpts=DEVICE_TYPES.map(t=>'<option value="'+tplEsc(t.value)+'">'+tplEsc(t.label)+'</option>').join('');
-  ov.innerHTML='<div id="fb-box" class="fb-wide"><button class="dlg-close" onclick="closeFieldBind()" title="关闭" aria-label="关闭">✕</button>'+
-    '<div id="fb-title">⚡ 从设备生成表格（行=设备，列=字段）</div>'+
-    '<div style="display:flex;gap:8px"><div style="flex:1"><label class="fb-l">设备类型</label><select id="tg-type">'+typeOpts+'</select></div>'+
-    '<div style="flex:1"><label class="fb-l">项目筛选</label><select id="tg-proj"></select></div></div>'+
-    '<label class="fb-l">设备（多选，每台一行）<button class="tb" id="tg-dev-all" style="float:right;padding:1px 7px;font-size:11px">全选/清空</button></label>'+
+  ov.innerHTML='<div id="fb-box" class="fb-wide"><button class="dlg-close" onclick="closeFieldBind()" title="'+TT('关闭','Close')+'" aria-label="'+TT('关闭','Close')+'">✕</button>'+
+    '<div id="fb-title">⚡ '+TT('从设备生成表格（行=设备，列=字段）','Generate table from devices (rows=devices, cols=fields)')+'</div>'+
+    '<div style="display:flex;gap:8px"><div style="flex:1"><label class="fb-l">'+TT('设备类型','Device type')+'</label><select id="tg-type">'+typeOpts+'</select></div>'+
+    '<div style="flex:1"><label class="fb-l">'+TT('项目筛选','Project filter')+'</label><select id="tg-proj"></select></div></div>'+
+    '<label class="fb-l">'+TT('设备（多选，每台一行）','Devices (multi-select, one per row)')+'<button class="tb" id="tg-dev-all" style="float:right;padding:1px 7px;font-size:11px">'+TT('全选/清空','All / none')+'</button></label>'+
     '<div id="tg-devs" class="tg-list"></div>'+
-    '<label class="fb-l">字段（多选，每个一列；点分组名折叠/展开，勾分组=全选该组）</label>'+
-    '<input id="tg-fld-q" class="tg-q" placeholder="🔍 模糊搜索字段（搜索时不丢已勾选项）…">'+
+    '<label class="fb-l">'+TT('字段（多选，每个一列；点分组名折叠/展开，勾分组=全选该组）','Fields (multi-select, one per column; click group to fold, tick group = select all)')+'</label>'+
+    '<input id="tg-fld-q" class="tg-q" placeholder="'+TT('🔍 模糊搜索字段（搜索时不丢已勾选项）…','🔍 Search fields (selection kept)…')+'">'+
     '<div id="tg-flds" class="tg-list tg-tree"></div>'+
-    '<label class="fb-l">扩展列（计算 / 值字典转义 · 按各行设备实例化）'+
-      '<button class="tb" id="tg-ext-add" style="float:right;padding:1px 7px;font-size:11px">＋ 添加扩展列</button></label>'+
+    '<label class="fb-l">'+TT('扩展列（计算 / 值字典转义 · 按各行设备实例化）','Derived columns (calc / dict, instantiated per row device)')+
+      '<button class="tb" id="tg-ext-add" style="float:right;padding:1px 7px;font-size:11px">＋ '+TT('添加扩展列','Add')+'</button></label>'+
     '<div id="tg-ext" class="tg-list" style="max-height:220px"></div>'+
-    '<div style="display:flex;gap:14px;margin-top:8px;font-size:12px;color:var(--ui-text)">'+
-    '<label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="tg-hrow" checked style="width:auto"> 首行字段名表头</label>'+
-    '<label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="tg-hcol" checked style="width:auto"> 首列设备名</label></div>'+
+    '<div style="display:flex;gap:14px;margin-top:8px;font-size:12px;color:var(--ui-text);flex-wrap:wrap">'+
+    '<label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="tg-hrow" checked style="width:auto"> '+TT('首行表头','Header row')+'</label>'+
+    '<label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="tg-hcol" checked style="width:auto"> '+TT('首列名称','Name column')+'</label>'+
+    '<label style="display:flex;align-items:center;gap:5px;cursor:pointer" title="'+TT('行=字段、列=设备（默认相反）','rows=fields, cols=devices')+'"><input type="checkbox" id="tg-transpose" style="width:auto"> '+TT('转置','Transpose')+'</label>'+
+    '<label style="display:flex;align-items:center;gap:5px;cursor:pointer" title="'+TT('不清空现有内容，新设备行接在现有行之后（列结构须与现有表一致）','Keep existing content; new device rows appended below (column layout must match)')+'"><input type="checkbox" id="tg-append" style="width:auto"> '+TT('追加到现有表格','Append to table')+'</label></div>'+
     '<div id="fb-acts"><span class="phint" id="tg-sum" style="flex:1;margin:0"></span>'+
-    '<button class="tb" onclick="closeFieldBind()">取消</button><button class="tb grn" id="tg-ok">生成</button></div>'+
-    '<div class="phint" style="margin-top:6px">将替换本表格现有内容：生成 (设备数+表头)×(字段数+设备名列) 的表格，逐格绑定所选设备的字段，值字典按后台绑定自动匹配。</div></div>';
+    '<button class="tb" onclick="closeFieldBind()">'+TT('取消','Cancel')+'</button><button class="tb grn" id="tg-ok">'+TT('生成','Generate')+'</button></div>'+
+    '<div class="phint" id="tg-hint" style="margin-top:6px">'+TT('将替换本表格现有内容：生成 (设备数+表头)×(字段数+名称列) 的表格，逐格绑定所选设备的字段，值字典按后台绑定自动匹配。','Replaces current table contents; every cell bound to the selected device/field, value dicts auto-matched.')+'</div></div>';
   document.body.appendChild(ov);
   const tSel=document.getElementById('tg-type'),pSel=document.getElementById('tg-proj');
   if(n.deviceType&&DEVICE_TYPES.some(t=>t.value===n.deviceType))tSel.value=n.deviceType;
   const sum=()=>{const d=ov.querySelectorAll('#tg-devs input:checked').length,f=ov._tgFldChecked.size;
-    const ext=(ov._tgExtCols||[]).filter(e=>e.zh||e.en).length,cols=f+ext;
-    document.getElementById('tg-sum').textContent=(d&&cols)?('将生成 '+(d+(document.getElementById('tg-hrow').checked?1:0))+' 行 × '+(cols+(document.getElementById('tg-hcol').checked?1:0))+' 列，'+(d*cols)+' 个绑定格'+(ext?('（含 '+ext+' 个扩展列）'):'')):'请勾选设备与字段（或配置扩展列）';};
+    const ext=(ov._tgExtCols||[]).filter(e=>e.zh||e.en).length,fc=f+ext;
+    const hrow=document.getElementById('tg-hrow').checked, hcol=document.getElementById('tg-hcol').checked;
+    const tp=document.getElementById('tg-transpose').checked, ap=!tp&&document.getElementById('tg-append').checked;
+    let txt='';
+    if(d&&fc){
+      // 常规：行=设备；转置：行=字段；追加：新行接在现有行之后（不加表头行）
+      const rowsN=tp?(fc+(hrow?1:0)):(ap?((n.rows|0)+d):(d+(hrow?1:0)));
+      const colsN=tp?(d+(hcol?1:0)):(fc+(hcol?1:0));
+      txt=TT('将生成 ','Result: ')+rowsN+' × '+colsN+TT('，','; ')+(d*fc)+TT(' 个绑定格',' bound cells')
+        +(ext?TT('（含 '+ext+' 个扩展列）',' (incl. '+ext+' derived)'):'')
+        +(ap?TT('（追加模式）',' (append)'):'')+(tp?TT('（转置）',' (transposed)'):'');
+    }else txt=TT('请勾选设备与字段（或配置扩展列）','Select devices & fields (or add derived columns)');
+    document.getElementById('tg-sum').textContent=txt;};
   const fillProj=()=>{const ps=projectsOfType(tSel.value);pSel.innerHTML='<option value="">全部项目</option>'+ps.map(p=>'<option value="'+tplEsc(p.id)+'">'+tplEsc(p.name)+'</option>').join('');};
   const fillDevs=()=>{
     const list=devicesOfType(tSel.value,pSel.value);
     document.getElementById('tg-devs').innerHTML=list.length?list.map(d=>'<label><input type="checkbox" value="'+tplEsc(d.deviceId)+'" style="width:auto"> '+tplEsc(d.deviceName+(d.projectName?(' · '+d.projectName):''))+'</label>').join('')
-      :'<div class="phint">该类型/项目下没有设备</div>';
+      :('<div class="phint">'+TT('该类型/项目下没有设备','No devices for this type/project')+'</div>');
     ov.querySelectorAll('#tg-devs input').forEach(x=>x.onchange=sum);
   };
   // 字段树：勾选集合挂在弹窗上（tblGenApply 按字典顺序取；搜索过滤/折叠重渲染不丢选）
@@ -866,7 +1420,7 @@ function openTableGen(){
     const q=(document.getElementById('tg-fld-q').value||'').trim().toLowerCase();
     const sel=ov._tgFldChecked;
     if(fldCollapsed===null)fldCollapsed=new Set(groups.slice(1).map(g=>g.location));
-    if(!groups.length){host.innerHTML='<div class="phint">该类型无字段字典（请确认 dic/ 已配置）</div>';return;}
+    if(!groups.length){host.innerHTML='<div class="phint">'+TT('该类型无字段字典（请确认 dic/ 已配置）','No field dictionary for this type (check dic/)')+'</div>';return;}
     const st=host.scrollTop;   // 重渲染保持滚动位置
     let html='';
     groups.forEach(g=>{
@@ -883,7 +1437,7 @@ function openTableGen(){
           return '<label><input type="checkbox" class="tg-fld-cb" value="'+tplEsc(v)+'"'+(sel.has(v)?' checked':'')+' style="width:auto"> '+tplEsc(fd)+'</label>';}).join('')+'</div>'):'')+
         '</div>';
     });
-    host.innerHTML=html||'<div class="phint">没有匹配「'+tplEsc(q)+'」的字段</div>';
+    host.innerHTML=html||('<div class="phint">'+TT('没有匹配「','No fields matching "')+tplEsc(q)+TT('」的字段','"')+'</div>');
     host.scrollTop=st;
     host.querySelectorAll('.tg-grp-cb').forEach(cb=>{
       const loc=cb.dataset.loc,g=groups.find(x=>x.location===loc);
@@ -902,37 +1456,37 @@ function openTableGen(){
   // ── 扩展列：计算公式（操作数=字段/常量，设备=本行设备）或 字段+值字典 转义列 ──
   const extCols=[];ov._tgExtCols=extCols;
   const fldOptions=cur=>{const gs=DEVICE_DICTS[tSel.value]||[];
-    return '<option value="">选择字段…</option>'+gs.map(g=>'<optgroup label="'+tplEsc(g.location)+'">'+
+    return '<option value="">'+TT('选择字段…','Choose field…')+'</option>'+gs.map(g=>'<optgroup label="'+tplEsc(g.location)+'">'+
       (g.fields||[]).map(fd=>{const v=g.location+'.'+fd;return '<option value="'+tplEsc(v)+'"'+(v===cur?' selected':'')+'>'+tplEsc(fd)+'</option>';}).join('')+'</optgroup>').join('');};
-  const dictOptions=cur=>'<option value="@auto"'+(cur==='@auto'?' selected':'')+'>值字典：自动匹配（默认）</option>'+
-    '<option value="@none"'+(cur==='@none'?' selected':'')+'>不转义（原样显示）</option>'+
-    effectiveValueDicts().map(d=>'<option value="'+tplEsc(d.type)+'"'+(cur===d.type?' selected':'')+'>强制：'+tplEsc((d.name||d.type)+' ('+d.type+')')+'</option>').join('');
+  const dictOptions=cur=>'<option value="@auto"'+(cur==='@auto'?' selected':'')+'>'+TT('值字典：自动匹配（默认）','Dict: auto match (default)')+'</option>'+
+    '<option value="@none"'+(cur==='@none'?' selected':'')+'>'+TT('不转义（原样显示）','No translation')+'</option>'+
+    effectiveValueDicts().map(d=>'<option value="'+tplEsc(d.type)+'"'+(cur===d.type?' selected':'')+'>'+TT('强制：','Force: ')+tplEsc((d.name||d.type)+' ('+d.type+')')+'</option>').join('');
   const renderExt=()=>{
     const host=document.getElementById('tg-ext');
-    if(!extCols.length){host.innerHTML='<div class="phint" style="margin:2px">派生列在此配置：如「功率 = 电流 × 电压 ÷ 1000」计算列、「状态 = 某字段 + 值字典」转义列；生成时逐行替换为该行设备。</div>';return;}
+    if(!extCols.length){host.innerHTML='<div class="phint" style="margin:2px">'+TT('派生列在此配置：如「功率 = 电流 × 电压 ÷ 1000」计算列、「状态 = 某字段 + 值字典」转义列；生成时逐行替换为该行设备。','Derived columns: e.g. calc "P = I × U ÷ 1000" or dict-translated field; instantiated per row device.')+'</div>';return;}
     host.innerHTML=extCols.map((e,i)=>{
       let body='';
       if(e.mode==='calc'){
         body='<div class="tg-ext-body">'+e.calc.operands.map((o,oi)=>{
           const opSel=oi>0?('<select class="tg-ext-op" data-i="'+i+'" data-oi="'+(oi-1)+'" style="flex:0 0 76px">'+
             CALC_OPS.map(x=>'<option value="'+x+'"'+(x===(e.calc.operators[oi-1]||'*')?' selected':'')+'>'+calcOpText(x)+'</option>').join('')+'</select>'):'<span style="flex:0 0 76px"></span>';
-          const kind='<select class="tg-ext-kind" data-i="'+i+'" data-oi="'+oi+'" style="flex:0 0 62px"><option value="field"'+(o.kind!=='const'?' selected':'')+'>字段</option><option value="const"'+(o.kind==='const'?' selected':'')+'>常量</option></select>';
+          const kind='<select class="tg-ext-kind" data-i="'+i+'" data-oi="'+oi+'" style="flex:0 0 62px"><option value="field"'+(o.kind!=='const'?' selected':'')+'>'+TT('字段','field')+'</option><option value="const"'+(o.kind==='const'?' selected':'')+'>'+TT('常量','const')+'</option></select>';
           const val=o.kind==='const'
-            ?'<input class="tg-ext-const" data-i="'+i+'" data-oi="'+oi+'" placeholder="常量值" value="'+tplEsc(o.v||'')+'" style="flex:1;min-width:0">'
+            ?'<input class="tg-ext-const" data-i="'+i+'" data-oi="'+oi+'" placeholder="'+TT('常量值','constant')+'" value="'+tplEsc(o.v||'')+'" style="flex:1;min-width:0">'
             :'<select class="tg-ext-fld" data-i="'+i+'" data-oi="'+oi+'" style="flex:1;min-width:0">'+fldOptions(o.v)+'</select>';
-          const del=e.calc.operands.length>2?'<button type="button" class="df-del tg-ext-odel" data-i="'+i+'" data-oi="'+oi+'" title="移除操作数">✕</button>':'';
+          const del=e.calc.operands.length>2?'<button type="button" class="df-del tg-ext-odel" data-i="'+i+'" data-oi="'+oi+'" title="'+TT('移除操作数','Remove operand')+'">✕</button>':'';
           return '<div class="tg-ext-row">'+opSel+kind+val+del+'</div>';
-        }).join('')+'<button type="button" class="tb tg-ext-oadd" data-i="'+i+'" style="font-size:11px;padding:2px 8px;margin-top:2px">＋ 操作数</button></div>';
+        }).join('')+'<button type="button" class="tb tg-ext-oadd" data-i="'+i+'" style="font-size:11px;padding:2px 8px;margin-top:2px">＋ '+TT('操作数','operand')+'</button></div>';
       }else{
         body='<div class="tg-ext-body"><div class="tg-ext-row">'+
           '<select class="tg-ext-dfld" data-i="'+i+'" style="flex:1;min-width:0">'+fldOptions(e.dictField)+'</select>'+
           '<select class="tg-ext-dict" data-i="'+i+'" style="flex:1;min-width:0">'+dictOptions(e.dict)+'</select></div></div>';
       }
       return '<div class="tg-ext-card"><div class="tg-ext-row">'+
-        '<input class="tg-ext-zh" data-i="'+i+'" placeholder="表头中文名（如 功率(kW)）" value="'+tplEsc(e.zh)+'" style="flex:1;min-width:0">'+
-        '<input class="tg-ext-en" data-i="'+i+'" placeholder="English（如 P(kW)）" value="'+tplEsc(e.en)+'" style="flex:1;min-width:0">'+
-        '<select class="tg-ext-mode" data-i="'+i+'" style="flex:0 0 116px"><option value="calc"'+(e.mode==='calc'?' selected':'')+'>计算/比较</option><option value="dict"'+(e.mode!=='calc'?' selected':'')+'>字段+值字典</option></select>'+
-        '<button type="button" class="df-del tg-ext-del" data-i="'+i+'" title="删除该扩展列">✕</button></div>'+body+'</div>';
+        '<input class="tg-ext-zh" data-i="'+i+'" placeholder="'+TT('表头中文名（如 功率(kW)）','Header zh (e.g. 功率(kW))')+'" value="'+tplEsc(e.zh)+'" style="flex:1;min-width:0">'+
+        '<input class="tg-ext-en" data-i="'+i+'" placeholder="'+TT('English（如 P(kW)）','English (e.g. P(kW))')+'" value="'+tplEsc(e.en)+'" style="flex:1;min-width:0">'+
+        '<select class="tg-ext-mode" data-i="'+i+'" style="flex:0 0 116px"><option value="calc"'+(e.mode==='calc'?' selected':'')+'>'+TT('计算/比较','Calc/compare')+'</option><option value="dict"'+(e.mode!=='calc'?' selected':'')+'>'+TT('字段+值字典','Field + dict')+'</option></select>'+
+        '<button type="button" class="df-del tg-ext-del" data-i="'+i+'" title="'+TT('删除该扩展列','Remove derived column')+'">✕</button></div>'+body+'</div>';
     }).join('');
     const q=sel=>[...host.querySelectorAll(sel)];
     q('.tg-ext-zh').forEach(x=>x.oninput=()=>{extCols[+x.dataset.i].zh=x.value;sum();});
@@ -958,6 +1512,19 @@ function openTableGen(){
   pSel.onchange=()=>{fillDevs();sum();};
   document.getElementById('tg-dev-all').onclick=()=>{const cbs=[...ov.querySelectorAll('#tg-devs input')];const all=cbs.length&&cbs.every(x=>x.checked);cbs.forEach(x=>x.checked=!all);sum();};
   document.getElementById('tg-hrow').onchange=sum;document.getElementById('tg-hcol').onchange=sum;
+  // 转置与追加互斥（追加按行接续，转置下行=字段无法按设备追加）；追加模式不重建表头
+  const tpCb=document.getElementById('tg-transpose'), apCb=document.getElementById('tg-append');
+  const syncGenHint=()=>{
+    apCb.disabled=tpCb.checked;if(tpCb.checked)apCb.checked=false;
+    document.getElementById('tg-hrow').disabled=apCb.checked;
+    document.getElementById('tg-hint').textContent=apCb.checked
+      ?TT('追加模式：保留现有内容，新设备行接在最后一行之后；列结构沿用本次勾选（应与现有表一致），不重建表头。','Append mode: existing content kept, new device rows added below; column layout follows current selection (should match the table).')
+      :(tpCb.checked
+        ?TT('转置：行=字段、列=设备。将替换本表格现有内容。','Transposed: rows=fields, cols=devices. Replaces current contents.')
+        :TT('将替换本表格现有内容：生成 (设备数+表头)×(字段数+名称列) 的表格，逐格绑定所选设备的字段，值字典按后台绑定自动匹配。','Replaces current table contents; every cell bound, value dicts auto-matched.'));
+    sum();
+  };
+  tpCb.onchange=syncGenHint;apCb.onchange=syncGenHint;
   document.getElementById('tg-ok').onclick=()=>tblGenApply(n.id);
   fillProj();fillDevs();fillFlds();sum();
 }
@@ -975,57 +1542,73 @@ function tblGenApply(nodeId){
   for(const e of exts){
     const nm=e.zh||e.en;
     if(e.mode==='calc'){
-      if(!e.calc.operands.some(o=>o.kind!=='const'&&o.v)){flashHint('扩展列「'+nm+'」：计算公式至少需要一个字段操作数');return;}
-      if(e.calc.operands.some(o=>o.kind==='const'?String(o.v).trim()==='':!o.v)){flashHint('扩展列「'+nm+'」：请补全公式的所有操作数');return;}
-    }else if(!e.dictField){flashHint('扩展列「'+nm+'」：请选择来源字段');return;}
+      if(!e.calc.operands.some(o=>o.kind!=='const'&&o.v)){flashHint(TT('扩展列「','Derived column "')+nm+TT('」：计算公式至少需要一个字段操作数','": formula needs at least one field operand'));return;}
+      if(e.calc.operands.some(o=>o.kind==='const'?String(o.v).trim()==='':!o.v)){flashHint(TT('扩展列「','Derived column "')+nm+TT('」：请补全公式的所有操作数','": fill in all operands'));return;}
+    }else if(!e.dictField){flashHint(TT('扩展列「','Derived column "')+nm+TT('」：请选择来源字段','": choose a source field'));return;}
   }
-  if(!devIds.length||(!flds.length&&!exts.length)){flashHint('请至少勾选一台设备和一个字段（或配置扩展列）');return;}
-  const hrow=document.getElementById('tg-hrow').checked, hcol=document.getElementById('tg-hcol').checked;
+  if(!devIds.length||(!flds.length&&!exts.length)){flashHint(TT('请至少勾选一台设备和一个字段（或配置扩展列）','Select at least one device and one field (or a derived column)'));return;}
+  const hrow0=document.getElementById('tg-hrow').checked, hcol=document.getElementById('tg-hcol').checked;
+  const tp=document.getElementById('tg-transpose').checked;
+  const ap=!tp&&document.getElementById('tg-append').checked;   // 追加：不清空、不建表头行、新行接在最后
+  const hrow=ap?false:hrow0;
+  const fc=flds.length+exts.length;
   snapshot();
-  n.rows=devIds.length+(hrow?1:0);
-  n.cols=flds.length+exts.length+(hcol?1:0);
-  n.headerRow=hrow;n.headerCol=hcol;
-  n.cells={};
-  n.data=(n.data||[]).filter(f=>f.tr==null);   // 清掉旧绑定格（整表重建）
-  if(hrow){
-    if(hcol)n.cells['0,0']={zh:'设备',en:'Device'};
-    flds.forEach((fd,fi)=>{const s=fd.split('.').pop();n.cells['0,'+(fi+(hcol?1:0))]={zh:s,en:s};});
-    exts.forEach((e,ei)=>{n.cells['0,'+(flds.length+ei+(hcol?1:0))]={zh:e.zh||e.en,en:e.en||e.zh};});
+  const rowOff=ap?Math.max(1,(n.rows|0)||1):0;
+  if(!ap){
+    n.cells={};
+    n.data=(n.data||[]).filter(f=>f.tr==null);   // 清掉旧绑定格（整表重建）
+    n.headerRow=hrow;n.headerCol=hcol;
+  }else n.cells=n.cells||{};
+  if(tp){ n.rows=fc+(hrow?1:0); n.cols=devIds.length+(hcol?1:0); }
+  else { n.rows=rowOff+devIds.length+(hrow?1:0); n.cols=Math.max(ap?((n.cols|0)||1):0, fc+(hcol?1:0)); }
+  // 单个字段/扩展列的显示名（表头用）
+  const colName=xi=>xi<flds.length?flds[xi].split('.').pop():(exts[xi-flds.length].zh||exts[xi-flds.length].en);
+  const colNameEn=xi=>xi<flds.length?flds[xi].split('.').pop():(exts[xi-flds.length].en||exts[xi-flds.length].zh);
+  if(hrow){   // 首行表头：常规=字段名；转置=设备名
+    if(hcol)n.cells['0,0']=tp?{zh:'字段',en:'Field'}:{zh:'设备',en:'Device'};
+    if(tp)devIds.forEach((did,di)=>{const dev=DEVICE_LIST.find(d=>d.deviceId===did);const nm=(dev&&dev.deviceName)||did;n.cells['0,'+(di+(hcol?1:0))]={zh:nm,en:nm};});
+    else for(let xi=0;xi<fc;xi++)n.cells['0,'+(xi+(hcol?1:0))]={zh:colName(xi),en:colNameEn(xi)};
   }
+  if(hcol&&tp)for(let xi=0;xi<fc;xi++)n.cells[(xi+(hrow?1:0))+',0']={zh:colName(xi),en:colNameEn(xi)};   // 转置的首列=字段名
   devIds.forEach((did,di)=>{
-    const r=di+(hrow?1:0);
     const dev=DEVICE_LIST.find(d=>d.deviceId===did);
     const devType=(dev&&dev.deviceType)||dt;
-    if(hcol){const nm=(dev&&dev.deviceName)||did;n.cells[r+',0']={zh:nm,en:nm};}
-    flds.forEach((fd,fi)=>{
-      const c=fi+(hcol?1:0), key='R'+(r+1)+'C'+(c+1);
-      n.data.push({key,keyEn:key,dv:'',tr:r,tc:c,
-        bind:{field:fd, deviceType:devType, deviceId:did}});
-    });
-    // 扩展列：计算公式逐操作数实例化为本行设备；字典列=单字段绑定+值字典设置
-    exts.forEach((e,ei)=>{
-      const c=flds.length+ei+(hcol?1:0), key='R'+(r+1)+'C'+(c+1);
+    if(hcol&&!tp){const r=rowOff+di+(hrow?1:0);const nm=(dev&&dev.deviceName)||did;n.cells[r+',0']={zh:nm,en:nm};}
+    for(let xi=0;xi<fc;xi++){
+      const r=tp?(xi+(hrow?1:0)):(rowOff+di+(hrow?1:0));
+      const c=tp?(di+(hcol?1:0)):(xi+(hcol?1:0));
+      const key='R'+(r+1)+'C'+(c+1);
       const fo={key,keyEn:key,dv:'',tr:r,tc:c};
-      if(e.mode==='calc'){
-        fo.bind={calc:{
-          operands:e.calc.operands.map(o=>o.kind==='const'?{const:autoNum(String(o.v).trim())}:{field:o.v,deviceType:devType,deviceId:did}),
-          operators:e.calc.operators.slice(0,e.calc.operands.length-1)
-        }};
+      if(xi<flds.length){
+        fo.bind={field:flds[xi], deviceType:devType, deviceId:did};
       }else{
-        fo.bind={field:e.dictField, deviceType:devType, deviceId:did};
-        if(e.dict==='@none')fo.dict='';else if(e.dict&&e.dict!=='@auto')fo.dict=e.dict;
+        const e=exts[xi-flds.length];
+        if(e.mode==='calc'){
+          fo.bind={calc:{
+            operands:e.calc.operands.map(o=>o.kind==='const'?{const:autoNum(String(o.v).trim())}:{field:o.v,deviceType:devType,deviceId:did}),
+            operators:e.calc.operators.slice(0,e.calc.operands.length-1)
+          }};
+        }else{
+          fo.bind={field:e.dictField, deviceType:devType, deviceId:did};
+          if(e.dict==='@none')fo.dict='';else if(e.dict&&e.dict!=='@auto')fo.dict=e.dict;
+        }
       }
+      // 追加模式下目标格已有内容 → 覆盖（旧字段移除，静态文字清除）
+      const old=tblFieldIndex(n,r,c);if(old>=0)n.data.splice(old,1);
+      if(n.cells[r+','+c]&&!(hrow&&r===0)&&!(hcol&&c===0))delete n.cells[r+','+c];
       n.data.push(fo);
-    });
+    }
   });
   snapshot();closeFieldBind();selectNode(n.id);
   if(document.getElementById('tbl-ed-overlay'))openTableCellEditor(true);   // 单元格弹框开着 → 重建并沿用最初快照（取消仍可回滚到打开前）
-  flashHint('已生成 '+n.rows+'×'+n.cols+' 表格，'+(devIds.length*(flds.length+exts.length))+' 个单元格已绑定'+(exts.length?('（含 '+exts.length+' 个扩展列）'):''));
+  flashHint(TT('已生成 ','Generated ')+n.rows+'×'+n.cols+TT(' 表格，',' table, ')+(devIds.length*fc)+TT(' 个单元格已绑定',' cells bound')
+    +(exts.length?TT('（含 '+exts.length+' 个扩展列）',' (incl. '+exts.length+' derived)'):'')
+    +(ap?TT('（追加）',' (appended)'):'')+(tp?TT('（转置）',' (transposed)'):''));
 }
 // 清空表格内容（保留行列数与样式）
 async function tblClearAll(){
   const n=nodes.find(x=>x.id===selNode);if(!n||n.type!=='table')return;
-  const ok=await uiConfirm('清空全部单元格内容与绑定？（行列数与样式保留）',true);
+  const ok=await uiConfirm(TT('清空全部单元格内容与绑定？（行列数与样式保留）','Clear all cell contents & bindings? (size & style kept)'),true);
   if(!ok)return;
   snapshot();
   n.cells={};n.data=(n.data||[]).filter(f=>f.tr==null);
@@ -1470,6 +2053,9 @@ function openFieldBind(i){
     '<label class="fb-l">来源设备</label><select id="fb-dev">'+devOpts.join('')+'</select>'+
     '<label class="fb-l">分类(location)</label><select id="fb-loc"></select>'+
     '<label class="fb-l">字段(field)</label><select id="fb-field"></select>'+
+    '<label class="fb-l" title="'+TT('数值显示保留的小数位（仅数值生效；值字典命中转义时不适用）','Displayed decimal places for numeric values (dict labels unaffected)')+'">'+TT('显示小数位','Decimals')+'</label>'+
+    '<select id="fb-dp">'+[['',TT('原样（默认）','as-is (default)')],['0','0'],['1','1'],['2','2'],['3','3']]
+      .map(([v,t])=>'<option value="'+v+'"'+(String(f.decimals??'')===v?' selected':'')+'>'+t+'</option>').join('')+'</select>'+
     '</div>'+
     _fbCalcBlockHTML()+
     '<div id="fb-acts"><button class="tb" onclick="clearFieldBind('+i+')">清除绑定</button><span style="flex:1"></span>'+
@@ -1522,14 +2108,14 @@ function openFieldBind(i){
 }
 function _fbMode(){const r=document.querySelector('input[name="fb-mode"]:checked');return r?r.value:'simple';}
 function closeFieldBind(){const ov=document.getElementById('fb-overlay');if(ov)ov.remove();_fbCalc=null;_fbCalcOpt=null;}
-function clearFieldBind(i){const n=nodes.find(x=>x.id===selNode);if(!n)return;const f=(n.data||[])[i];if(f){snapshot();delete f.bind;snapshot();}closeFieldBind();renderDFs(n);}
+function clearFieldBind(i){const n=nodes.find(x=>x.id===selNode);if(!n)return;const f=(n.data||[])[i];if(f){snapshot();delete f.bind;delete f.decimals;snapshot();}closeFieldBind();renderDFs(n);}
 function confirmFieldBind(i){
   const n=nodes.find(x=>x.id===selNode);if(!n)return;const f=(n.data||[])[i];if(!f)return;
   if(_fbMode()==='calc'){   // 计算/比较模式：校验操作数并固化 bind={calc:{operands,operators}}
     const r=_fbCalcCollect();
     if(r.err){flashHint(r.err);_fbCalcSum();return;}
     const hasCmp=(r.calc.operators||[]).some(op=>CALC_CMP_OPS.includes(op));
-    snapshot();f.bind={calc:r.calc};snapshot();
+    snapshot();f.bind={calc:r.calc};delete f.decimals;snapshot();   // 计算绑定的小数位在 calc.decimals，字段级的清掉
     closeFieldBind();renderDFs(n);
     flashHint('已保存计算绑定：后台推送各操作数原始值，画布/前端按公式实时计算'+(hasCmp?'（比较结果为 1/0，可在 📖 里配值字典转文案）':''));
     return;
@@ -1542,6 +2128,8 @@ function confirmFieldBind(i){
   const bind={field:loc+'.'+field};
   if(did){ bind.deviceId=did; if(dt)bind.deviceType=dt; }   // 指定了具体设备 → 跨设备/显式来源
   f.bind=bind;
+  const dpSel=document.getElementById('fb-dp');
+  if(dpSel&&dpSel.value!=='')f.decimals=Math.max(0,Math.min(3,(+dpSel.value)|0));else delete f.decimals;   // 显示小数位（原样=不落字段）
   if(!f.key){ f.key=field; f.keyEn=f.keyEn||field; }        // 字段名未填则用后台字段名兜底
   snapshot();closeFieldBind();renderDFs(n);
 }

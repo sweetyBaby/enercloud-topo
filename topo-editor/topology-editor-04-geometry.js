@@ -170,7 +170,43 @@ function tblSetStaticText(n,r,c,which,v){
   if(!cur.zh&&!cur.en)delete n.cells[k];else n.cells[k]=cur;
 }
 function tblFieldIndex(n,r,c){ return (n.data||[]).findIndex(f=>f.tr===r&&f.tc===c); }
-// 世界坐标 → 表格单元格 {r,c}（考虑节点旋转；不在任何格内返回 null）。_tblGeom 由 drawTableNode 每帧回填
+// 格级样式归一为导出对象（静态格 v.{color,bg,bold,align} / 绑定格 f.cell{Color,Bg,Bold,Align} 共用）：
+// 全缺省返回 null（不导出）；align 认 left/right/center（显式 center 可覆盖列级左右对齐；未设=继承列）
+function tblCellStyleObj(color,bg,bold,align){
+  const st={};
+  if(color)st.color=String(color);
+  if(bg)st.bg=String(bg);
+  if(bold)st.bold=true;
+  if(align==='left'||align==='right'||align==='center')st.align=align;
+  return Object.keys(st).length?st:null;
+}
+// 合并格覆盖表：cover[r][c] = 锚点坐标 {ar,ac}（含锚点自身）或 null（普通格）。
+// 锚点来源 = 静态格 cells 值的 spanR/spanC + 绑定字段的 spanR/spanC（越界部分裁剪到表内）
+function tblCoverMap(n){
+  const rows=Math.max(1,(n.rows|0)||1), cols=Math.max(1,(n.cols|0)||1);
+  const cover=[];
+  const mark=(ar,ac,sr,sc)=>{
+    sr=Math.min(Math.max(1,sr|0),rows-ar);sc=Math.min(Math.max(1,sc|0),cols-ac);
+    if(sr<=1&&sc<=1)return;
+    for(let r=ar;r<ar+sr;r++){cover[r]=cover[r]||[];for(let c=ac;c<ac+sc;c++)cover[r][c]={ar,ac};}
+  };
+  Object.keys(n.cells||{}).forEach(k=>{
+    const v=n.cells[k];if(!v||typeof v!=='object')return;
+    if(v.spanR>1||v.spanC>1){const p=k.split(',');mark(+p[0],+p[1],v.spanR||1,v.spanC||1);}
+  });
+  (n.data||[]).forEach(f=>{
+    if(f.tr!=null&&(f.spanR>1||f.spanC>1))mark(f.tr,f.tc,f.spanR||1,f.spanC||1);
+  });
+  return cover;
+}
+// (r,c) → 所属合并区锚点坐标（非合并区原样返回）；cover 可选传入（批量调用时只建一次）
+function tblCellAnchor(n,r,c,cover){
+  const cv=(cover||tblCoverMap(n));
+  const a=cv[r]&&cv[r][c];
+  return a?{r:a.ar,c:a.ac}:{r,c};
+}
+// 世界坐标 → 表格单元格 {r,c}（考虑节点旋转；不在任何格内返回 null）。_tblGeom 由 drawTableNode 每帧回填。
+// 命中合并区内任意位置都归到锚点格（编辑/双击语义一致）
 function tableCellAt(n,wx,wy){
   const g=n&&n._tblGeom; if(!g)return null;
   const rot=(n.rotation||0)*Math.PI/180;
@@ -178,7 +214,7 @@ function tableCellAt(n,wx,wy){
   if(lx<g.colX[0]||lx>g.colX[g.colX.length-1]||ly<g.rowY[0]||ly>g.rowY[g.rowY.length-1])return null;
   let c=0;while(c<g.colX.length-2&&lx>g.colX[c+1])c++;
   let r=0;while(r<g.rowY.length-2&&ly>g.rowY[r+1])r++;
-  return {r,c};
+  return tblCellAnchor(n,r,c);
 }
 // 注：status / online 已彻底移除，节点的可用信号 = 仅其「已绑定数据字段」
 

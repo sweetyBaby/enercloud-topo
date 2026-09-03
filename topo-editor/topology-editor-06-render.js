@@ -656,8 +656,20 @@ function fieldLiveValue(n,f,ctxv){
 function variableValue(n){
   return fieldLiveValue(n,(n.data||[]).find(x=>!x.hidden&&x.key));
 }
+// 按当前 ctx.font 把文本截断到 maxW 内（超出加 …）：固定列宽/窄列下防止文字压过相邻格。
+// 自动列宽的列按内容撑开，天然放得下 → 原样返回，不进二分
+function tblEllipsize(t,maxW){
+  if(!t)return '';
+  if(maxW<=0)return '…';
+  if(ctx.measureText(t).width<=maxW)return t;
+  const ew=ctx.measureText('…').width;
+  let lo=0,hi=t.length;
+  while(lo<hi){const mid=(lo+hi+1)>>1;if(ctx.measureText(t.slice(0,mid)).width+ew<=maxW)lo=mid;else hi=mid-1;}
+  return lo>0?t.slice(0,lo)+'…':'…';
+}
 // 表格节点渲染：rows×cols 网格，列宽按内容自适应（含最小列宽），字号/内边距随 1/zoom 屏幕恒定。
 // 单元格内容：绑定格（data 里带 tr/tc 的字段）显示实时值/默认值；否则显示 cells{"r,c"} 静态文字。
+// 2.1：支持 逐列宽(colWs)/逐列与格级对齐/格级样式(color,bg,bold)/合并格(spanR,spanC)/长文本省略号
 function drawTableNode(n){
   const isSel=selNode===n.id;
   const sc=n.scale||1, fs=(n.fontSize||14)*sc/zoom;
@@ -666,20 +678,28 @@ function drawTableNode(n){
   const padX=(n.padX!=null?n.padX:10)*sc/zoom, padY=(n.padY!=null?n.padY:6)*sc/zoom;
   const minW=(n.colMinW!=null?n.colMinW:64)*sc/zoom;
   const fixedW=(n.colW>0)?n.colW*sc/zoom:0;
+  // 逐列宽（2.1）：colWs[c]>0 固定该列，0=自动；未配置数组时退回旧标量（全列等宽）
+  const colWsArr=Array.isArray(n.colWs)?n.colWs:null;
+  const colFixed=c=>{const w=colWsArr?(+colWsArr[c]||0):0;return w>0?w*sc/zoom:fixedW;};
   const fontN=fs+"px -apple-system,'Microsoft YaHei',sans-serif";
   const fontB='bold '+fontN;
   ctx.save();
   const rot=(n.rotation||0)*Math.PI/180;
   if(rot){ctx.translate(n.x,n.y);ctx.rotate(rot);ctx.translate(-n.x,-n.y);}
-  // 一次构建信号上下文，逐格取显示文本；列宽=固定列宽，或该列最宽内容自适应（表头以粗体量宽）
+  // 一次构建信号上下文，逐格取显示文本；列宽=固定列宽，或该列最宽内容自适应（表头/加粗以粗体量宽）
   const ctxv=buildCtx(signalValues);
+  const cover=tblCoverMap(n);   // 合并格覆盖表（被覆盖格不渲染，锚点内容跨区显示）
   const txts=[],colW=[];
-  for(let c=0;c<cols;c++)colW[c]=fixedW||minW;
+  for(let c=0;c<cols;c++)colW[c]=colFixed(c)||minW;
   const iconSize=fs*1.5;   // 单元格图标边长（随字号/整表缩放）
+  // 对齐：格级 align（含显式 center）> 列级 colAlign > 居中
+  const alignOf=(ca,c)=>(ca==='left'||ca==='right'||ca==='center')?ca:((n.colAlign&&(n.colAlign[c]==='left'||n.colAlign[c]==='right'))?n.colAlign[c]:'center');
   for(let r=0;r<rows;r++){txts[r]=[];
     for(let c=0;c<cols;c++){
+      const cvr=cover[r]&&cover[r][c];
+      if(cvr&&(cvr.ar!==r||cvr.ac!==c)){txts[r][c]=null;continue;}   // 被合并区覆盖的格
       const f=tableCellField(n,r,c);
-      let t='',bound=false,has=false,icon=null;
+      let t='',bound=false,has=false,icon=null,st=null,spanR=1,spanC=1;
       if(f){
         bound=bindHasSource(f.bind);
         const show=f.cellShow||'value';
@@ -690,15 +710,29 @@ function drawTableNode(n){
           if(it)icon=it;
         }
         if(show!=='icon'&&bound){const v=fieldLiveValue(n,f,ctxv);has=(v!==''&&v!=null);t=has?String(v):'--';}
+        st={color:f.cellColor,bg:f.cellBg,bold:f.cellBold,align:f.cellAlign};
+        spanR=f.spanR>1?(f.spanR|0):1;spanC=f.spanC>1?(f.spanC|0):1;
+      }else{
+        const cv=n.cells&&n.cells[r+','+c];
+        t=tblStaticText(cv).replace(/\n/g,' ');   // 静态格中英双语，随当前语言
+        if(cv&&typeof cv==='object'){
+          st={color:cv.color,bg:cv.bg,bold:cv.bold,align:cv.align};
+          spanR=cv.spanR>1?(cv.spanR|0):1;spanC=cv.spanC>1?(cv.spanC|0):1;
+        }
       }
-      else t=tblStaticText(n.cells&&n.cells[r+','+c]).replace(/\n/g,' ');   // 静态格中英双语，随当前语言
+      spanR=Math.min(spanR,rows-r);spanC=Math.min(spanC,cols-c);
       const hdr=(n.headerRow&&r===0)||(n.headerCol&&c===0);
-      ctx.font=hdr?fontB:fontN;
-      if(!fixedW){
-        const w0=(t?ctx.measureText(t).width:0)+(icon?(iconSize+(t?fs*0.35:0)):0);
-        if(w0)colW[c]=Math.max(colW[c],w0+padX*2);
+      const bold=hdr||!!(st&&st.bold);
+      ctx.font=bold?fontB:fontN;
+      // 自动列宽：合并格需求宽先扣掉跨到的固定列，剩余均摊给自动列（混跨时按 spanC 均分会少分给自动列、内容被误截）
+      const w0=(t?ctx.measureText(t).width:0)+(icon?(iconSize+(t?fs*0.35:0)):0);
+      if(w0){
+        let fixedSum=0,autoN=0;
+        for(let cc=c;cc<c+spanC;cc++){const fw=colFixed(cc);if(fw)fixedSum+=fw;else autoN++;}
+        if(autoN){const per=Math.max(0,(w0+padX*2)-fixedSum)/autoN;
+          for(let cc=c;cc<c+spanC;cc++)if(!colFixed(cc))colW[cc]=Math.max(colW[cc],per);}
       }
-      txts[r][c]={t,bound,has,hdr,icon};
+      txts[r][c]={t,bound,has,hdr,icon,st,spanR,spanC,bold,align:alignOf(st&&st.align,c)};
     }
   }
   const rowH=(n.rowH>0)?n.rowH*sc/zoom:(fs*1.45+padY*2);
@@ -721,29 +755,53 @@ function drawTableNode(n){
     if(n.headerRow)ctx.fillRect(bx,by,w,rowH);
     if(n.headerCol)ctx.fillRect(bx,by+(n.headerRow?rowH:0),colW[0],h-(n.headerRow?rowH:0));
   }
+  // 格级底色（先铺底，再画网格线/文字；合并区整块铺）
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const cell=txts[r][c];if(!cell||!cell.st||!cell.st.bg)continue;
+    ctx.fillStyle=cell.st.bg;
+    ctx.fillRect(colX[c],rowY[r],colX[c+cell.spanC]-colX[c],rowY[r+cell.spanR]-rowY[r]);
+  }
   ctx.strokeStyle=n.gridColor||'#2a5a9a';ctx.lineWidth=(n.gridWidth!=null?n.gridWidth:1)/zoom;
   ctx.beginPath();
-  for(let r=0;r<=rows;r++){ctx.moveTo(bx,rowY[r]);ctx.lineTo(bx+w,rowY[r]);}
-  for(let c=0;c<=cols;c++){ctx.moveTo(colX[c],by);ctx.lineTo(colX[c],by+h);}
+  // 网格线按段绘制：合并区内部的横竖线跳过（同一锚点两侧不画分隔）
+  for(let r=0;r<=rows;r++)for(let c=0;c<cols;c++){
+    if(r>0&&r<rows){
+      const a=cover[r-1]&&cover[r-1][c], b2=cover[r]&&cover[r][c];
+      if(a&&b2&&a.ar===b2.ar&&a.ac===b2.ac)continue;
+    }
+    ctx.moveTo(colX[c],rowY[r]);ctx.lineTo(colX[c+1],rowY[r]);
+  }
+  for(let c=0;c<=cols;c++)for(let r=0;r<rows;r++){
+    if(c>0&&c<cols){
+      const a=cover[r]&&cover[r][c-1], b2=cover[r]&&cover[r][c];
+      if(a&&b2&&a.ar===b2.ar&&a.ac===b2.ac)continue;
+    }
+    ctx.moveTo(colX[c],rowY[r]);ctx.lineTo(colX[c],rowY[r+1]);
+  }
   ctx.stroke();
   for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
-    const cell=txts[r][c];if(!cell.t&&!cell.icon)continue;
-    const cx0=(colX[c]+colX[c+1])/2, cy0=(rowY[r]+rowY[r+1])/2;
-    ctx.font=cell.hdr?fontB:fontN;
-    ctx.fillStyle=cell.hdr?(n.headerColor||'#cfe4ff')
-      :(cell.bound?(cell.has?(n.valColor||'#4dd0ff'):'#6b8299'):(n.fontColor||'#e8f4ff'));
+    const cell=txts[r][c];if(!cell||(!cell.t&&!cell.icon))continue;
+    // 合并区：内容在整个区域内排布
+    const x0=colX[c], x1=colX[c+cell.spanC], cy0=(rowY[r]+rowY[r+cell.spanR])/2;
+    ctx.font=cell.bold?fontB:fontN;
+    // 颜色优先级：格级 color >（表头色 / 绑定值色）；绑定无值 '--' 恒灰（状态语义，样式不覆盖）
+    ctx.fillStyle=(cell.bound&&!cell.has)?'#6b8299'
+      :((cell.st&&cell.st.color)||(cell.hdr?(n.headerColor||'#cfe4ff'):(cell.bound?(n.valColor||'#4dd0ff'):(n.fontColor||'#e8f4ff'))));
+    const gap=(cell.icon&&cell.t)?fs*0.35:0;
+    const availW=(x1-x0)-padX*2-(cell.icon?iconSize+gap:0);
+    const t=tblEllipsize(cell.t,availW);   // 超出可用宽度截断加省略号（自动列宽下天然放得下=原样）
     if(cell.icon){
-      // 图标（+文字）整体在格内居中：图标左、值右
       const img=CUSTOM_ICONS[cell.icon]||IMGS[cell.icon];
-      const gap=cell.t?fs*0.35:0;
-      const tw=cell.t?ctx.measureText(cell.t).width:0;
+      const tw=t?ctx.measureText(t).width:0;
       const total=iconSize+gap+tw;
-      let x=cx0-total/2;
+      // 图标+文字作为整体按对齐方式放置：左/右贴边（留内边距），居中=组合居中
+      let x=cell.align==='left'?x0+padX:(cell.align==='right'?x1-padX-total:(x0+x1)/2-total/2);
       if(img)ctx.drawImage(img,x,cy0-iconSize/2,iconSize,iconSize);
-      if(cell.t){ctx.textAlign='left';fillTextVCenter(cell.t,x+iconSize+gap,cy0,fs);}
-    }else{
-      ctx.textAlign='center';
-      fillTextVCenter(cell.t,cx0,cy0,fs);
+      if(t){ctx.textAlign='left';fillTextVCenter(t,x+iconSize+gap,cy0,fs);}
+    }else if(t){
+      ctx.textAlign=cell.align;
+      const tx=cell.align==='left'?x0+padX:(cell.align==='right'?x1-padX:(x0+x1)/2);
+      fillTextVCenter(t,tx,cy0,fs);
     }
   }
   ctx.restore();

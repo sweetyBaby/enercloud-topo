@@ -111,7 +111,17 @@ const I18N={
   '反向 ←':'Reverse ←',
   '双向 ↔':'Both ↔',
   '无流向':'No Flow',
-  '普通模式':'Normal'
+  '普通模式':'Normal',
+  // ── 表格面板 ──
+  '📋 表格':'📋 Table','行 × 列':'Rows × Cols','首行表头':'Header row','首列表头':'Header column',
+  '表头底色':'Header BG','表头文字色':'Header Text','网格线颜色':'Grid Color','网格线宽':'Grid Width',
+  '绑定值颜色':'Value Color','最小列宽':'Min Col Width','固定列宽':'Fixed Col Width','行高':'Row Height',
+  '0=按内容自适应（受最小列宽约束）；>0 所有列等宽；逐列宽度在单元格弹框中右键列号设置':'0 = auto by content (min width applies); >0 = equal widths; set per-column width via right-click on column headers in the cell editor',
+  '0=按字号+内边距自动':'0 = auto (font size + padding)',
+  '单元格内边距（横 / 纵）':'Cell Padding (H / V)','单元格内容':'Cell Contents',
+  '📝 编辑单元格内容…':'📝 Edit cells…','⚡ 从设备生成表格':'⚡ Generate from devices','清空':'Clear',
+  '单元格编辑在独立弹框中进行；画布上双击单元格也可直接编辑文字/默认值。':'Cells are edited in a dialog; double-click a cell on canvas to edit its text/default value.',
+  '行':'rows','列':'cols'
 };
 function tr(zh){ return lang==='en' ? (I18N[zh]||zh) : zh; }
 function applyLang(){
@@ -622,7 +632,7 @@ canvas.addEventListener('dblclick',e=>{
       if(hit){
         const f=tableCellField(n,hit.r,hit.c), pos='R'+(hit.r+1)+'C'+(hit.c+1);
         if(f&&bindHasSource(f.bind)){
-          openInlineInput(e.clientX,e.clientY,'默认值 · '+pos+'（实时数据会覆盖）',(f.dv==null?'':String(f.dv)),v=>{
+          openInlineInput(e.clientX,e.clientY,(lang==='en'?('Default · '+pos+' (live data overrides)'):('默认值 · '+pos+'（实时数据会覆盖）')),(f.dv==null?'':String(f.dv)),v=>{
             snapshot();f.dv=v;snapshot();selectNode(n.id);
           });
         }else{

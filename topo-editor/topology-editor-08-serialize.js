@@ -1,3 +1,7 @@
+// ───── 画布图纸格式版本 ─────
+// TOPO_SCHEMA_VERSION 由 packages/topology-runtime/topology-runtime.js 提供（topo.html 先于
+// 本分段加载，浏览器全局可直接使用；前端经 npm 包导入同一常量）——单一事实源，升版约定见包内注释。
+
 // ───── 元素库 + 字典：后台维护、提供给前端的「单一事实来源」 ─────
 // 前端加载一次即可知道每种 type 的图标 / 默认字段 / 默认尺寸 / 分组 / 连线类型 / 中英字典。
 function buildLibraryObj(){
@@ -100,7 +104,14 @@ function buildJSON(){
           // 表格单元格动态图标：展示方式（icon/both；缺省 value 不导出）+ 默认图标 + 图标规则（顺序匹配）
           ...(f.cellShow&&f.cellShow!=='value'?{cellShow:f.cellShow}:{}),
           ...(f.icon?{icon:f.icon}:{}),
-          ...(Array.isArray(f.iconRules)&&f.iconRules.length?{iconRules:f.iconRules.map(x=>({when:x.when,icon:x.icon}))}:{})
+          ...(Array.isArray(f.iconRules)&&f.iconRules.length?{iconRules:f.iconRules.map(x=>({when:x.when,icon:x.icon}))}:{}),
+          // ── 2.1 表格扩展 ──
+          // 单字段绑定的显示小数位（0~3；缺省不导出=原样。计算绑定的小数位在 calc.decimals）
+          ...(f.decimals!=null?{decimals:Math.max(0,Math.min(3,f.decimals|0))}:{}),
+          // 合并格：锚点格跨 r 行 c 列（缺省 1×1 不导出）
+          ...((f.spanR>1||f.spanC>1)?{cellSpan:{r:Math.max(1,(f.spanR|0)||1),c:Math.max(1,(f.spanC|0)||1)}}:{}),
+          // 格级样式（文字色/底色/加粗/对齐；缺省沿用列对齐 colAlign 与表级配色）
+          ...(function(){const st=tblCellStyleObj(f.cellColor,f.cellBg,f.cellBold,f.cellAlign);return st?{cellStyle:st}:{};})()
         };
         if(f.bind&&bindIsCalc(f.bind)){
           // ★ 计算绑定：导出 calc 定义（操作数逐个显式化，同单字段的 followNode 语义）；
@@ -145,18 +156,33 @@ function buildJSON(){
         const v=n.cells[k];if(v==null)return;
         const zh=(typeof v==='object')?String(v.zh||''):String(v);
         const en=(typeof v==='object')?String(v.en||''):'';
-        if(!zh&&!en)return;
-        const p=k.split(',');cells.push({r:+p[0],c:+p[1],text:{zh,en}});
+        const st=(typeof v==='object')?tblCellStyleObj(v.color,v.bg,v.bold,v.align):null;
+        const spanR=(typeof v==='object'&&v.spanR>1)?(v.spanR|0):1;
+        const spanC=(typeof v==='object'&&v.spanC>1)?(v.spanC|0):1;
+        if(!zh&&!en&&!st&&spanR<=1&&spanC<=1)return;   // 无文字/样式/合并的空格不导出
+        const p=k.split(',');
+        const co={r:+p[0],c:+p[1],text:{zh,en}};
+        if(st)co.style=st;                              // 格级样式（2.1）
+        if(spanR>1||spanC>1)co.span={r:spanR,c:spanC};  // 合并格（2.1；锚点跨行列）
+        cells.push(co);
       });
       cells.sort((a,b)=>(a.r-b.r)||(a.c-b.c));
+      const _cols=Math.max(1,(n.cols|0)||1);
       o.tableStyle={
-        rows:Math.max(1,(n.rows|0)||1), cols:Math.max(1,(n.cols|0)||1),
+        rows:Math.max(1,(n.rows|0)||1), cols:_cols,
         headerRow:!!n.headerRow, headerCol:!!n.headerCol,
         headerBg:n.headerBg||'none', headerColor:n.headerColor||'#cfe4ff',
         gridColor:n.gridColor||'#2a5a9a', gridWidth:(n.gridWidth!=null?n.gridWidth:1),
         colMinW:(n.colMinW!=null?n.colMinW:64), valueColor:n.valColor||'#4dd0ff',
         ...(n.rowH>0?{rowH:n.rowH}:{}),   // 显式行高（缺省=按字号+内边距自动）
-        ...(n.colW>0?{colW:n.colW}:{}),   // 固定列宽（缺省=按内容自适应）；内边距在 textStyle.padX/padY
+        // 列宽（2.1 起可逐列）：colWs 数组任一 >0 → 导出数组（0=该列自动）；否则沿用旧标量（>0 全列等宽）
+        ...(Array.isArray(n.colWs)&&n.colWs.some(w=>+w>0)
+          ?{colW:Array.from({length:_cols},(_,c)=>Math.max(0,Math.round(+n.colWs[c]||0)))}
+          :(n.colW>0?{colW:n.colW}:{})),
+        // 逐列对齐（2.1）：有非居中列才导出；缺省全表居中
+        ...(Array.isArray(n.colAlign)&&n.colAlign.some(a=>a==='left'||a==='right')
+          ?{colAlign:Array.from({length:_cols},(_,c)=>{const a=n.colAlign[c];return (a==='left'||a==='right')?a:'center';})}
+          :{}),
         cells
       };
     }
@@ -172,7 +198,7 @@ function buildJSON(){
   const edgeStyles={};
   usedET.forEach(k=>{const c=ET[k]||ET.ac_power;edgeStyles[k]={labelZh:c.label,labelEn:c.labelEn,color:c.color,width:c.w,dash:c.dash,anim:c.anim,speed:c.spd};});
   const obj={
-    schemaVersion:'2.0',
+    schemaVersion:TOPO_SCHEMA_VERSION,
     meta:{
       app:'储能拓扑编辑器', generatedAt:new Date().toISOString(), lang,
       // ★ 引用元素库版本（按 name+version 加载完整库）；本文件已自带 edgeStyles，可独立还原线型
@@ -558,6 +584,12 @@ function parseImportedNode(o){
     if(f.cellShow==='icon'||f.cellShow==='both')fld.cellShow=f.cellShow;   // 表格单元格动态图标
     if(f.icon)fld.icon=String(f.icon);
     if(Array.isArray(f.iconRules)&&f.iconRules.length)fld.iconRules=f.iconRules.filter(x=>x&&x.icon).map(x=>({when:x.when,icon:x.icon}));
+    // ── 2.1 表格扩展：显示小数位 / 合并格 / 格级样式 ──
+    if(f.decimals!=null)fld.decimals=Math.max(0,Math.min(3,(+f.decimals)|0));
+    if(f.cellSpan){if(+f.cellSpan.r>1)fld.spanR=(+f.cellSpan.r)|0;if(+f.cellSpan.c>1)fld.spanC=(+f.cellSpan.c)|0;}
+    if(f.cellStyle&&typeof f.cellStyle==='object'){const s=f.cellStyle;
+      if(s.color)fld.cellColor=String(s.color);if(s.bg)fld.cellBg=String(s.bg);if(s.bold)fld.cellBold=true;
+      if(s.align==='left'||s.align==='right'||s.align==='center')fld.cellAlign=s.align;}
     if(f.bind&&f.bind.calc&&Array.isArray(f.bind.calc.operands)){
       // ★ 计算绑定还原：followNode 操作数退回「跟随节点」（只存 field），显式来源固化 deviceType/deviceId
       const c=parseImportedCalc(f.bind.calc);
@@ -586,7 +618,16 @@ function parseImportedNode(o){
       const t=c.text;let zh,en;
       if(t&&typeof t==='object'){zh=String(t.zh||'');en=String(t.en||'');}   // 新格式：中英双语
       else{zh=(t==null?'':String(t));en='';}                                  // 旧格式：纯字符串视为中文
-      if(zh||en)n.cells[((+c.r)|0)+','+((+c.c)|0)]={zh,en};
+      const s=(c.style&&typeof c.style==='object')?c.style:null;              // 格级样式（2.1）
+      const spanR=(c.span&&+c.span.r>1)?((+c.span.r)|0):1;                    // 合并格（2.1）
+      const spanC=(c.span&&+c.span.c>1)?((+c.span.c)|0):1;
+      if(!zh&&!en&&!s&&spanR<=1&&spanC<=1)return;
+      const cell={zh,en};
+      if(s){if(s.color)cell.color=String(s.color);if(s.bg)cell.bg=String(s.bg);if(s.bold)cell.bold=true;
+        if(s.align==='left'||s.align==='right'||s.align==='center')cell.align=s.align;}
+      if(spanR>1)cell.spanR=spanR;
+      if(spanC>1)cell.spanC=spanC;
+      n.cells[((+c.r)|0)+','+((+c.c)|0)]=cell;
     });
     // 行列数：缺省时按 内容/绑定格 的最大行列推导兜底
     let maxR=0,maxC=0;
@@ -599,7 +640,11 @@ function parseImportedNode(o){
     n.gridColor=ts.gridColor||'#2a5a9a';n.gridWidth=(ts.gridWidth!=null?+ts.gridWidth:1);
     n.colMinW=(ts.colMinW!=null?+ts.colMinW:64);n.valColor=ts.valueColor||'#4dd0ff';
     if(+ts.rowH>0)n.rowH=+ts.rowH;
-    if(+ts.colW>0)n.colW=+ts.colW;
+    // 列宽：2.1 起可为数组（逐列，0=该列自动）；旧标量=全列等宽
+    if(Array.isArray(ts.colW)){const a=ts.colW.map(w=>Math.max(0,Math.round(+w||0)));if(a.some(w=>w>0))n.colWs=a;}
+    else if(+ts.colW>0)n.colW=+ts.colW;
+    // 逐列对齐（2.1）：left/right 之外一律归一为 center
+    if(Array.isArray(ts.colAlign))n.colAlign=ts.colAlign.map(a=>(a==='left'||a==='right')?a:'center');
     if(o.fontSize==null)n.fontSize=14;
   }
   // 变量节点：label / value 两段字体属性 + 排列方式
@@ -726,6 +771,14 @@ async function importCanvasJSON(obj){
   if(!obj||typeof obj!=='object'||!Array.isArray(obj.nodes)){
     alert(lang==='en'?'Not a valid canvas JSON (missing "nodes" array).':'不是有效的画布 JSON（缺少 nodes 数组）。');
     return;
+  }
+  // 版本握手：图纸主版本比编辑器新 → 导入可能丢字段、再导出会降级图纸，需用户确认
+  const docMajor=parseInt(obj.schemaVersion,10);
+  if(isFinite(docMajor)&&docMajor>parseInt(TOPO_SCHEMA_VERSION,10)){
+    const ok=await uiConfirm(lang==='en'
+      ?('This file uses schema '+obj.schemaVersion+', newer than this editor ('+TOPO_SCHEMA_VERSION+'). Importing may drop newer fields. Continue?')
+      :('图纸格式版本 '+obj.schemaVersion+' 高于本编辑器支持的 '+TOPO_SCHEMA_VERSION+'，导入可能丢失新版字段，确定继续？'),false);
+    if(!ok)return;
   }
   if(nodes.length>0){
     const ok=await uiConfirm(lang==='en'?'Import will replace current canvas content. Continue?':'导入将替换当前画布内容，确定？',false);

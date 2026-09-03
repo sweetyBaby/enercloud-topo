@@ -41,6 +41,11 @@
  *   isDragging(): boolean         选填，默认 false。编辑器拖拽中只重算相关连线
  *   dragIds(): Set<string>        选填。被拖拽节点 id 集合
  */
+// ── 图纸格式版本（单一事实源）──
+// 编辑器 buildJSON 导出盖章；前端 load-topology 按主版本握手（图纸主版本更新 → 明确报"请升级系统"）。
+// 升版约定：新增字段只升次版本（旧消费方按缺省值忽略即可）；不兼容变更（字段改名/语义变化）升主版本。
+var TOPO_SCHEMA_VERSION = '2.1';   // 2.1：表格 colAlign/逐列宽/合并格/格级样式 + 字段级 decimals（均为增量字段）
+
 function createTopoRuntime(env) {
   if (!env || typeof env.getNodes !== 'function' || typeof env.getEdges !== 'function')
     throw new Error('createTopoRuntime: env.getNodes/getEdges 必填');
@@ -149,9 +154,17 @@ function createTopoRuntime(env) {
   function translateFieldValue(f, v, deviceType){
     if(v==null||v==='')return '';
     const d=resolveValueDict(f, deviceType);
-    if(!d)return String(v);
-    const s=valueDictLabel(d, v);
-    return s!=null?s:String(v);
+    if(d){
+      const s=valueDictLabel(d, v);
+      if(s!=null)return s;
+    }
+    // 单字段绑定的显示小数位（f.decimals 0~3）：字典未命中且值确为数值才格式化——
+    // 布尔/空白串等可被 +v 强转的非数值不碰；计算绑定的小数位在 calcValue 内处理，
+    // 此处必须跳过（否则导入图纸若同时残留 f.decimals 会二次取整）
+    if(f&&f.decimals!=null&&!(f.bind&&f.bind.calc)
+      &&(typeof v==='number'||(typeof v==='string'&&v.trim()!==''))&&isFinite(+v))
+      return (+v).toFixed(Math.max(0,Math.min(3,f.decimals|0)));
+    return String(v);
   }
   // 字段当前值(f.dv)的展示文案（实时值已由宿主回写进 f.dv）
   function fieldDisplayValue(f, deviceType){ return translateFieldValue(f, f&&f.dv, deviceType); }
@@ -1146,5 +1159,5 @@ function createTopoRuntime(env) {
 
 // CJS 尾巴：Node / 打包器（Next.js 等）消费；浏览器 <script> 引入时 module 未定义，走全局
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createTopoRuntime };
+  module.exports = { createTopoRuntime, TOPO_SCHEMA_VERSION };
 }
