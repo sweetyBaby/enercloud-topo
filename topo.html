@@ -344,9 +344,9 @@
           <div class="pr cpt"><label data-i18n="行 × 列">行 × 列</label>
             <div class="pr-inline">
               <input type="number" id="p-tbl-rows-num" class="pnum" min="1" max="100" step="1" value="4" oninput="applyTableSize()" title="行数">
-              <span class="punit">行</span>
+              <span class="punit" data-i18n="行">行</span>
               <input type="number" id="p-tbl-cols-num" class="pnum" min="1" max="30" step="1" value="3" oninput="applyTableSize()" title="列数">
-              <span class="punit">列</span></div></div>
+              <span class="punit" data-i18n="列">列</span></div></div>
           <div class="pr"><div style="display:flex;gap:14px;flex-wrap:wrap">
             <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-tbl-hrow" onchange="applyTableStyle()" style="width:auto"> <span data-i18n="首行表头">首行表头</span></label>
             <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ui-text);cursor:pointer"><input type="checkbox" id="p-tbl-hcol" onchange="applyTableStyle()" style="width:auto"> <span data-i18n="首列表头">首列表头</span></label>
@@ -372,7 +372,7 @@
           <div class="pr cpt"><label data-i18n="固定列宽">固定列宽</label>
             <div class="pr-inline"><input type="range" id="p-tbl-colw" min="0" max="400" step="1" value="0" oninput="pairFromSlider('p-tbl-colw');applyTableStyle()">
               <input type="number" id="p-tbl-colw-num" class="pnum" min="0" max="800" step="1" value="0" oninput="pairFromNum('p-tbl-colw');applyTableStyle()"><span class="punit">px</span></div>
-            <div class="phint" style="margin-top:2px" data-i18n="0=按内容自适应（受最小列宽约束）；>0 所有列等宽">0=按内容自适应（受最小列宽约束）；&gt;0 所有列等宽</div></div>
+            <div class="phint" style="margin-top:2px" data-i18n="0=按内容自适应（受最小列宽约束）；>0 所有列等宽；逐列宽度在单元格弹框中右键列号设置">0=按内容自适应（受最小列宽约束）；&gt;0 所有列等宽；逐列宽度在单元格弹框中右键列号设置</div></div>
           <div class="pr cpt"><label data-i18n="行高">行高</label>
             <div class="pr-inline"><input type="range" id="p-tbl-rowh" min="0" max="160" step="1" value="0" oninput="pairFromSlider('p-tbl-rowh');applyTableStyle()">
               <input type="number" id="p-tbl-rowh-num" class="pnum" min="0" max="400" step="1" value="0" oninput="pairFromNum('p-tbl-rowh');applyTableStyle()"><span class="punit">px</span></div>
